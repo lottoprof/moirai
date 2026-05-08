@@ -1,0 +1,96 @@
+---
+/*
+ * <Nav /> — фиксированная навигация на всех публичных страницах.
+ * Минимум: лого + один CTA (Apply Now). Fade-in на ~20px scroll
+ * через `.is-scrolled` класс, добавляемый vanilla `<script>`.
+ *
+ * Стили scoped (`<style>` без is:global) — Astro прибавит скоуп
+ * к `.nav` элементу; runtime-toggling `.is-scrolled` совместим
+ * с скоупом (data-attribute остаётся на элементе).
+ *
+ * Источник CSS: docs/moirai-home.html.
+ */
+
+interface Props {
+  locale: "en" | "ru";
+}
+
+const { locale } = Astro.props;
+
+const labels = locale === "ru"
+  ? { aria: "Главная", cta: "Подать заявку →" }
+  : { aria: "Primary", cta: "Apply now →" };
+---
+
+<nav class="nav" aria-label={labels.aria}>
+  <a href={`/${locale}/`} class="nav__logo">Moirai.</a>
+  <a href={`/${locale}/apply`} class="nav__cta">{labels.cta}</a>
+</nav>
+
+<style>
+  .nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: var(--space-lg) var(--container-pad);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition:
+      background var(--duration-normal) var(--ease-out),
+      backdrop-filter var(--duration-normal) var(--ease-out),
+      border-color var(--duration-normal) var(--ease-out);
+    border-bottom: 1px solid transparent;
+  }
+
+  .nav.is-scrolled {
+    background: color-mix(in srgb, var(--ink) 85%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-bottom-color: var(--border);
+  }
+
+  .nav__logo {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 300;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--paper);
+    opacity: 0.95;
+  }
+
+  .nav__cta {
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--amber);
+    border-bottom: 1px solid var(--amber);
+    padding-bottom: 2px;
+    transition:
+      color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+  .nav__cta:hover {
+    color: var(--amber-light);
+    border-bottom-color: var(--amber-light);
+  }
+</style>
+
+<script>
+  /*
+   * Toggle .is-scrolled на nav элементе после ~20px scroll.
+   * Vanilla, без зависимостей. Passive listener — perf-friendly.
+   */
+  const nav = document.querySelector(".nav");
+  if (nav instanceof HTMLElement) {
+    const update = (): void => {
+      nav.classList.toggle("is-scrolled", window.scrollY > 20);
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+  }
+</script>

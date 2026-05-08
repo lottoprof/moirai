@@ -1,0 +1,108 @@
+---
+/*
+ * <Footer /> — подвал на всех публичных страницах.
+ * Лого + footer-навигация + копирайт + privacy/terms.
+ * Locale-aware ссылки. Scoped стили (по той же логике что Nav).
+ *
+ * Источник CSS и markup: docs/moirai-home.html §footer.
+ */
+
+interface Props {
+  locale: "en" | "ru";
+}
+
+const { locale } = Astro.props;
+const base = `/${locale}`;
+
+const links = locale === "ru"
+  ? [
+      { href: `${base}/beginner`, label: "Beginner" },
+      { href: `${base}/intermediate`, label: "Intermediate" },
+      { href: `${base}/works`, label: "Работы" },
+      { href: `${base}/journal`, label: "Журнал" },
+      { href: `${base}/faq`, label: "FAQ" },
+      { href: `${base}/contact`, label: "Контакты" },
+    ]
+  : [
+      { href: `${base}/beginner`, label: "Beginner" },
+      { href: `${base}/intermediate`, label: "Intermediate" },
+      { href: `${base}/works`, label: "Works" },
+      { href: `${base}/journal`, label: "Journal" },
+      { href: `${base}/faq`, label: "FAQ" },
+      { href: `${base}/contact`, label: "Contact" },
+    ];
+
+const labels = locale === "ru"
+  ? { aria: "Подвал", privacy: "Конфиденциальность", terms: "Условия" }
+  : { aria: "Footer", privacy: "Privacy", terms: "Terms" };
+---
+
+<footer class="footer">
+  <div class="center">
+    <div class="footer__top">
+      <a href={`${base}/`} class="footer__logo">Moirai.</a>
+      <nav class="footer__nav" aria-label={labels.aria}>
+        {links.map((link) => <a href={link.href}>{link.label}</a>)}
+      </nav>
+    </div>
+    <div class="footer__copy">
+      © 2026 Moirai ·{" "}
+      <a href={`${base}/legal/privacy`}>{labels.privacy}</a> ·{" "}
+      <a href={`${base}/legal/terms`}>{labels.terms}</a>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    border-top: 1px solid var(--border);
+    padding-block: var(--space-3xl);
+    background: var(--bg);
+  }
+
+  .footer__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: var(--space-2xl);
+    margin-bottom: var(--space-2xl);
+  }
+
+  .footer__logo {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 300;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .footer__nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-lg);
+  }
+
+  .footer__nav a {
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .footer__nav a:hover {
+    color: var(--amber);
+  }
+
+  .footer__copy {
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    letter-spacing: var(--tracking-wide);
+  }
+  .footer__copy a {
+    color: inherit;
+  }
+  .footer__copy a:hover {
+    color: var(--amber);
+  }
+</style>

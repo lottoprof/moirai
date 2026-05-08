@@ -12,6 +12,8 @@ import "../../styles/tokens.css";
 import "../../styles/base.css";
 import "../../styles/utilities.css";
 import SeoHead from "../../components/public/SeoHead.astro";
+import Nav from "../../components/public/Nav.astro";
+import Footer from "../../components/public/Footer.astro";
 
 interface Seo {
   title: string;
@@ -43,13 +45,13 @@ const pathname = Astro.url.pathname;
   <body>
     <a href="#main" class="skip-link">Skip to main content</a>
 
+    <Nav locale={locale} />
+
     <main id="main">
       <slot />
     </main>
 
-    <footer>
-      <p>© 2026 Moirai — Vladimir Popov &amp; Anastasia Zasypkina.</p>
-    </footer>
+    <Footer locale={locale} />
   </body>
 </html>
 

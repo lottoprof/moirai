@@ -24,20 +24,20 @@ export default [
     },
   },
   ...astro.configs.recommended,
+  //
+  // .astro файлы: отключаем type-aware правила typescript-eslint.
+  // Причины:
+  //   1. JSX-выражения внутри template eslint-plugin-astro парсит
+  //      как отдельные виртуальные TS-файлы вне tsconfig.eslint.json
+  //      project — type-aware правила падают.
+  //   2. <script> блоки в .astro тоже виртуальные файлы.
+  // В .ts файлах строгие правила сохраняются.
+  //
+  // Виртуальные TS из <script> имеют путь Component.astro/1_1.ts —
+  // обычный glob ".astro" их не ловит, расширяем ".astro/*.ts".
+  //
   {
-    /*
-     * Внутри .astro templates type-flow от typescript-eslint не
-     * полный (eslint-plugin-astro парсит JSX-выражения отдельно).
-     * Расслабляем `no-unsafe-*` правила специально для шаблонов.
-     * В .ts файлах строгие правила сохраняются.
-     */
-    files: ["**/*.astro"],
-    rules: {
-      "@typescript-eslint/no-unsafe-return": "off",
-      "@typescript-eslint/no-unsafe-assignment": "off",
-      "@typescript-eslint/no-unsafe-call": "off",
-      "@typescript-eslint/no-unsafe-member-access": "off",
-      "@typescript-eslint/no-unsafe-argument": "off",
-    },
+    files: ["**/*.astro", "**/*.astro/*.ts"],
+    ...tseslint.configs.disableTypeChecked,
   },
 ];
