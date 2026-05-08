@@ -8,6 +8,10 @@ dist/
 
 # Wrangler / Cloudflare
 .wrangler/
+# worker-configuration.d.ts — авто-генерится `wrangler types` после
+# pnpm install (см. package.json scripts.prepare). Не коммитим:
+# меняется при каждой правке wrangler.toml + 500KB шум.
+worker-configuration.d.ts
 
 # Secrets — wrangler secret put / .dev.vars only
 .env

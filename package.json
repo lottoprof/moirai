@@ -11,7 +11,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "lint": "eslint .",
-    "typecheck": "astro check"
+    "typecheck": "astro check",
+    "prepare": "wrangler types || true"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.7",
