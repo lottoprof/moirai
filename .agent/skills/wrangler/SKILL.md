@@ -26,7 +26,7 @@ pages_build_output_dir = "./dist"
 # binding = "DB"
 # database_name = "moirai-prod"
 # database_id = "<uuid>"
-# migrations_dir = "schema/migrations"
+# migrations_dir = "migrations"
 
 # [[kv_namespaces]]
 # binding = "KV_SESSIONS"

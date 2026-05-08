@@ -29,11 +29,12 @@
 - Cookie / JWT с проверкой подписи и срока действия.
 - Ошибки валидации — короткие, без утечки внутренней структуры.
 
-## Защищённая зона (ЛК)
+## Защищённая зона (ЛК + admin)
 
-- Доступ к `src/pages/app/**` и `src/pages/api/**` (где требуется
-  авторизация) — через `src/middleware.ts` и/или явный guard в
-  начале handler'а.
+- Доступ к `src/pages/[locale]/dashboard/**`, `src/pages/admin/**`
+  и `src/pages/api/**` (где требуется авторизация) — через
+  `src/middleware.ts` и/или явный guard в начале handler'а.
+- `/admin/**` дополнительно проверяет `users.role = 'admin'`.
 - Сессии — в KV; токены сессий — opaque, неугадываемые
   (`crypto.getRandomValues`).
 - CSRF / SameSite куки — настроены явно.

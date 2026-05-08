@@ -1,15 +1,16 @@
 ---
 name: vidstack
-description: Use this skill when integrating Vidstack media player into the protected zone (ЛК) as an Astro island. Covers component placement, hydration directive choice, theme/icons import, source/poster handling, and SSR boundaries. Read before adding video/audio components to src/components/app.
+description: Use this skill when integrating Vidstack media player into the dashboard zone (ЛК) as an Astro island. Covers component placement, hydration directive choice, theme/icons import, source/poster handling, and SSR boundaries. Read before adding video/audio components to src/components/dashboard.
 ---
 
 # Vidstack — Media Player Skill
 
 ## Зона действия
 
-Vidstack используется **только в защищённой зоне** (`src/pages/app/**`,
-`src/components/app/**`). В публичном слое плеер запрещён по
-правилу `boundaries.md`.
+Vidstack используется **только в личном кабинете**
+(`src/pages/[locale]/dashboard/**`, `src/components/dashboard/**`).
+В публичном слое плеер запрещён по правилу `boundaries.md`. В
+публичной галерее `/works` используется native `<video>`.
 
 ## Установка
 
@@ -32,7 +33,7 @@ Vidstack — Web Components + framework-обёртки. Под Astro работ�
 
 ```astro
 ---
-// src/components/app/Player.astro
+// src/components/dashboard/Player.astro
 ---
 <media-player
   title="Video"
@@ -62,17 +63,17 @@ Astro автоматически:
 
 ```astro
 ---
-// src/pages/app/library/[id].astro
-import AppLayout from "@/layouts/app/AppLayout.astro";
-import Player from "@/components/app/Player.astro";
+// src/pages/[locale]/dashboard/modules/[id].astro
+import DashboardLayout from "@/layouts/dashboard/DashboardLayout.astro";
+import Player from "@/components/dashboard/Player.astro";
 
 // серверная часть: проверка доступа, получение src/poster
 const env = Astro.locals.runtime.env;
 // const item = await fetchItem(env, Astro.params.id);
 ---
-<AppLayout>
+<DashboardLayout>
   <Player />
-</AppLayout>
+</DashboardLayout>
 ```
 
 Если плеер вынесен в островной компонент на фреймворке (React/Svelte

@@ -44,7 +44,7 @@ agents_dir:  .agent/agents/
 
 ```json
 {
-  "target_agent": "astro-public|astro-app|pages-ssr|schema|docs|reviewer|e2e",
+  "target_agent": "astro-public|astro-dashboard|astro-admin|content|pages-ssr|schema|docs|reviewer|e2e",
   "issue": "кратко что нужно сделать",
   "file": "целевой файл/директория",
   "details": "точные требования, ограничения, критерии готовности"
@@ -53,20 +53,29 @@ agents_dir:  .agent/agents/
 
 ### PROJECT AGENT MAP
 
-- `astro-public` — публичный SEO-слой: `src/pages/` (без `app/`),
-  `src/components/public/`, `src/layouts/public/`, vanilla JS,
-  CSS-only анимации, статика
-- `astro-app` — защищённая зона (ЛК): `src/pages/app/`,
-  `src/components/app/`, островная гидрация (`client:idle` /
-  `client:visible`), Vidstack
-- `pages-ssr` — серверные эндпоинты и SSR: `src/pages/api/`,
-  `src/lib/server/`, `src/middleware.ts`, `wrangler.toml`,
-  `astro.config.mjs`, биндинги (D1/KV/R2) через
+- `astro-public` — публичный SEO-слой: `src/pages/[locale]/*.astro`
+  (без `dashboard/`, без `admin/`), `src/components/public/`,
+  `src/layouts/public/`, vanilla JS, CSS-only анимации, статика
+- `astro-dashboard` — личный кабинет (student/instructor):
+  `src/pages/[locale]/dashboard/**`, `src/components/dashboard/**`,
+  островная гидрация (`client:idle` / `client:visible`), Vidstack
+- `astro-admin` — админ-панель: `src/pages/admin/**` (без локали),
+  `src/components/admin/**`, role=admin guard, CRUD поверх API,
+  `noindex`
+- `content` — Content Collections: `src/content/**` (programmes с
+  тирами, bundles, instructors, segments, pages, journal, works,
+  voice-guide), `drafts/**` (agent journal pipeline)
+- `pages-ssr` — серверные эндпоинты и SSR: `src/pages/api/**`,
+  `src/lib/server/**`, `src/middleware.ts`, `astro.config.mjs`,
+  `wrangler.toml`, `src/content/config.ts` (zod-схемы коллекций),
+  `db/types.ts` (ручные TS-типы D1), биндинги через
   `Astro.locals.runtime.env`
-- `schema` — `schema/migrations/` (D1 миграции — если используется D1)
+- `schema` — D1-миграции в `migrations/**` (top-level), нумерация
+  `NNNN_*.sql`, иммутабельные после коммита, применение через
+  `wrangler d1 migrations`
 - `docs` — `docs/`, `wiki/`, `README.md`
 - `reviewer` — read-only ревью: lint / typecheck / build /
-  edge-compat audit
+  edge-compat / boundaries / security audit
 - `e2e` — Playwright MCP против локального `wrangler pages dev` или
   preview-деплоя
 
@@ -80,9 +89,11 @@ language:    TypeScript
 framework:   Astro 5 (Vite + TS под капотом)
 runtime:     Cloudflare Workers (через @astrojs/cloudflare adapter)
 hosting:     Cloudflare Pages
-public:      Vanilla JS + CSS-only animations
-app (ЛК):    Astro islands, Vidstack media player
-storage:     D1 / KV / R2 (по необходимости, биндинги через wrangler.toml)
+public:      [locale]/ — vanilla JS + CSS-only animations
+dashboard:   [locale]/dashboard/ — Astro islands, Vidstack
+admin:       /admin/ — без локали, role=admin, CRUD
+content:     src/content/ — Content Collections (programmes, bundles, ...)
+storage:     D1 / KV / R2 (биндинги через wrangler.toml; без ORM)
 tooling:     wrangler, pnpm, eslint, typescript, vitest (опц.), playwright (e2e)
 ```
 

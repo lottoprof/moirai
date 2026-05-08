@@ -24,8 +24,10 @@
 
 ## Защищённая зона
 
-- Все `src/pages/app/**` и защищённые `src/pages/api/**` — за
-  guard'ом (middleware или явный check в начале handler'а).
+- Все `src/pages/[locale]/dashboard/**`, `src/pages/admin/**` и
+  защищённые `src/pages/api/**` — за guard'ом (middleware или явный
+  check в начале handler'а). `/admin/**` — дополнительно
+  `users.role = 'admin'`.
 - Сессии — opaque-токены в KV, не угадываемые.
 - CSRF / SameSite — настроить явно.
 
