@@ -1,0 +1,214 @@
+---
+/*
+ * Главная страница (`/{locale}/`).
+ *
+ * Контент берётся из Content Collection `pages`, entry id = `home.<locale>`.
+ * Секции — free-form в zod schema (`pages` коллекция); этот шаблон
+ * локально декларирует HomeSections тип для type-safe рендера.
+ *
+ * Рендер сейчас stub-like: семантика + текст из frontmatter без
+ * стилизации компонентов. Стилизация (Hero/Section/Card BEM-классы,
+ * @keyframes rise, ticker animation, pricing cards) — Stage 4.
+ *
+ * `prerender = true` — статика по умолчанию для SEO-страниц
+ * (см. ADR `dd7d91c` Sprint 0 bootstrap).
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../layouts/public/Layout.astro";
+
+export const prerender = true;
+
+export function getStaticPaths() {
+  return [
+    { params: { locale: "en" } },
+    { params: { locale: "ru" } },
+  ];
+}
+
+type Locale = "en" | "ru";
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  throw new Error(`Unexpected locale: ${String(locale)}`);
+}
+const typedLocale: Locale = locale;
+
+const home = await getEntry("pages", `home.${typedLocale}`);
+if (!home) {
+  throw new Error(`home.${typedLocale} not found in pages collection`);
+}
+
+// Local section types — narrow loose `Record<string, unknown>` schema
+// под shape, который пишут home.{en,ru}.mdx. Schema в config.ts
+// намеренно free-form: разные страницы в pages коллекции (home, faq,
+// about, legal-*) имеют разные shape sections.
+interface CtaItem {
+  title: string;
+  body: string;
+}
+interface Track {
+  name: string;
+  tagline: string;
+  body: string;
+  topics: string[];
+}
+interface CurriculumLevel {
+  id: string;
+  title: string;
+  tracks: Track[];
+  final: { title: string; body: string };
+}
+interface HomeSections {
+  hero: { eyebrow: string; title: string; lede: string; cta_text: string; cta_href: string };
+  ticker: { items: string[] };
+  who: { eyebrow: string; title: string; audiences: CtaItem[] };
+  curriculum: { eyebrow: string; title: string; intro: string; levels: CurriculumLevel[] };
+  included: { eyebrow: string; title: string; items: CtaItem[] };
+  instructors: { eyebrow: string; title: string; ids: string[] };
+  after: { eyebrow: string; title: string; intro: string; items: CtaItem[] };
+  pricing: { eyebrow: string; title: string; note: string };
+  ai_module: { badge: string; title: string; body: string; cta_text: string; cta_href: string };
+  final_cta: { eyebrow: string; title: string; body: string; urgency: string; cta_text: string; cta_href: string };
+}
+
+const sections = home.data.sections as HomeSections | undefined;
+if (!sections) {
+  throw new Error(`home.${typedLocale}: sections missing in frontmatter`);
+}
+
+const seo = home.data.seo;
+const faqs: { q: string; a: string }[] = home.data.faqs ?? [];
+---
+
+<Layout locale={typedLocale} seo={seo}>
+  {/* Hero — LCP element (<h1>); preload шрифтов добавится в Stage 5 */}
+  <section class="section">
+    <p class="eyebrow">{sections.hero.eyebrow}</p>
+    <h1 set:html={sections.hero.title}></h1>
+    <p>{sections.hero.lede}</p>
+    <a href={sections.hero.cta_href}>{sections.hero.cta_text}</a>
+  </section>
+
+  {/* Ticker — декоративный, screen readers пропускают */}
+  <div class="ticker" aria-hidden="true">
+    {sections.ticker.items.map((item, i) => (
+      <Fragment>
+        {i > 0 && <span> · </span>}
+        <span>{item}</span>
+      </Fragment>
+    ))}
+  </div>
+
+  {/* Who is this for */}
+  <section class="section">
+    <p class="eyebrow">{sections.who.eyebrow}</p>
+    <h2 set:html={sections.who.title}></h2>
+    {sections.who.audiences.map((a) => (
+      <article>
+        <h3>{a.title}</h3>
+        <p>{a.body}</p>
+      </article>
+    ))}
+  </section>
+
+  {/* Curriculum */}
+  <section class="section">
+    <p class="eyebrow">{sections.curriculum.eyebrow}</p>
+    <h2>{sections.curriculum.title}</h2>
+    <p>{sections.curriculum.intro}</p>
+    {sections.curriculum.levels.map((lvl) => (
+      <div>
+        <h3>{lvl.title}</h3>
+        {lvl.tracks.map((tr) => (
+          <article>
+            <h4>{tr.name}</h4>
+            <p><em>{tr.tagline}</em></p>
+            <p>{tr.body}</p>
+            <ul>{tr.topics.map((t) => <li>{t}</li>)}</ul>
+          </article>
+        ))}
+        <article>
+          <h4>{lvl.final.title}</h4>
+          <p>{lvl.final.body}</p>
+        </article>
+      </div>
+    ))}
+  </section>
+
+  {/* What's included */}
+  <section class="section">
+    <p class="eyebrow">{sections.included.eyebrow}</p>
+    <h2>{sections.included.title}</h2>
+    <ul>
+      {sections.included.items.map((item) => (
+        <li>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  {/* Instructors — карточки рендерятся из коллекции instructors,
+      когда появятся первые vladimir-popov.{en,ru}.mdx и
+      anastasia-zasypkina.{en,ru}.mdx (Stage 9). */}
+  <section class="section">
+    <p class="eyebrow">{sections.instructors.eyebrow}</p>
+    <h2 set:html={sections.instructors.title}></h2>
+    <p><em>Instructor cards: pending instructors collection (Stage 9).</em></p>
+  </section>
+
+  {/* After the program */}
+  <section class="section">
+    <p class="eyebrow">{sections.after.eyebrow}</p>
+    <h2 set:html={sections.after.title}></h2>
+    <p>{sections.after.intro}</p>
+    <ul>
+      {sections.after.items.map((item) => (
+        <li>
+          <h3>{item.title}</h3>
+          <p>{item.body}</p>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  {/* Pricing — карточки рендерятся из programmes + bundles
+      коллекций (Stage 9). */}
+  <section class="section">
+    <p class="eyebrow">{sections.pricing.eyebrow}</p>
+    <h2>{sections.pricing.title}</h2>
+    <p><em>{sections.pricing.note}</em></p>
+  </section>
+
+  {/* AI Module */}
+  <section class="section">
+    <p class="eyebrow">{sections.ai_module.badge}</p>
+    <h2>{sections.ai_module.title}</h2>
+    <p>{sections.ai_module.body}</p>
+    <a href={sections.ai_module.cta_href}>{sections.ai_module.cta_text}</a>
+  </section>
+
+  {/* FAQ — Schema.org FAQPage компонент будет в Stage 6 */}
+  {faqs.length > 0 && (
+    <section class="section">
+      <h2>{typedLocale === "ru" ? "Вопросы и ответы" : "Common questions"}</h2>
+      {faqs.map((qa) => (
+        <details>
+          <summary>{qa.q}</summary>
+          <p>{qa.a}</p>
+        </details>
+      ))}
+    </section>
+  )}
+
+  {/* Final CTA */}
+  <section class="section">
+    <p class="eyebrow">{sections.final_cta.eyebrow}</p>
+    <h2 set:html={sections.final_cta.title}></h2>
+    <p>{sections.final_cta.body}</p>
+    <p><strong>{sections.final_cta.urgency}</strong></p>
+    <a href={sections.final_cta.cta_href}>{sections.final_cta.cta_text}</a>
+  </section>
+</Layout>
