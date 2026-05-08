@@ -1,0 +1,121 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m :*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git rm:*)",
+      "Bash(git mv:*)",
+      "Bash(git restore:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git branch:*)",
+      "Bash(git fetch:*)",
+      "Bash(ls:*)",
+      "Bash(ls *)",
+      "Bash(find . *)",
+      "Bash(find /home/az/git/moirai *)",
+      "Bash(grep:*)",
+      "Bash(rg -n:*)",
+      "Bash(rg :*)",
+      "Bash(wc:*)",
+      "Bash(du:*)",
+      "Bash(tail -n:*)",
+      "Bash(head -n:*)",
+      "Bash(sed -n:*)",
+      "Bash(npm install:*)",
+      "Bash(npm i :*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run preview:*)",
+      "Bash(npm test:*)",
+      "Bash(npm outdated:*)",
+      "Bash(npx astro :*)",
+      "Bash(npx astro check:*)",
+      "Bash(npx astro build:*)",
+      "Bash(npx wrangler types:*)",
+      "Bash(npx wrangler --version)",
+      "Bash(npx wrangler pages dev:*)",
+      "Bash(npx wrangler pages project list:*)",
+      "Bash(npx wrangler pages deployment list:*)",
+      "Bash(npx wrangler d1 execute * --local *)",
+      "Bash(npx wrangler kv:key list:*)",
+      "Bash(npx wrangler kv:namespace list:*)",
+      "Bash(npx wrangler r2 bucket list:*)",
+      "Bash(npx wrangler r2 object list:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(npx playwright show-report:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npx tsc:*)",
+      "Read(//tmp/**)",
+      "WebSearch",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_type",
+      "mcp__playwright__browser_fill_form",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_close",
+      "mcp__claude_ai_Cloudflare_Developer_Platform__search_cloudflare_documentation",
+      "mcp__claude_ai_Mermaid_Chart__validate_and_render_mermaid_diagram"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "tool == \"Read\" && tool_input.file_path matches \"(\\\\.env$|\\\\.env\\\\..*$|\\\\.dev\\\\.vars$)\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[BLOCK] Чтение секретов запрещено. Используй wrangler pages secret put / list' >&2; exit 2"
+          }
+        ]
+      },
+      {
+        "matcher": "tool == \"Write\" && tool_input.file_path matches \"(\\\\.env$|\\\\.env\\\\..*$|\\\\.dev\\\\.vars$)\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[BLOCK] Запись секретов запрещена. Используй wrangler pages secret put' >&2; exit 2"
+          }
+        ]
+      },
+      {
+        "matcher": "tool == \"Edit\" && tool_input.file_path matches \"(\\\\.env$|\\\\.env\\\\..*$|\\\\.dev\\\\.vars$)\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[BLOCK] Правка секретов запрещена. Используй wrangler pages secret put' >&2; exit 2"
+          }
+        ]
+      },
+      {
+        "matcher": "tool == \"Bash\" && tool_input.command matches \"(wrangler pages deploy|wrangler d1 execute.*--remote|wrangler pages secret put|wrangler pages secret delete)\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[BLOCK] Production-операции wrangler требуют явного запроса пользователя.' >&2; exit 2"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "tool == \"Write\" && tool_input.file_path matches \"\\\\.sh$\"",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -n \"$TOOL_INPUT_FILE_PATH\" 2>&1 || echo '[WARN] bash -n нашёл проблемы' >&2"
+          }
+        ]
+      }
+    ]
+  }
+}
