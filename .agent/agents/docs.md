@@ -58,7 +58,7 @@
 
 ```json
 {
-  "target_agent": "astro-public|astro-app|pages-ssr|schema|reviewer|e2e",
+  "target_agent": "astro-public|astro-dashboard|astro-admin|content|pages-ssr|schema|reviewer|e2e",
   "issue": "что нужно сделать",
   "file": "файл/директория",
   "details": "контекст, ограничения и критерии готовности"

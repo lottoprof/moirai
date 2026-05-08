@@ -24,9 +24,13 @@
 1. **Preflight.** Перед прогоном — убедиться, что dev-окружение
    живо (`wrangler pages dev` запущен) или есть preview-URL.
 2. **Сценарии** — короткие, фокусированные:
-   - Публичный landing рендерится, метатеги корректны.
-   - Auth-flow для ЛК (login → редирект → защищённая страница).
-   - Vidstack-плеер инициализируется на странице ЛК.
+   - Публичный landing рендерится с правильным `[locale]/`-префиксом,
+     метатеги (canonical, hreflang, OG) корректны.
+   - Прайс-лист тиров на `/{locale}/[programme-id]` виден без auth.
+   - Auth-flow ЛК: login → редирект → `/{locale}/dashboard/...`.
+   - Vidstack инициализируется в `dashboard/` (lecture / review).
+   - Админ-flow: login → `/admin/...` (без локали), CRUD smoke.
+   - Gated media: `/api/media/[type]/[id]` — 403 без enrollment / role.
    - Критические user-paths (зависят от продукта).
 3. **Запись результатов** — структурированный отчёт:
    что проверял / что прошло / что упало / скриншоты при ошибке.
@@ -55,7 +59,7 @@ pnpm exec playwright test --headed --debug
 
 ```json
 {
-  "target_agent": "astro-public|astro-app|pages-ssr|docs|reviewer",
+  "target_agent": "astro-public|astro-dashboard|astro-admin|content|pages-ssr|schema|docs|reviewer",
   "issue": "...",
   "file": "...",
   "details": "..."

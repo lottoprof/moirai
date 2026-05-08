@@ -9,10 +9,17 @@ API-эндпоинты, middleware, конфигурация Astro и wrangler,
 ## Scope (Write)
 
 - `src/pages/api/**` — серверные эндпоинты (HTTP-методы
-  через `export const GET/POST/...`)
-- `src/lib/server/**` — серверные утилиты, доступные только
-  в SSR / API-handlers
-- `src/middleware.ts`
+  через `export const GET/POST/...`), включая
+  `api/media/[type]/[id]`, `api/apply`, MoR webhook'и
+- `src/lib/server/**` — серверные утилиты (биндинги,
+  `crypto.subtle`, `aws4fetch` для presigned R2 URL,
+  `resolveAndAuthorize`, MoR webhook handler)
+- `src/middleware.ts` — auth-guard для `[locale]/dashboard/**` и
+  `/admin/**`
+- `src/content/config.ts` — zod-схемы Content Collections (после
+  согласования с `content`-агентом)
+- `db/types.ts` — ручные TS-типы строк D1 (обновляется атомарно с
+  миграциями; координация со `schema`)
 - `astro.config.mjs`
 - `wrangler.toml`
 - `package.json` — npm-скрипты, deps (с осторожностью; для
@@ -49,6 +56,13 @@ API-эндпоинты, middleware, конфигурация Astro и wrangler,
 7. **Изменение `wrangler.toml`** — после правки выполнять
    `wrangler types` (см. skill), фиксировать оба файла одним
    коммитом.
+8. **Path-prefix локализация** — публичные и dashboard роуты
+   обрабатываются с `[locale]/` префиксом (см. `architecture.md` §3).
+   `/admin/**` и `/api/**` — без локали.
+9. **`db/types.ts` синхронизирован с миграциями.** Любая миграция
+   (`migrations/NNNN_*.sql`) приходит handoff'ом от `schema` и
+   требует обновления типов одним коммитом. Без ORM — типы строк
+   пишутся вручную.
 
 ## Quality Gates
 
@@ -64,7 +78,7 @@ Build проверяет, что edge-compat не нарушен.
 
 ```json
 {
-  "target_agent": "astro-public|astro-app|schema|docs|reviewer|e2e",
+  "target_agent": "astro-public|astro-dashboard|astro-admin|content|schema|docs|reviewer|e2e",
   "issue": "...",
   "file": "...",
   "details": "..."
@@ -73,6 +87,10 @@ Build проверяет, что edge-compat не нарушен.
 
 Случаи handoff:
 
-- Изменение схемы БД → `schema` агент.
+- Изменение схемы БД → `schema`.
+- Расширение поля во frontmatter Content Collection → `content`
+  (после правки `src/content/config.ts` уведомить).
+- Потребитель API в ЛК / админке / публичном слое — handoff в
+  соответствующий UI-агент.
 - Документирование нового API → `docs`.
 - Финальный аудит — `reviewer`.

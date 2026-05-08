@@ -25,11 +25,22 @@ edge-compat audit, security audit перед merge.
 
 ### 1. Boundaries
 
-- В публичном слое нет `client:*`, нет UI-фреймворков.
-- В `app/` нет прямых обращений к биндингам.
-- Серверный код не импортируется в клиентские компоненты.
-- `src/lib/server/**` не утекает в `components/public/**` или
-  `components/app/**`.
+- **Public** (`src/pages/[locale]/*.astro`, `components/public/**`):
+  нет `client:*`, нет UI-фреймворков, нет хардкода цен/счётных
+  чисел/meta-тегов.
+- **Dashboard** (`src/pages/[locale]/dashboard/**`,
+  `components/dashboard/**`): нет прямых обращений к биндингам,
+  только через `/api/`. Auth-guard через `middleware.ts`.
+- **Admin** (`src/pages/admin/**`, `components/admin/**`): без
+  префикса локали, role=admin guard, `noindex`, мутации только
+  через API.
+- **Content** (`src/content/**`): translation pairs, единый URL
+  namespace programmes+bundles, `bundles.includes_programmes`
+  ссылается на существующие id, цены только в `tiers[]`.
+- `src/lib/server/**` не утекает в `components/public/**`,
+  `components/dashboard/**`, `components/admin/**`.
+- Кросс-импорты между `components/{public,dashboard,admin}/`
+  запрещены.
 
 ### 2. Edge-compat
 
@@ -43,15 +54,16 @@ edge-compat audit, security audit перед merge.
 
 - Нет хардкода секретов, токенов, ключей.
 - AES-GCM через `crypto.subtle` для чувствительных значений.
-- Валидация внешнего ввода (zod / эквивалент).
-- Auth-guard на всех `src/pages/app/**` и защищённых
-  `src/pages/api/**`.
+- Валидация внешнего ввода через zod на всех API-эндпоинтах.
+- Auth-guard на всех `src/pages/[locale]/dashboard/**`,
+  `src/pages/admin/**` и защищённых `src/pages/api/**`.
 - Ничего секретного не логируется.
 
 ### 4. Schema (если применимо)
 
-- Закоммиченные миграции не модифицированы.
-- Нумерация последовательная.
+- Коммитнутые миграции в `migrations/` не модифицированы.
+- Нумерация последовательная (`0001`, `0002`, ...).
+- `db/types.ts` обновлён в том же PR, что и миграция.
 - Breaking changes имеют запись в `decisions.md`.
 
 ### 5. Quality Gates
@@ -85,7 +97,8 @@ pnpm build
 ```
 
 Категории: `boundaries` / `edge-compat` / `security` / `schema` /
-`quality` / `style`. Severity: `critical` / `warning` / `info`.
+`content` / `quality` / `style`. Severity: `critical` / `warning` /
+`info`.
 
 ## Запреты
 

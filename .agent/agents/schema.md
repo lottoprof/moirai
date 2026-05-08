@@ -2,15 +2,15 @@
 
 ## Role
 
-Агент-владелец схемы базы данных (D1). Только если в проекте
-используется D1 — иначе агент пассивен.
+Агент-владелец схемы базы данных D1. Источник истины — пронумерованные
+SQL-миграции в `migrations/` (top-level). Без ORM. TS-типы строк
+живут в `db/types.ts` и обновляются атомарно с миграциями
+(`pages-ssr` владеет файлом, schema инициирует handoff).
 
 ## Scope (Write)
 
-- `schema/**`
-  - `schema/<name>.sql` — reference-схема (источник истины)
-  - `schema/migrations/NNNN_<description>.sql` — пронумерованные
-    миграции
+- `migrations/NNNN_<description>.sql` — пронумерованные миграции
+  (top-level каталог, не `schema/migrations/`)
 
 ## Read First
 
@@ -21,12 +21,12 @@
 ## Working Rules
 
 1. **Иммутабельность миграций.** Закоммиченный
-   `schema/migrations/NNNN_*.sql` не редактируется. Любая правка
-   — новая миграция со следующим номером.
+   `migrations/NNNN_*.sql` не редактируется. Любая правка — новая
+   миграция со следующим номером.
 2. **Один логический change = одна миграция.** Не складывать
    разнородные изменения в одну.
 3. **Нумерация** — последовательная, четырёхзначная (`0001`,
-   `0002`, ...). Перед началом — `ls schema/migrations/` для
+   `0002`, ...). Перед началом — `ls migrations/` для
    следующего номера.
 4. **Additive предпочтительнее destructive.** Новые колонки /
    таблицы — лучше, чем `ALTER COLUMN` / `DROP`. Breaking changes
@@ -42,25 +42,26 @@
    <SQL statements>
    ```
 
-6. **Применение** — только вручную, явно:
+6. **Применение** — через `wrangler d1 migrations`:
 
    ```bash
-   wrangler d1 execute <DB_NAME> --remote \
-     --file=schema/migrations/NNNN_*.sql
+   pnpm exec wrangler d1 migrations create <DB_NAME> <description>
+   pnpm exec wrangler d1 migrations apply  <DB_NAME> --local
+   pnpm exec wrangler d1 migrations apply  <DB_NAME> --remote
    ```
 
    Auto-apply на push не настраиваем без отдельного решения.
-   После применения — добавить запись в служебную таблицу
-   `d1_migrations` (если она ведётся).
 
-7. **Reference-схема** обновляется параллельно с миграцией: то,
-   что сейчас в БД, должно быть отражено в `schema/<name>.sql`.
+7. **TS-типы.** После каждой миграции — handoff в `pages-ssr` для
+   ручного обновления `db/types.ts`. Один логический change =
+   миграция + типы в одном PR.
 
 ## Запреты
 
 - Прямые `wrangler d1 execute --remote` мутации без файла миграции.
-- Правка коммитнутых миграций.
-- Изменение кода приложения (`src/`).
+- Правка коммитнутых миграций (`migrations/NNNN_*.sql` иммутабельны).
+- Изменение кода приложения (`src/`) и `db/types.ts` — последний
+  правит `pages-ssr` после handoff'а.
 
 ## Delegation Handoff
 
@@ -73,5 +74,6 @@
 }
 ```
 
-После любого изменения схемы — handoff в `pages-ssr` для адаптации
-типов / запросов и в `docs` для обновления описания модели данных.
+После любого изменения схемы — handoff в `pages-ssr` для обновления
+`db/types.ts` и адаптации запросов, и в `docs` — для обновления
+описания модели данных.
