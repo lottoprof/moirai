@@ -1,6 +1,8 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 import cloudflare from "@astrojs/cloudflare";
+import mdx from "@astrojs/mdx";
+import sitemap from "@astrojs/sitemap";
 
 export default defineConfig({
   site: "https://moirai.film",
@@ -16,4 +18,13 @@ export default defineConfig({
       redirectToDefaultLocale: false,
     },
   },
+  integrations: [
+    mdx(),
+    sitemap({
+      i18n: {
+        defaultLocale: "en",
+        locales: { en: "en", ru: "ru" },
+      },
+    }),
+  ],
 });
