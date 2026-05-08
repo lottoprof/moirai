@@ -9,6 +9,8 @@
  */
 
 import "../../styles/tokens.css";
+import "../../styles/base.css";
+import "../../styles/utilities.css";
 import SeoHead from "../../components/public/SeoHead.astro";
 
 interface Seo {
@@ -51,32 +53,8 @@ const pathname = Astro.url.pathname;
   </body>
 </html>
 
-<style is:global>
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-body);
-    font-size: var(--type-body-md);
-    line-height: var(--leading-normal);
-  }
-
-  *:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 4px;
-  }
-
-  .skip-link {
-    position: absolute;
-    left: -9999px;
-    top: 0;
-  }
-  .skip-link:focus {
-    left: 0;
-    top: 0;
-    padding: var(--space-sm) var(--space-md);
-    background: var(--bg-elevated);
-    color: var(--text);
-    z-index: 999;
-  }
-</style>
+<!--
+  Глобальные стили вынесены в src/styles/{base,utilities}.css —
+  импортируются выше во frontmatter. Per-component scoped styles
+  живут в .astro компонентах через <style> (без is:global).
+-->

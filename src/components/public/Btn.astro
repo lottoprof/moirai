@@ -1,0 +1,58 @@
+---
+/*
+ * <Btn /> — markup-обёртка для кнопок и CTA-ссылок.
+ * Стили живут в `src/styles/utilities.css` (.btn + модификаторы),
+ * этот компонент только композирует правильную разметку.
+ *
+ * Пример:
+ *   <Btn href="/en/apply" variant="primary" size="lg" arrow>Apply now</Btn>
+ *   <Btn type="submit">Send</Btn>
+ */
+
+import type { HTMLAttributes } from "astro/types";
+
+interface Props extends Omit<HTMLAttributes<"a">, "type"> {
+  href?: string | URL;
+  variant?: "primary" | "ghost";
+  size?: "default" | "lg" | "xl";
+  type?: "button" | "submit";
+  arrow?: boolean;
+}
+
+const {
+  href,
+  variant = "primary",
+  size = "default",
+  type = "button",
+  arrow = false,
+  class: extraClass,
+  ...rest
+} = Astro.props;
+
+const classes = ["btn", `btn--${variant}`];
+if (size !== "default") classes.push(`btn--${size}`);
+if (typeof extraClass === "string" && extraClass.length > 0) classes.push(extraClass);
+const className = classes.join(" ");
+---
+
+{
+  href ? (
+    <a href={href} class={className} {...rest}>
+      <slot />
+      {arrow && (
+        <span class="btn__arrow" aria-hidden="true">
+          →
+        </span>
+      )}
+    </a>
+  ) : (
+    <button type={type} class={className} {...rest}>
+      <slot />
+      {arrow && (
+        <span class="btn__arrow" aria-hidden="true">
+          →
+        </span>
+      )}
+    </button>
+  )
+}

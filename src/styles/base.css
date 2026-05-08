@@ -1,0 +1,115 @@
+/*
+ * Element reset + базовые стили для всех страниц.
+ * Адаптировано из docs/moirai-home.html, переменные — tokens.css.
+ *
+ * Применяется глобально через импорт в Layout.astro.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--type-body-md);
+  font-weight: 400;
+  line-height: var(--leading-normal);
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  min-height: 100vh;
+
+  /*
+   * Тонкая атмосферная подсветка — двойной radial-gradient через
+   * color-mix() от --amber. Дешёво по perf (одна CSS-операция,
+   * без файлов изображений).
+   */
+  background-image:
+    radial-gradient(
+      ellipse 800px 600px at 20% -10%,
+      color-mix(in srgb, var(--amber) 4%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 600px 400px at 80% 110%,
+      color-mix(in srgb, var(--amber) 3%, transparent),
+      transparent 60%
+    );
+  background-attachment: fixed;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--text-accent);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--text-accent-hover);
+}
+
+ul,
+ol {
+  list-style: none;
+  padding: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Focus baseline — никогда не убирать без замены (a11y) */
+*:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+}
+
+/* Skip link — становится видимым на focus */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: var(--space-md);
+  background: var(--amber);
+  color: var(--ink);
+  padding: var(--space-sm) var(--space-md);
+  z-index: 1000;
+  font-size: var(--type-micro-md);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  transition: top var(--duration-fast) var(--ease-out);
+}
+.skip-link:focus {
+  top: var(--space-md);
+  color: var(--ink);
+}
