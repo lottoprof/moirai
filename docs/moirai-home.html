@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0D0B09">
+<meta name="color-scheme" content="dark">
+
+<!-- ============================================================
+     SEO meta — pulled from /content/pages/home.en.mdx in production
+============================================================ -->
+<title>Online Filmmaking Program — Direct Your First Film | Moirai</title>
+<meta name="description" content="Two-level online program taught by working directors. Small groups, 1:1 sessions, personal feedback. Learn directing, editing, screenwriting and finish with your own short film.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+
+<!-- Canonical & hreflang -->
+<link rel="canonical" href="https://moirai.film/en/">
+<link rel="alternate" hreflang="en" href="https://moirai.film/en/">
+<link rel="alternate" hreflang="ru" href="https://moirai.film/ru/">
+<link rel="alternate" hreflang="x-default" href="https://moirai.film/en/">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Moirai">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="ru_RU">
+<meta property="og:url" content="https://moirai.film/en/">
+<meta property="og:title" content="Online Filmmaking Program — Direct Your First Film">
+<meta property="og:description" content="Two-level online program with working directors. Small groups, 1:1 sessions, personal feedback.">
+<meta property="og:image" content="https://media.moirai.film/og/home.en.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Moirai online filmmaking program">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:site" content="@moirai_film">
+<meta name="twitter:title" content="Online Filmmaking Program — Direct Your First Film">
+<meta name="twitter:description" content="Two-level online program with working directors. 1:1 mentorship.">
+<meta name="twitter:image" content="https://media.moirai.film/og/home.en.jpg">
+
+<!-- Resource hints -->
+<!-- NOTE: in production these come from media.moirai.film (self-hosted R2) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=Outfit:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=Outfit:wght@400;500&display=swap">
+
+<!-- ============================================================
+     Schema.org JSON-LD
+     In production these are generated from data sources
+     (Content Collections + D1) by components, not authored by hand.
+============================================================ -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "EducationalOrganization",
+  "@id": "https://moirai.film/#organization",
+  "name": "Moirai",
+  "url": "https://moirai.film/en/",
+  "description": "Online filmmaking program teaching directing, editing, and screenwriting through small-group sessions and personal mentorship.",
+  "sameAs": [
+    "https://instagram.com/moirai.film",
+    "https://youtube.com/@moirai-film"
+  ],
+  "founder": [
+    {
+      "@type": "Person",
+      "@id": "https://moirai.film/en/instructors/vladimir-popov#person",
+      "name": "Vladimir Popov",
+      "jobTitle": "Film Director and Educator",
+      "url": "https://moirai.film/en/instructors/vladimir-popov"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://moirai.film/en/instructors/anastasia-zasypkina#person",
+      "name": "Anastasia Zasypkina",
+      "jobTitle": "Film Director and Educator",
+      "url": "https://moirai.film/en/instructors/anastasia-zasypkina"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Course",
+  "@id": "https://moirai.film/en/beginner#course",
+  "name": "Beginner — Foundation in Filmmaking",
+  "description": "Structured online programme covering visual language, editing fundamentals, and three-act structure. Ends with your first short film.",
+  "provider": { "@id": "https://moirai.film/#organization" },
+  "url": "https://moirai.film/en/beginner",
+  "inLanguage": "en",
+  "educationalLevel": "Beginner",
+  "offers": [
+    {
+      "@type": "Offer",
+      "name": "Standard",
+      "price": "369",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock",
+      "url": "https://moirai.film/en/beginner"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is this fully online?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes, fully online via Zoom. All sessions are scheduled in Eastern Time. Sessions are recorded for students in different timezones." }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need any prior film experience?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No — Beginner is designed for complete newcomers. A smartphone is enough." }
+    },
+    {
+      "@type": "Question",
+      "name": "What camera do I need?",
+      "acceptedAnswer": { "@type": "Answer", "text": "A smartphone is completely fine. The focus is on thinking and storytelling, not expensive equipment." }
+    },
+    {
+      "@type": "Question",
+      "name": "How much time per week?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Around 3–5 hours: live sessions plus weekly assignments. Designed to be manageable alongside school or a full-time job." }
+    }
+  ]
+}
+</script>
+
+<!-- ============================================================
+     Critical CSS — inline.
+     In production split into critical (inline) + async (linked).
+============================================================ -->
+<style>
+/* ============================================================
+   Design tokens (from DESIGN_SYSTEM.md)
+============================================================ */
+:root {
+  /* Raw palette */
+  --ink:           #0D0B09;
+  --ink-elevated:  #1A1612;
+  --paper:         #F7F3EC;
+  --paper-muted:   #C8BFB0;
+  --paper-faint:   #7A7168;
+  --amber:         #D4820A;
+  --amber-light:   #F0A830;
+  --amber-faint:   rgba(212, 130, 10, 0.12);
+  --line:          rgba(247, 243, 236, 0.08);
+  --line-strong:   rgba(247, 243, 236, 0.16);
+
+  /* Semantic */
+  --bg:               var(--ink);
+  --bg-elevated:      var(--ink-elevated);
+  --text:             var(--paper);
+  --text-muted:       var(--paper-muted);
+  --text-faint:       var(--paper-faint);
+  --text-accent:      var(--amber);
+  --text-accent-hover: var(--amber-light);
+  --border:           var(--line);
+  --border-strong:    var(--line-strong);
+  --focus-ring:       var(--amber);
+
+  /* Fonts */
+  --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-body:    'Outfit', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Type scale */
+  --type-display-xl: clamp(64px, 8vw, 120px);
+  --type-display-lg: clamp(48px, 6vw, 80px);
+  --type-display-md: clamp(32px, 3.5vw, 48px);
+  --type-display-sm: clamp(24px, 2.5vw, 32px);
+  --type-body-lg: 18px;
+  --type-body-md: 16px;
+  --type-body-sm: 14px;
+  --type-micro-lg: 13px;
+  --type-micro-md: 12px;
+  --type-micro-sm: 10px;
+
+  /* Tracking */
+  --tracking-tight:  -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.1em;
+  --tracking-wider:  0.14em;
+  --tracking-widest: 0.2em;
+
+  /* Leading */
+  --leading-tight:   0.95;
+  --leading-snug:    1.1;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.7;
+
+  /* Spacing scale */
+  --space-2xs: 4px;
+  --space-xs:  8px;
+  --space-sm:  12px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+  --space-4xl: 96px;
+  --space-5xl: 128px;
+  --space-6xl: 192px;
+
+  /* Layout */
+  --container-max: 1200px;
+  --container-pad: clamp(20px, 5vw, 48px);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast:   150ms;
+  --duration-normal: 250ms;
+  --duration-rise:   900ms;
+}
+
+/* ============================================================
+   Reset & base
+============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+body {
+  font-family: var(--font-body);
+  font-size: var(--type-body-md);
+  font-weight: 400;
+  line-height: var(--leading-normal);
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  min-height: 100vh;
+
+  /* subtle film grain - performance-cheap atmospheric texture */
+  background-image:
+    radial-gradient(ellipse 800px 600px at 20% -10%, rgba(212, 130, 10, 0.04), transparent 60%),
+    radial-gradient(ellipse 600px 400px at 80% 110%, rgba(212, 130, 10, 0.03), transparent 60%);
+  background-attachment: fixed;
+}
+img, svg { display: block; max-width: 100%; height: auto; }
+a { color: var(--text-accent); text-decoration: none; }
+a:hover { color: var(--text-accent-hover); }
+
+/* Focus styles — never remove without replacing */
+*:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+}
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: var(--space-md);
+  background: var(--amber);
+  color: var(--ink);
+  padding: var(--space-sm) var(--space-md);
+  z-index: 1000;
+  font-size: var(--type-micro-md);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  transition: top var(--duration-fast) var(--ease-out);
+}
+.skip-link:focus {
+  top: var(--space-md);
+  color: var(--ink);
+}
+
+/* ============================================================
+   Typography classes
+============================================================ */
+.h1 {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: var(--type-display-xl);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+.h1 em { font-style: italic; color: var(--text-accent-hover); }
+
+.h2 {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: var(--type-display-md);
+  line-height: var(--leading-snug);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+.h2 em { font-style: italic; color: var(--text-accent-hover); }
+
+.h2--display {
+  font-size: var(--type-display-lg);
+  line-height: 1.05;
+}
+
+.h3 {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: var(--type-display-sm);
+  line-height: var(--leading-snug);
+  color: var(--text);
+}
+
+.h4 {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 18px;
+  line-height: 1.3;
+  color: var(--text);
+  letter-spacing: 0;
+}
+
+.h5 {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.eyebrow {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--type-micro-md);
+  line-height: 1;
+  letter-spacing: var(--tracking-widest);
+  text-transform: uppercase;
+  color: var(--text-accent);
+}
+
+.text-muted { color: var(--text-muted); }
+.text-faint { color: var(--text-faint); }
+.text-accent { color: var(--text-accent); }
+
+/* ============================================================
+   Layout utilities
+============================================================ */
+.center {
+  max-width: var(--container-max);
+  margin-inline: auto;
+  padding-inline: var(--container-pad);
+}
+
+.stack-xs > * + * { margin-top: var(--space-xs); }
+.stack-sm > * + * { margin-top: var(--space-sm); }
+.stack-md > * + * { margin-top: var(--space-md); }
+.stack-lg > * + * { margin-top: var(--space-lg); }
+.stack-xl > * + * { margin-top: var(--space-xl); }
+.stack-2xl > * + * { margin-top: var(--space-2xl); }
+
+.cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: center;
+}
+.cluster--sm { gap: var(--space-sm); }
+.cluster--lg { gap: var(--space-lg); }
+
+.section {
+  padding-block: clamp(80px, 12vw, 160px);
+  position: relative;
+}
+.section--alt { background: var(--bg-elevated); }
+.section--cta {
+  padding-block: clamp(120px, 16vw, 200px);
+  text-align: center;
+}
+
+/* ============================================================
+   Components
+============================================================ */
+
+/* --- Nav --- */
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: var(--space-lg) var(--container-pad);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background var(--duration-normal) var(--ease-out),
+              backdrop-filter var(--duration-normal) var(--ease-out),
+              border-color var(--duration-normal) var(--ease-out);
+  border-bottom: 1px solid transparent;
+}
+.nav.is-scrolled {
+  background: rgba(13, 11, 9, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom-color: var(--border);
+}
+.nav__logo {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--paper);
+  opacity: 0.95;
+}
+.nav__cta {
+  font-size: var(--type-micro-md);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--amber);
+  border-bottom: 1px solid var(--amber);
+  padding-bottom: 2px;
+  transition: color var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
+}
+.nav__cta:hover { color: var(--amber-light); border-bottom-color: var(--amber-light); }
+
+/* --- Hero --- */
+.hero {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 120px var(--container-pad) var(--space-4xl);
+  max-width: var(--container-max);
+  margin-inline: auto;
+}
+.hero__eyebrow {
+  margin-bottom: var(--space-2xl);
+  opacity: 0;
+  animation: rise var(--duration-rise) 0.2s var(--ease-out) both;
+}
+.hero__title {
+  margin-bottom: var(--space-2xl);
+  opacity: 0;
+  animation: rise var(--duration-rise) 0.35s var(--ease-out) both;
+  max-width: 14ch;
+}
+.hero__lede {
+  font-size: var(--type-body-lg);
+  max-width: 56ch;
+  margin-bottom: var(--space-3xl);
+  opacity: 0;
+  animation: rise var(--duration-rise) 0.5s var(--ease-out) both;
+}
+.hero__cta {
+  opacity: 0;
+  animation: rise var(--duration-rise) 0.65s var(--ease-out) both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Buttons --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-body);
+  font-size: var(--type-micro-lg);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  padding: 18px 36px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out),
+              gap var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
+  white-space: nowrap;
+}
+.btn--primary {
+  background: var(--amber);
+  color: var(--ink);
+}
+.btn--primary:hover {
+  background: var(--amber-light);
+  color: var(--ink);
+  gap: 20px;
+}
+.btn--ghost {
+  background: transparent;
+  color: var(--paper);
+  border-color: var(--border-strong);
+}
+.btn--ghost:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.btn--lg { padding: 20px 44px; font-size: var(--type-body-sm); }
+.btn--xl { padding: 24px 56px; font-size: var(--type-body-md); }
+
+.btn__arrow { display: inline-block; transition: transform var(--duration-fast) var(--ease-out); }
+.btn:hover .btn__arrow { transform: translateX(4px); }
+
+/* --- Ticker --- */
+.ticker {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  padding: var(--space-lg) 0;
+  white-space: nowrap;
+}
+.ticker__track {
+  display: inline-flex;
+  gap: var(--space-2xl);
+  animation: scroll-x 40s linear infinite;
+  font-family: var(--font-display);
+  font-size: var(--type-body-lg);
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text-faint);
+}
+.ticker__sep { color: var(--amber); }
+@media (prefers-reduced-motion: reduce) {
+  .ticker__track { animation: none; }
+}
+@keyframes scroll-x {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* --- Section header --- */
+.section__head {
+  margin-bottom: var(--space-4xl);
+  max-width: 50ch;
+}
+.section__head .eyebrow { margin-bottom: var(--space-md); }
+.section__head .h2 + p { margin-top: var(--space-lg); }
+
+/* --- Who grid --- */
+.who-grid {
+  display: grid;
+  gap: var(--space-2xl);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .who-grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-3xl) var(--space-2xl); }
+}
+.who-card { display: grid; grid-template-columns: auto 1fr; gap: var(--space-md); align-items: start; }
+.who-card__num {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--amber);
+  line-height: 1;
+  padding-top: 4px;
+  min-width: 32px;
+}
+.who-card__title {
+  font-size: var(--type-body-md);
+  font-weight: 500;
+  color: var(--paper);
+  margin-bottom: var(--space-xs);
+}
+.who-card__body {
+  font-size: var(--type-body-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* --- Programme grid --- */
+.programme-grid {
+  display: grid;
+  gap: var(--space-xl);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .programme-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.programme-card {
+  background: var(--bg-elevated);
+  padding: var(--space-2xl);
+  border: 1px solid var(--border);
+  transition: border-color var(--duration-normal) var(--ease-out);
+}
+.programme-card:hover { border-color: var(--amber); }
+.programme-card__label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: var(--space-md);
+}
+.programme-card__title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 300;
+  line-height: 1.1;
+  margin-bottom: var(--space-md);
+}
+.programme-card__lede {
+  color: var(--text-muted);
+  margin-bottom: var(--space-xl);
+  line-height: 1.6;
+}
+.programme-card__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--type-micro-lg);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--amber);
+  border-bottom: 1px solid var(--amber);
+  padding-bottom: 2px;
+  transition: gap var(--duration-fast) var(--ease-out);
+}
+.programme-card__link:hover { gap: var(--space-sm); }
+
+/* --- Features grid --- */
+.features-grid {
+  display: grid;
+  gap: var(--space-2xl);
+  grid-template-columns: 1fr;
+  list-style: none;
+  padding: 0;
+}
+@media (min-width: 768px) {
+  .features-grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-3xl) var(--space-2xl); }
+}
+@media (min-width: 1024px) {
+  .features-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.feature__num {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--amber);
+  margin-bottom: var(--space-md);
+  line-height: 1;
+}
+.feature__title {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: var(--space-xs);
+}
+.feature__body {
+  color: var(--text-muted);
+  font-size: var(--type-body-sm);
+  line-height: 1.6;
+}
+
+/* --- Instructor grid --- */
+.instructor-grid {
+  display: grid;
+  gap: var(--space-xl);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .instructor-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.instructor-card {
+  background: var(--bg-elevated);
+  padding: var(--space-2xl);
+  position: relative;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.instructor-card__initial {
+  position: absolute;
+  top: 16px;
+  right: 24px;
+  font-family: var(--font-display);
+  font-size: 96px;
+  font-weight: 300;
+  color: var(--amber-faint);
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+.instructor-card__name {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 300;
+  margin-bottom: var(--space-2xs);
+}
+.instructor-card__role {
+  font-size: var(--type-micro-md);
+  font-weight: 400;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: var(--space-lg);
+}
+.instructor-card__body {
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: var(--space-lg);
+}
+
+/* --- Outcomes grid --- */
+.outcomes-grid {
+  display: grid;
+  gap: var(--space-xl);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .outcomes-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.outcome__title {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: var(--space-xs);
+}
+.outcome__body {
+  color: var(--text-muted);
+  font-size: var(--type-body-sm);
+  line-height: 1.6;
+}
+
+/* --- Pricing grid --- */
+.pricing-grid {
+  display: grid;
+  gap: var(--space-md);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .pricing-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.tier-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: border-color var(--duration-normal) var(--ease-out);
+}
+.tier-card:hover { border-color: var(--border-strong); }
+.tier-card--featured {
+  background: var(--amber);
+  border-color: var(--amber);
+}
+.tier-card--featured * { color: var(--ink) !important; }
+.tier-card__badge {
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--amber);
+  color: var(--ink);
+  font-size: var(--type-micro-sm);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  padding: 6px 18px;
+  white-space: nowrap;
+}
+.tier-card--featured .tier-card__badge {
+  background: var(--ink);
+  color: var(--amber);
+}
+.tier-card__name {
+  font-size: var(--type-micro-lg);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: var(--space-md);
+}
+.tier-card__price {
+  font-family: var(--font-display);
+  font-size: 64px;
+  font-weight: 300;
+  line-height: 1;
+  margin-bottom: var(--space-2xs);
+}
+.tier-card__sub {
+  font-size: var(--type-micro-md);
+  color: var(--text-faint);
+  margin-bottom: var(--space-xl);
+}
+.tier-card__features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-2xl) 0;
+  flex-grow: 1;
+}
+.tier-card__features li {
+  display: flex;
+  gap: var(--space-sm);
+  font-size: var(--type-body-sm);
+  color: var(--paper-muted);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.tier-card__features li::before {
+  content: '—';
+  color: var(--amber);
+  flex-shrink: 0;
+}
+.tier-card--featured .tier-card__features li {
+  color: rgba(13, 11, 9, 0.85);
+  border-color: rgba(13, 11, 9, 0.15);
+}
+.tier-card--featured .tier-card__features li::before { color: var(--ink); }
+.tier-card__cta {
+  display: block;
+  text-align: center;
+  padding: 14px;
+  font-size: var(--type-micro-md);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 1px solid var(--border-strong);
+  color: var(--paper);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.tier-card__cta:hover {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--ink);
+}
+.tier-card--featured .tier-card__cta {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.tier-card--featured .tier-card__cta:hover {
+  background: transparent;
+  color: var(--ink);
+}
+
+/* --- FAQ --- */
+.faq { max-width: 800px; margin-inline: auto; }
+.faq__item {
+  border-bottom: 1px solid var(--border);
+}
+.faq__item[open] { padding-bottom: var(--space-md); }
+.faq__question {
+  list-style: none;
+  cursor: pointer;
+  padding: var(--space-lg) 0;
+  font-size: var(--type-body-md);
+  font-weight: 400;
+  color: var(--paper);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-md);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+.faq__question:hover { color: var(--amber); }
+.faq__question::-webkit-details-marker { display: none; }
+.faq__question::after {
+  content: '+';
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--amber);
+  font-weight: 300;
+  transition: transform var(--duration-normal) var(--ease-out);
+  flex-shrink: 0;
+  line-height: 1;
+}
+.faq__item[open] .faq__question::after { transform: rotate(45deg); }
+.faq__answer {
+  padding-bottom: var(--space-md);
+  color: var(--text-muted);
+  line-height: 1.7;
+  max-width: 65ch;
+}
+
+/* --- Final CTA --- */
+.final-cta__title {
+  margin-bottom: var(--space-xl);
+}
+.final-cta__lede {
+  font-size: var(--type-body-lg);
+  color: var(--text-muted);
+  margin-bottom: var(--space-3xl);
+}
+.urgency {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-2xl);
+  font-size: var(--type-micro-md);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.urgency__dot {
+  width: 6px;
+  height: 6px;
+  background: var(--amber);
+  border-radius: 50%;
+  animation: pulse 2s ease infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.3); }
+}
+
+/* --- Footer --- */
+.footer {
+  border-top: 1px solid var(--border);
+  padding-block: var(--space-3xl);
+  background: var(--bg);
+}
+.footer__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--space-2xl);
+  margin-bottom: var(--space-2xl);
+}
+.footer__logo {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 300;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.footer__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+}
+.footer__nav a {
+  font-size: var(--type-micro-md);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.footer__nav a:hover { color: var(--amber); }
+.footer__copy {
+  font-size: var(--type-micro-md);
+  color: var(--text-faint);
+  letter-spacing: var(--tracking-wide);
+}
+
+/* --- Reveal on scroll --- */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>
+</head>
+<body>
+
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<!-- ============================================================
+     Nav
+============================================================ -->
+<nav class="nav" role="navigation" aria-label="Primary">
+  <a href="/" class="nav__logo">Moirai.</a>
+  <a href="/en/apply" class="nav__cta">Apply Now →</a>
+</nav>
+
+<main id="main">
+
+  <!-- ============================================================
+       Hero — LCP element
+  ============================================================ -->
+  <section class="hero" aria-labelledby="hero-title">
+    <span class="hero__eyebrow eyebrow">
+      Online Filmmaking Program — small groups · 1:1 with working directors
+    </span>
+    <h1 id="hero-title" class="hero__title h1">
+      Direct <em>your</em> first film.
+    </h1>
+    <p class="hero__lede text-muted">
+      A two-level online program taught by working directors. Small groups,
+      personal feedback after every assignment, finished short film at
+      the end of each level.
+    </p>
+    <div class="hero__cta">
+      <a href="/en/apply" class="btn btn--primary btn--lg">
+        Apply now
+        <span class="btn__arrow" aria-hidden="true">→</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Ticker — semantic enrichment, decorative for a11y
+  ============================================================ -->
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker__track">
+      <span>Cinematography</span>
+      <span class="ticker__sep">·</span>
+      <span>Direction</span>
+      <span class="ticker__sep">·</span>
+      <span>Editing</span>
+      <span class="ticker__sep">·</span>
+      <span>Screenwriting</span>
+      <span class="ticker__sep">·</span>
+      <span>Producing</span>
+      <span class="ticker__sep">·</span>
+      <span>Storytelling</span>
+      <span class="ticker__sep">·</span>
+      <!-- duplicated for seamless loop -->
+      <span>Cinematography</span>
+      <span class="ticker__sep">·</span>
+      <span>Direction</span>
+      <span class="ticker__sep">·</span>
+      <span>Editing</span>
+      <span class="ticker__sep">·</span>
+      <span>Screenwriting</span>
+      <span class="ticker__sep">·</span>
+      <span>Producing</span>
+      <span class="ticker__sep">·</span>
+      <span>Storytelling</span>
+      <span class="ticker__sep">·</span>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Section: Who is this for
+  ============================================================ -->
+  <section class="section" id="who" aria-labelledby="who-title">
+    <div class="center">
+      <header class="section__head reveal">
+        <span class="eyebrow">Who is this for</span>
+        <h2 id="who-title" class="h2">Film school teaches theory.<br>We teach <em>practice</em>.</h2>
+      </header>
+
+      <div class="who-grid">
+        <article class="who-card reveal">
+          <div class="who-card__num">01</div>
+          <div>
+            <h3 class="who-card__title">Content creators going deeper</h3>
+            <p class="who-card__body">You shoot YouTube or TikTok but want to tell real stories — not just document moments.</p>
+          </div>
+        </article>
+        <article class="who-card reveal">
+          <div class="who-card__num">02</div>
+          <div>
+            <h3 class="who-card__title">Aspiring indie filmmakers</h3>
+            <p class="who-card__body">You've had the idea for years. This program gives you the tools and accountability to actually make it.</p>
+          </div>
+        </article>
+        <article class="who-card reveal">
+          <div class="who-card__num">03</div>
+          <div>
+            <h3 class="who-card__title">Photographers moving to video</h3>
+            <p class="who-card__body">You understand light and composition. Now learn how to add time, motion, and story.</p>
+          </div>
+        </article>
+        <article class="who-card reveal">
+          <div class="who-card__num">04</div>
+          <div>
+            <h3 class="who-card__title">Complete beginners</h3>
+            <p class="who-card__body">A smartphone is enough. No prior experience needed — just the desire to make something real.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Section: Curriculum preview
+  ============================================================ -->
+  <section class="section section--alt" id="curriculum" aria-labelledby="curriculum-title">
+    <div class="center">
+      <header class="section__head reveal">
+        <span class="eyebrow">Curriculum</span>
+        <h2 id="curriculum-title" class="h2">Two levels.<br>One <em>finished</em> film.</h2>
+        <p class="text-muted" style="margin-top: var(--space-md); max-width: 60ch;">
+          Both levels cover Directing, Editing, and Scriptwriting — but Intermediate isn't a
+          continuation, it's a different depth. Where Beginner builds your foundation,
+          Intermediate breaks down the craft.
+        </p>
+      </header>
+
+      <div class="programme-grid">
+        <article class="programme-card reveal">
+          <div class="programme-card__label">Level 01</div>
+          <h3 class="programme-card__title">Beginner</h3>
+          <p class="programme-card__lede">
+            Visual language, editing rhythm, three-act structure. Hands-on
+            assignments and personal feedback. End with your first short film.
+          </p>
+          <a href="/en/beginner" class="programme-card__link">
+            Explore Beginner <span aria-hidden="true">→</span>
+          </a>
+        </article>
+        <article class="programme-card reveal">
+          <div class="programme-card__label">Level 02</div>
+          <h3 class="programme-card__title">Intermediate</h3>
+          <p class="programme-card__lede">
+            Actor direction, world-building, full producing track. Storyboarding,
+            advanced editing principles. End with a festival-ready short.
+          </p>
+          <a href="/en/intermediate" class="programme-card__link">
+            Explore Intermediate <span aria-hidden="true">→</span>
+          </a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Section: What's included
+  ============================================================ -->
+  <section class="section" id="included" aria-labelledby="included-title">
+    <div class="center">
+      <header class="section__head reveal">
+        <span class="eyebrow">What's included</span>
+        <h2 id="included-title" class="h2">Everything to <em>finish</em> the film.</h2>
+      </header>
+
+      <ul class="features-grid">
+        <li class="feature reveal">
+          <div class="feature__num">01</div>
+          <h3 class="feature__title">Live 1:1 sessions</h3>
+          <p class="feature__body">Personal video sessions with working directors after each practical module. Discussion, deeper analysis, applied exercises.</p>
+        </li>
+        <li class="feature reveal">
+          <div class="feature__num">02</div>
+          <h3 class="feature__title">Practice every module</h3>
+          <p class="feature__body">Each module ends with a hands-on assignment — shooting exercises, written scenes, short edits. Every piece reviewed personally.</p>
+        </li>
+        <li class="feature reveal">
+          <div class="feature__num">03</div>
+          <h3 class="feature__title">Pre-session corrections</h3>
+          <p class="feature__body">Timestamp comments on your work videos before each live session. Real director notes, not automated responses.</p>
+        </li>
+        <li class="feature reveal">
+          <div class="feature__num">04</div>
+          <h3 class="feature__title">Course workbook</h3>
+          <p class="feature__body">Templates, directing scripts, budget breakdowns, glossary. Yours to keep and use on every future production.</p>
+        </li>
+        <li class="feature reveal">
+          <div class="feature__num">05</div>
+          <h3 class="feature__title">Lifetime access to recordings</h3>
+          <p class="feature__body">Every session recorded. Rewatch at your own pace, return to any topic anytime in the future.</p>
+        </li>
+        <li class="feature reveal">
+          <div class="feature__num">06</div>
+          <h3 class="feature__title">Final film 1:1 review</h3>
+          <p class="feature__body">Dedicated session reviewing your finished short film with detailed critique and direction for next steps.</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Section: Instructors
+  ============================================================ -->
+  <section class="section section--alt" id="instructors" aria-labelledby="instructors-title">
+    <div class="center">
+      <header class="section__head reveal">
+        <span class="eyebrow">Instructors</span>
+        <h2 id="instructors-title" class="h2">Taught by <em>working</em> directors.</h2>
+      </header>
+
+      <div class="instructor-grid">
+        <article class="instructor-card reveal">
+          <div class="instructor-card__initial" aria-hidden="true">V</div>
+          <h3 class="instructor-card__name">Vladimir Popov</h3>
+          <div class="instructor-card__role">Film Director &amp; Educator</div>
+          <p class="instructor-card__body">
+            Started making media before he could drive — local TV reporting,
+            radio film show as a teenager. Film degree in directing, feature-
+            length graduation film on a $1,000 budget. Music videos, narrative
+            shorts, and large-scale commercial production.
+          </p>
+          <a href="/en/instructors/vladimir-popov" class="programme-card__link">
+            Read more <span aria-hidden="true">→</span>
+          </a>
+        </article>
+
+        <article class="instructor-card reveal">
+          <div class="instructor-card__initial" aria-hidden="true">A</div>
+          <h3 class="instructor-card__name">Anastasia Zasypkina</h3>
+          <div class="instructor-card__role">Film Director &amp; Educator</div>
+          <p class="instructor-card__body">
+            Film degree in directing. Built her career as 1st AD on TV series,
+            shorts, and commercials. Festival-placing short films. Specializes
+            in what most courses skip: the director's script as a working
+            tool, and the psychology of directing actors.
+          </p>
+          <a href="/en/instructors/anastasia-zasypkina" class="programme-card__link">
+            Read more <span aria-hidden="true">→</span>
+          </a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Section: After the program
+  ============================================================ -->
+  <section class="section" id="after" aria-labelledby="after-title">
+    <div class="center">
+      <header class="section__head reveal">
+        <span class="eyebrow">After the program</span>
+        <h2 id="after-title" class="h2">You leave with <em>more</em> than a film.</h2>
+      </header>
+
+      <div class="outcomes-grid">
+        <div class="outcome reveal">
+          <h3 class="outcome__title">A festival submission</h3>
+          <p class="outcome__body">Personal guidance on which festivals to target, how to write your synopsis, and what selection actually looks like.</p>
+        </div>
+        <div class="outcome reveal">
+          <h3 class="outcome__title">A working vocabulary</h3>
+          <p class="outcome__body">Speak the language of the set. Understand what's happening on any production you step onto.</p>
+        </div>
+        <div class="outcome reveal">
+          <h3 class="outcome__title">The confidence to go again</h3>
+          <p class="outcome__body">The hardest part is the first film. After that, you know you can do it — and you know how.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Section: Pricing
+  ============================================================ -->
+  <section class="section section--alt" id="pricing" aria-labelledby="pricing-title">
+    <div class="center">
+      <header class="section__head reveal" style="text-align: center; margin-inline: auto;">
+        <span class="eyebrow">Pricing</span>
+        <h2 id="pricing-title" class="h2">Simple, <em>transparent</em> pricing.</h2>
+      </header>
+
+      <div class="pricing-grid">
+        <article class="tier-card reveal">
+          <div class="tier-card__name">Beginner</div>
+          <div class="tier-card__price">$369</div>
+          <div class="tier-card__sub">No experience needed</div>
+          <ul class="tier-card__features">
+            <li>Live sessions across 3 tracks</li>
+            <li>All homework reviewed personally</li>
+            <li>Course workbook + recordings</li>
+            <li>Cohort community access</li>
+            <li>Final film 1:1 review</li>
+          </ul>
+          <a href="/en/beginner" class="tier-card__cta">Choose Beginner →</a>
+        </article>
+
+        <article class="tier-card tier-card--featured reveal">
+          <div class="tier-card__badge">Best Value</div>
+          <div class="tier-card__name">Bundle</div>
+          <div class="tier-card__price">$749</div>
+          <div class="tier-card__sub">Beginner + Intermediate</div>
+          <ul class="tier-card__features">
+            <li>All content from both levels</li>
+            <li>Priority feedback (48h)</li>
+            <li>2 extra 1:1 sessions</li>
+            <li>Festival submission support</li>
+            <li>Alumni community access</li>
+          </ul>
+          <a href="/en/bundle" class="tier-card__cta">Choose Bundle →</a>
+        </article>
+
+        <article class="tier-card reveal">
+          <div class="tier-card__name">Intermediate</div>
+          <div class="tier-card__price">$469</div>
+          <div class="tier-card__sub">Requires Beginner or equivalent</div>
+          <ul class="tier-card__features">
+            <li>Live sessions across 4 tracks</li>
+            <li>Producing module included</li>
+            <li>All homework reviewed</li>
+            <li>Cohort community + recordings</li>
+            <li>Festival-ready final film</li>
+          </ul>
+          <a href="/en/intermediate" class="tier-card__cta">Choose Intermediate →</a>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Section: FAQ
+  ============================================================ -->
+  <section class="section" id="faq" aria-labelledby="faq-title">
+    <div class="center">
+      <header class="section__head reveal" style="text-align: center; margin-inline: auto;">
+        <span class="eyebrow">Common questions</span>
+        <h2 id="faq-title" class="h2">Common <em>questions</em>.</h2>
+      </header>
+
+      <div class="faq stack-md reveal">
+        <details class="faq__item">
+          <summary class="faq__question">Is this fully online? What time are sessions held?</summary>
+          <div class="faq__answer">
+            Yes, fully online via Zoom. All sessions are scheduled in Eastern Time (ET). If
+            you're in a different timezone, all sessions are recorded so you can watch on
+            your own schedule and submit assignments at your own pace.
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__question">Do I need any prior film experience?</summary>
+          <div class="faq__answer">
+            No — Beginner is designed for complete newcomers. A smartphone is enough.
+            Intermediate is for students who have completed Beginner or have equivalent
+            hands-on experience.
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__question">What camera do I need?</summary>
+          <div class="faq__answer">
+            A smartphone is completely fine. The focus is on thinking and storytelling, not
+            expensive equipment.
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__question">How much time per week?</summary>
+          <div class="faq__answer">
+            Around 3–5 hours: live sessions plus weekly assignments. Designed to be
+            manageable alongside school or a full-time job.
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__question">What is the final project?</summary>
+          <div class="faq__answer">
+            In Beginner: a short film shot, edited, and submitted by you — reviewed
+            personally by both instructors. In Intermediate: a festival-ready short film
+            with a dedicated review session and guidance on where to submit it.
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__question">When does the next cohort start?</summary>
+          <div class="faq__answer">
+            Beginner and Intermediate cohorts run on separate schedules. Apply and we'll
+            confirm the next available date for your level. Spots are limited per group.
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       Section: Final CTA
+  ============================================================ -->
+  <section class="section section--cta section--alt" id="final-cta" aria-labelledby="final-title">
+    <div class="center">
+      <span class="eyebrow reveal">Ready?</span>
+      <h2 id="final-title" class="h2 h2--display final-cta__title reveal" style="margin-top: var(--space-md);">
+        Make your <em>first</em> film.
+      </h2>
+      <p class="final-cta__lede reveal">
+        Applications reviewed within 48 hours.
+      </p>
+      <div class="reveal">
+        <a href="/en/apply" class="btn btn--primary btn--xl">
+          Apply now
+          <span class="btn__arrow" aria-hidden="true">→</span>
+        </a>
+      </div>
+      <div class="urgency reveal">
+        <span class="urgency__dot" aria-hidden="true"></span>
+        Next cohort forming now — limited spots
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ============================================================
+     Footer
+============================================================ -->
+<footer class="footer">
+  <div class="center">
+    <div class="footer__top">
+      <a href="/" class="footer__logo">Moirai.</a>
+      <nav class="footer__nav" aria-label="Footer">
+        <a href="/en/beginner">Beginner</a>
+        <a href="/en/intermediate">Intermediate</a>
+        <a href="/en/bundle">Bundle</a>
+        <a href="/en/works">Works</a>
+        <a href="/en/journal">Journal</a>
+        <a href="/en/faq">FAQ</a>
+        <a href="/en/contact">Contact</a>
+      </nav>
+    </div>
+    <div class="footer__copy">
+      © 2026 Moirai · <a href="/en/legal/privacy" style="color: inherit;">Privacy</a> · <a href="/en/legal/terms" style="color: inherit;">Terms</a>
+    </div>
+  </div>
+</footer>
+
+<!-- ============================================================
+     Minimal vanilla JS — defer'd via type="module"
+============================================================ -->
+<script type="module">
+// Nav scroll state — toggle .is-scrolled after first scroll
+const nav = document.querySelector('.nav');
+let scrolled = false;
+const updateNavState = () => {
+  const isScrolled = window.scrollY > 24;
+  if (isScrolled !== scrolled) {
+    scrolled = isScrolled;
+    nav.classList.toggle('is-scrolled', isScrolled);
+  }
+};
+updateNavState();
+window.addEventListener('scroll', updateNavState, { passive: true });
+
+// Reveal-on-scroll via IntersectionObserver
+// Respects prefers-reduced-motion via CSS
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        e.target.classList.add('is-visible');
+        io.unobserve(e.target);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px', threshold: 0.05 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+} else {
+  // No IO support — show everything
+  document.querySelectorAll('.reveal').forEach(el => el.classList.add('is-visible'));
+}
+</script>
+
+</body>
+</html>
