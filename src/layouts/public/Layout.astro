@@ -1,0 +1,82 @@
+---
+/*
+ * Корневой layout для всех публичных страниц ([locale]/*.astro).
+ * Подключает design tokens, SEO head, skip link, base body shell.
+ *
+ * Стилизация секций (компонентов Hero/Section/Card и т.д.) —
+ * Stage 4. Сейчас body отдаёт чистую семантику без декоративных
+ * стилей, чтобы первый билд работал и читался скрин-ридером.
+ */
+
+import "../../styles/tokens.css";
+import SeoHead from "../../components/public/SeoHead.astro";
+
+interface Seo {
+  title: string;
+  description: string;
+  og_image?: string;
+  noindex?: boolean;
+}
+
+interface Props {
+  locale: "en" | "ru";
+  seo: Seo;
+}
+
+const { locale, seo } = Astro.props;
+const pathname = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0D0B09" />
+    <meta name="color-scheme" content="dark" />
+
+    <SeoHead locale={locale} pathname={pathname} seo={seo} />
+  </head>
+
+  <body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+
+    <main id="main">
+      <slot />
+    </main>
+
+    <footer>
+      <p>© 2026 Moirai — Vladimir Popov &amp; Anastasia Zasypkina.</p>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    line-height: var(--leading-normal);
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 4px;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+  }
+  .skip-link:focus {
+    left: 0;
+    top: 0;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-elevated);
+    color: var(--text);
+    z-index: 999;
+  }
+</style>

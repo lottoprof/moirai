@@ -24,4 +24,20 @@ export default [
     },
   },
   ...astro.configs.recommended,
+  {
+    /*
+     * Внутри .astro templates type-flow от typescript-eslint не
+     * полный (eslint-plugin-astro парсит JSX-выражения отдельно).
+     * Расслабляем `no-unsafe-*` правила специально для шаблонов.
+     * В .ts файлах строгие правила сохраняются.
+     */
+    files: ["**/*.astro"],
+    rules: {
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+    },
+  },
 ];
