@@ -123,6 +123,18 @@ pnpm build       # astro build (включая wrangler types)
 После каждого выполненного этапа из checklist — обязательны
 `git add` и `git commit` до перехода к следующему этапу.
 
+## PLANS LIFECYCLE (MANDATORY)
+
+1. Активный план живёт в `.agent/plans/active/<slug>.md`.
+2. **Как только все этапы плана выполнены и закоммичены** —
+   немедленно `git mv .agent/plans/active/<slug>.md
+   .agent/plans/done/` отдельным коммитом. Не ждать следующей
+   задачи и не откладывать на потом.
+3. В `.agent/plans/active/` могут лежать только планы, по которым
+   ещё есть незакрытые этапы. Пустота в `active/` — норма.
+4. Перед стартом новой задачи — проверить `ls .agent/plans/active/`:
+   завершённые остатки переносим в `done/` до начала новой работы.
+
 ## FORBIDDEN
 
 См. `.agent/rules/forbidden.md`.
