@@ -17,25 +17,33 @@ description: Use this skill when working on Astro 5 project structure, page rout
 ```
 src/
 ├── pages/
-│   ├── index.astro              # публичный landing
-│   ├── *.astro                  # публичные SEO-страницы
-│   ├── app/
-│   │   ├── index.astro          # ЛК — главная
-│   │   └── ...                  # защищённые страницы
+│   ├── [locale]/
+│   │   ├── index.astro          # публичный landing
+│   │   ├── *.astro              # публичные SEO-страницы
+│   │   └── dashboard/           # ЛК (student/instructor)
+│   ├── admin/                   # админка (без локали, role=admin)
 │   └── api/
-│       └── <route>.ts           # серверные эндпоинты
+│       └── <route>.ts           # серверные эндпоинты (без локали)
+├── content/                     # Content Collections (programmes,
+│   └── ...                      # bundles, instructors, journal, ...)
 ├── components/
 │   ├── public/                  # vanilla, CSS-only
-│   └── app/                     # islands, Vidstack
+│   ├── dashboard/               # islands, Vidstack
+│   └── admin/                   # CRUD-формы
 ├── layouts/
 │   ├── public/
-│   └── app/
+│   ├── dashboard/
+│   └── admin/
 ├── lib/
 │   ├── server/                  # edge-only код
 │   └── shared/                  # изоморфные утилиты
-├── middleware.ts                # auth/ratelimit на границе app
+├── middleware.ts                # auth-guard для dashboard и admin
 ├── styles/
 └── env.d.ts                     # типы биндингов + Astro.locals
+db/
+└── types.ts                     # ручные TS-типы строк D1
+migrations/
+└── NNNN_<name>.sql              # D1-миграции
 public/                          # статика (favicon, fonts, og-images)
 astro.config.mjs
 wrangler.toml
@@ -66,14 +74,14 @@ export default defineConfig({
 | Директива | Когда |
 |-----------|-------|
 | `client:load` | компонент нужен сразу при отрисовке (редко) |
-| `client:idle` | по умолчанию для большинства островов в `app/` |
+| `client:idle` | по умолчанию для большинства островов в `dashboard/` |
 | `client:visible` | компонент гидрируется при скролле в viewport |
 | `client:media="(...)"` | гидрация при совпадении media-query |
 | `client:only="<framework>"` | без SSR (учитывать fallback) |
 
-**В публичном слое** (`src/pages/*.astro`, `src/components/public/**`)
-ни одна `client:*` директива не используется — только Astro-рендер +
-vanilla `<script>` + CSS.
+**В публичном слое** (`src/pages/[locale]/*.astro`,
+`src/components/public/**`) ни одна `client:*` директива не
+используется — только Astro-рендер + vanilla `<script>` + CSS.
 
 ## Доступ к биндингам Cloudflare
 
@@ -120,9 +128,13 @@ declare namespace App {
 import { defineMiddleware } from "astro:middleware";
 
 export const onRequest = defineMiddleware(async (ctx, next) => {
-  // auth-guard для /app/**
-  if (ctx.url.pathname.startsWith("/app")) {
-    // проверка сессии через ctx.locals.runtime.env.KV_SESSIONS
+  const path = ctx.url.pathname;
+  // auth-guard для ЛК ([locale]/dashboard/**) и админки (/admin/**)
+  const isDashboard = /^\/[a-z]{2}\/dashboard(\/|$)/.test(path);
+  const isAdmin = path.startsWith("/admin");
+  if (isDashboard || isAdmin) {
+    // проверка сессии через ctx.locals.runtime.env (D1 auth_sessions)
+    // дополнительно для /admin: users.role === 'admin'
   }
   return next();
 });
