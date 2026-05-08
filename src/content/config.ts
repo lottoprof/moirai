@@ -16,6 +16,20 @@
 import { defineCollection, z } from "astro:content";
 import { glob } from "astro/loaders";
 
+/**
+ * Helper: glob loader для коллекций с конвенцией `[id].{locale}.mdx`.
+ * Сохраняет точки в id ("home.en", "beginner.ru"); по умолчанию
+ * Astro их стирает (homeen / beginnerru). Locale вытаскивается на
+ * стороне template/utility — split('.').pop().
+ */
+function localeAwareGlob(name: string) {
+  return glob({
+    pattern: "**/*.{md,mdx}",
+    base: `./src/content/${name}`,
+    generateId: ({ entry }) => entry.replace(/\.mdx?$/, ""),
+  });
+}
+
 // ============================================================
 // Shared sub-schemas
 // ============================================================
@@ -64,7 +78,7 @@ const monolingualField = { monolingual: z.boolean().optional() } as const;
 // ============================================================
 
 const programmes = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/programmes" }),
+  loader: localeAwareGlob("programmes"),
   schema: z.object({
     title: z.string().min(1),
     summary: z.string().min(1),
@@ -76,7 +90,7 @@ const programmes = defineCollection({
 });
 
 const bundles = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/bundles" }),
+  loader: localeAwareGlob("bundles"),
   schema: z.object({
     title: z.string().min(1),
     summary: z.string().min(1),
@@ -88,7 +102,7 @@ const bundles = defineCollection({
 });
 
 const instructors = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/instructors" }),
+  loader: localeAwareGlob("instructors"),
   schema: z.object({
     name: z.string().min(1),
     role: z.string().min(1), // "Film Director and Educator"
@@ -101,7 +115,7 @@ const instructors = defineCollection({
 });
 
 const segments = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/segments" }),
+  loader: localeAwareGlob("segments"),
   schema: z.object({
     title: z.string().min(1),
     audience: z.string().min(1), // "Content creators going deeper"
@@ -118,7 +132,7 @@ const segments = defineCollection({
  * Тип уточним когда появятся первые страницы (home + faq).
  */
 const pages = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/pages" }),
+  loader: localeAwareGlob("pages"),
   schema: z.object({
     title: z.string().min(1),
     sections: z.record(z.string(), z.unknown()).optional(),
@@ -136,7 +150,7 @@ const pages = defineCollection({
 });
 
 const journal = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/journal" }),
+  loader: localeAwareGlob("journal"),
   schema: z.object({
     title: z.string().min(1),
     slug: z.string().min(1),
@@ -151,7 +165,7 @@ const journal = defineCollection({
 });
 
 const works = defineCollection({
-  loader: glob({ pattern: "**/*.{md,mdx}", base: "./src/content/works" }),
+  loader: localeAwareGlob("works"),
   schema: z.object({
     title: z.string().min(1),
     slug: z.string().min(1),
