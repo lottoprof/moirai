@@ -48,6 +48,20 @@ dist/
 
 ## Хуки
 
-Если в проекте появятся git-хуки — они живут в `.git/hooks/` и не
-коммитятся. Шаблоны для шаринга — в отдельной директории (например,
-`scripts/git-hooks/`) с инструкцией по установке.
+Шаблоны хуков лежат в `scripts/git-hooks/` (tracked) — оттуда
+устанавливаются в `.git/hooks/` (untracked).
+
+```bash
+bash scripts/git-hooks/install.sh
+```
+
+Что сейчас стоит:
+
+- **pre-commit** — `npm run lint`. Пропускается, если в стейдже
+  только `*.md` или если `package.json` ещё нет (pre-scaffold
+  состояние).
+- **pre-push** — `npm run lint && npm run typecheck && npm run build`.
+  Скип на тех же условиях.
+
+Не запускать `git commit --no-verify` без явного запроса
+пользователя.

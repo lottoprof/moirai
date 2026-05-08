@@ -5,6 +5,7 @@
 
 ## M0. Скаффолд
 
+- [ ] Установить git-хуки: `bash scripts/git-hooks/install.sh`.
 - [ ] `npm create astro@latest` под minimal/typescript template.
 - [ ] Поставить `@astrojs/cloudflare`, прописать adapter в
       `astro.config.mjs`.

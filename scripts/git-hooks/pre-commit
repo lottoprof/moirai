@@ -1,0 +1,25 @@
+#!/bin/bash
+# moirai pre-commit hook: run lint on staged code changes.
+# Skips when only markdown/docs are staged, or when project is not
+# yet scaffolded (no package.json).
+
+set -e
+
+# Skip if package.json not present yet (pre-scaffold state)
+if [ ! -f package.json ]; then
+  exit 0
+fi
+
+# Collect staged files (added/modified/copied/renamed — exclude deletions)
+staged=$(git diff --cached --name-only --diff-filter=d)
+if [ -z "$staged" ]; then
+  exit 0
+fi
+
+# Skip if only markdown changed
+non_md=$(echo "$staged" | grep -v '\.md$' || true)
+if [ -z "$non_md" ]; then
+  exit 0
+fi
+
+npm run lint

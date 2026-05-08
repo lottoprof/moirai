@@ -1,0 +1,31 @@
+#!/bin/bash
+# moirai pre-push hook: run full quality gate on code changes.
+# Skips when the push contains only markdown changes, or when project
+# is not yet scaffolded (no package.json).
+
+set -e
+
+# Skip if package.json not present yet (pre-scaffold state)
+if [ ! -f package.json ]; then
+  exit 0
+fi
+
+# stdin: <local_ref> <local_sha> <remote_ref> <remote_sha>
+while read local_ref local_sha remote_ref remote_sha; do
+  # New branch (remote sha all zeros) — diff against empty tree
+  if [[ "$remote_sha" =~ ^0+$ ]]; then
+    changed=$(git diff --name-only "$local_sha" 2>/dev/null)
+  else
+    changed=$(git diff --name-only "$remote_sha..$local_sha" 2>/dev/null)
+  fi
+
+  non_md=$(echo "$changed" | grep -v '\.md$' || true)
+  if [ -n "$non_md" ]; then
+    npm run lint
+    npm run typecheck
+    npm run build
+    exit 0
+  fi
+done
+
+exit 0
