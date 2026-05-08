@@ -1,0 +1,27 @@
+name = "moirai"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "./dist"
+
+# Биндинги добавляются по мере необходимости.
+# После любой правки этого файла — выполнить:
+#   pnpm exec wrangler types
+# и закоммитить worker-configuration.d.ts вместе с wrangler.toml.
+
+# [[d1_databases]]
+# binding         = "DB"
+# database_name   = "moirai-prod"
+# database_id     = "<uuid>"
+# migrations_dir  = "migrations"
+
+# [[kv_namespaces]]
+# binding    = "KV_CONFIG"
+# id         = "<id>"
+# preview_id = "<preview-id>"
+
+# [[r2_buckets]]
+# binding     = "MEDIA"
+# bucket_name = "moirai-media"
+
+# [vars]
+# ENVIRONMENT = "production"

@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "astro.config.mjs",
+    "eslint.config.mjs",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.astro",
+    "db/**/*.ts"
+  ],
+  "exclude": ["dist", "node_modules", ".wrangler", ".astro"]
+}
