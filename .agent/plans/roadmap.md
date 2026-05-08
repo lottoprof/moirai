@@ -6,15 +6,15 @@
 ## M0. Скаффолд
 
 - [ ] Установить git-хуки: `bash scripts/git-hooks/install.sh`.
-- [ ] `npm create astro@latest` под minimal/typescript template.
+- [ ] `pnpm create astro@latest` под minimal/typescript template.
 - [ ] Поставить `@astrojs/cloudflare`, прописать adapter в
       `astro.config.mjs`.
 - [ ] Зафиксировать `output` (`server` / `hybrid`) в
       `decisions.md`.
 - [ ] Стартовый `wrangler.toml` с `pages_build_output_dir`.
-- [ ] `npm run lint` / `npm run typecheck` / `npm run build`
-      проходят на пустом скелете.
-- [ ] `npx wrangler pages dev` запускает локальный dev.
+- [ ] `pnpm lint` / `pnpm typecheck` / `pnpm build` проходят на
+      пустом скелете.
+- [ ] `pnpm wrangler pages dev` запускает локальный dev.
 
 ## M1. Структура слоёв
 

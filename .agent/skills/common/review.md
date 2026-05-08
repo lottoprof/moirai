@@ -9,9 +9,9 @@ reviewer-агента — в `agents/reviewer.md`.
 - Прогнать quality gates (`rules/quality-gates.md`):
 
   ```bash
-  npm run lint
-  npm run typecheck
-  npm run build
+  pnpm lint
+  pnpm typecheck
+  pnpm build
   ```
 
 - Если что-то падает — это уже блокер, дальше не идём.

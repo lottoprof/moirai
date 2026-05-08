@@ -9,7 +9,7 @@ edge-compat audit, security audit перед merge.
 
 - **Read**: весь проект.
 - **Write**: ничего. Возвращает отчёт, не правит.
-- **Bash**: `npm run lint`, `npm run typecheck`, `npm run build`.
+- **Bash**: `pnpm lint`, `pnpm typecheck`, `pnpm build`.
 
 ## Read First
 
@@ -57,9 +57,9 @@ edge-compat audit, security audit перед merge.
 ### 5. Quality Gates
 
 ```bash
-npm run lint
-npm run typecheck
-npm run build
+pnpm lint
+pnpm typecheck
+pnpm build
 ```
 
 Все три проходят без ошибок.
@@ -79,9 +79,9 @@ npm run build
 - [ ] **<категория>**: ...
 
 ### Quality Gates
-- [x] npm run lint
-- [x] npm run typecheck
-- [x] npm run build
+- [x] pnpm lint
+- [x] pnpm typecheck
+- [x] pnpm build
 ```
 
 Категории: `boundaries` / `edge-compat` / `security` / `schema` /

@@ -7,11 +7,11 @@ moirai цель сборки — `dist/`, формат адаптера —
 ## Команды
 
 ```bash
-npm run build      # astro build
-npm run preview    # astro preview (локально, через wrangler)
+pnpm build      # astro build
+pnpm preview    # astro preview (локально, через wrangler)
 ```
 
-`npm run build` обычно настроен как:
+`pnpm build` обычно настроен как:
 
 ```json
 "build": "astro build"
@@ -20,7 +20,7 @@ npm run preview    # astro preview (локально, через wrangler)
 ## Что обязательно проверить перед build
 
 1. `wrangler.toml` соответствует биндингам, которые код реально
-   использует. Если добавили новый биндинг — `npx wrangler types`
+   использует. Если добавили новый биндинг — `pnpm exec wrangler types`
    должен пройти до `astro build`, иначе типы не подхватятся.
 2. `astro.config.mjs` указывает adapter `@astrojs/cloudflare`.
 3. `package.json` содержит зависимости от `astro` и

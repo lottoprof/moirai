@@ -145,9 +145,9 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
 ## Команды
 
 ```bash
-npm run dev        # astro dev (с platformProxy → биндинги доступны)
-npm run build      # astro build
-npm run preview    # astro preview (локально через wrangler)
+pnpm dev        # astro dev (с platformProxy → биндинги доступны)
+pnpm build      # astro build
+pnpm preview    # astro preview (локально через wrangler)
 ```
 
 Подробности по wrangler — в `skills/wrangler/SKILL.md`.

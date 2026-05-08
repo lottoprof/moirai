@@ -1,0 +1,26 @@
+# Node / pnpm
+node_modules/
+.pnpm-store/
+
+# Astro / Vite
+dist/
+.astro/
+
+# Wrangler / Cloudflare
+.wrangler/
+worker-configuration.d.ts
+
+# Secrets — wrangler secret put / .dev.vars only
+.env
+.env.*
+.dev.vars
+
+# Editor / OS
+.DS_Store
+*.log
+
+# Legacy archive (factory-era plans, kept on disk for reference)
+.agent/plans/done/
+
+# Старый worktree от factory — удалён; запрет на повторное появление
+.agent/worktrees/

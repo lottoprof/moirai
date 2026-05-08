@@ -7,8 +7,8 @@ description: Use this skill for all Cloudflare wrangler operations — local dev
 
 ## Версия и установка
 
-`wrangler` ставится как dev-зависимость (`npm i -D wrangler`).
-Запуск через `npx wrangler` или npm-скрипты. Не использовать
+`wrangler` ставится как dev-зависимость (`pnpm add -D wrangler`).
+Запуск через `pnpm exec wrangler` или pnpm-скрипты. Не использовать
 глобально установленный wrangler — версия должна быть зафиксирована
 в `package.json`.
 
@@ -47,12 +47,16 @@ pages_build_output_dir = "./dist"
 
 ## Локальная разработка
 
+Два режима (см. Architecture §12):
+
 ```bash
-# Astro dev с эмуляцией биндингов
-npm run dev
-# Под капотом: astro dev — adapter с platformProxy подаёт биндинги
-# через locals.runtime.env. Для секретов — .dev.vars в корне.
+pnpm dev                       # astro dev (Vite, HMR, без CF bindings)
+pnpm wrangler pages dev        # miniflare с D1/R2/KV/env (полная эмуляция)
 ```
+
+`platformProxy` в `astro.config.mjs` подаёт биндинги в
+`Astro.locals.runtime.env` на `pnpm dev` для базовых сценариев.
+Для полноценной отладки D1/R2/KV нужен второй режим.
 
 `.dev.vars` — формат как `.env`:
 
@@ -67,18 +71,18 @@ SOME_API_KEY=...
 Альтернативно — запуск на собранной статике:
 
 ```bash
-npm run build
-npx wrangler pages dev ./dist
+pnpm build
+pnpm exec wrangler pages dev ./dist
 ```
 
 ## Деплой
 
 ```bash
 # Deploy на Pages (production)
-npx wrangler pages deploy ./dist --project-name moirai
+pnpm exec wrangler pages deploy ./dist --project-name moirai
 
 # Preview-деплой (на ветку)
-npx wrangler pages deploy ./dist --project-name moirai --branch preview/<name>
+pnpm exec wrangler pages deploy ./dist --project-name moirai --branch preview/<name>
 ```
 
 Альтернативный путь — git-driven deploy через подключение Pages-проекта
@@ -91,49 +95,58 @@ npx wrangler pages deploy ./dist --project-name moirai --branch preview/<name>
 
 ```bash
 # Production-секрет
-npx wrangler pages secret put MASTER_SECRET --project-name moirai
+pnpm exec wrangler pages secret put MASTER_SECRET --project-name moirai
 
 # Список
-npx wrangler pages secret list --project-name moirai
+pnpm exec wrangler pages secret list --project-name moirai
 
 # Удаление
-npx wrangler pages secret delete MASTER_SECRET --project-name moirai
+pnpm exec wrangler pages secret delete MASTER_SECRET --project-name moirai
 ```
 
 Локально — в `.dev.vars`. См. `rules/security.md`.
 
 ## D1 — миграции
 
+Архитектура (v0.8.1 §12) фиксирует канонический формальный flow
+через `wrangler d1 migrations`. Файлы лежат в `migrations/` (top-level),
+TS-типы — в `db/types.ts` (см. `agents/schema.md`).
+
 ```bash
 # Создать БД (один раз)
-npx wrangler d1 create moirai-prod
+pnpm exec wrangler d1 create moirai-prod
 
-# Применить миграцию (вручную, по одному файлу)
-npx wrangler d1 execute moirai-prod --remote \
-  --file=schema/migrations/0001_init.sql
+# Создать новую миграцию (генерит migrations/NNNN_<name>.sql)
+pnpm exec wrangler d1 migrations create moirai-prod <name>
 
-# Локальная база (эмуляция)
-npx wrangler d1 execute moirai-prod --local \
-  --file=schema/migrations/0001_init.sql
+# Применить все pending локально (miniflare)
+pnpm exec wrangler d1 migrations apply moirai-prod --local
 
-# Произвольный SQL (interactive)
-npx wrangler d1 execute moirai-prod --remote \
+# Применить все pending на production (требует явного подтверждения)
+pnpm exec wrangler d1 migrations apply moirai-prod --remote
+
+# Список применённых
+pnpm exec wrangler d1 migrations list moirai-prod --remote
+
+# Произвольный SQL для отладки (read-only — безопасно)
+pnpm exec wrangler d1 execute moirai-prod --remote \
   --command="SELECT * FROM users LIMIT 10"
 ```
 
-**Не запускать `--remote` мутации без явного подтверждения
+**Не запускать `--remote` мутации (`migrations apply --remote`,
+`execute --remote --file=...`) без явного подтверждения
 пользователя.** См. `agents/schema.md`.
 
 ## KV / R2
 
 ```bash
 # KV
-npx wrangler kv:namespace create KV_SESSIONS
-npx wrangler kv:key list --binding=KV_SESSIONS
+pnpm exec wrangler kv:namespace create KV_SESSIONS
+pnpm exec wrangler kv:key list --binding=KV_SESSIONS
 
 # R2
-npx wrangler r2 bucket create moirai-media
-npx wrangler r2 object list moirai-media
+pnpm exec wrangler r2 bucket create moirai-media
+pnpm exec wrangler r2 object list moirai-media
 ```
 
 ## Типы биндингов
@@ -141,7 +154,7 @@ npx wrangler r2 object list moirai-media
 После любой правки `wrangler.toml`:
 
 ```bash
-npx wrangler types
+pnpm exec wrangler types
 ```
 
 Создаёт / обновляет `worker-configuration.d.ts` с типом `Env`.
@@ -151,7 +164,7 @@ npx wrangler types
 
 ```bash
 # Tail логов production-деплоя
-npx wrangler pages deployment tail --project-name moirai
+pnpm exec wrangler pages deployment tail --project-name moirai
 ```
 
 ## Pitfalls

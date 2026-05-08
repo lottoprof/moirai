@@ -10,9 +10,9 @@
 ## Vitest (если используется)
 
 ```bash
-npm test                   # vitest run
-npm test -- --watch        # watch mode
-npm test -- <pattern>      # фильтр по имени
+pnpm test                   # vitest run
+pnpm test -- --watch        # watch mode
+pnpm test -- <pattern>      # фильтр по имени
 ```
 
 Конфиг: `vitest.config.ts`. Окружение для Astro-кода обычно
@@ -50,10 +50,10 @@ tests/
 ## Playwright (если используется)
 
 ```bash
-npx playwright test
-npx playwright test --headed
-npx playwright test --debug
-npx playwright show-report
+pnpm exec playwright test
+pnpm exec playwright test --headed
+pnpm exec playwright test --debug
+pnpm exec playwright show-report
 ```
 
 Конфиг: `playwright.config.ts`. baseURL — локальный
@@ -62,7 +62,7 @@ npx playwright show-report
 ## Coverage
 
 ```bash
-npm test -- --coverage
+pnpm test -- --coverage
 ```
 
 Не ставить целевой % покрытия как формальное требование без
@@ -74,7 +74,7 @@ npm test -- --coverage
    серверной логики нужен `@cloudflare/vitest-pool-workers`,
    иначе `Astro.locals.runtime.env` будет undefined.
 2. **Playwright против `astro dev`** — может быть нестабильно из-за
-   HMR. Запускать против `npm run build && wrangler pages dev` или
+   HMR. Запускать против `pnpm build && pnpm wrangler pages dev` или
    против preview-URL.
 3. **Тестовые секреты** — в `.dev.vars`, не в `.env`. Никогда не в
    commit.

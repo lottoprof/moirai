@@ -53,9 +53,9 @@ API-эндпоинты, middleware, конфигурация Astro и wrangler,
 ## Quality Gates
 
 ```bash
-npm run lint
-npm run typecheck
-npm run build
+pnpm lint
+pnpm typecheck
+pnpm build
 ```
 
 Build проверяет, что edge-compat не нарушен.

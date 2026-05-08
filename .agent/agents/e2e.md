@@ -40,13 +40,15 @@
 
 ```bash
 # Локальный dev
-npx wrangler pages dev ./dist  # после npm run build
+pnpm exec wrangler pages dev ./dist   # после pnpm build
 # или
-npm run dev                    # если такой скрипт настроен
+pnpm dev                              # если без CF bindings достаточно
+# или
+pnpm wrangler pages dev               # с D1/R2/KV/env через miniflare
 
 # Playwright tests (если настроены)
-npx playwright test
-npx playwright test --headed --debug
+pnpm exec playwright test
+pnpm exec playwright test --headed --debug
 ```
 
 ## Delegation Handoff

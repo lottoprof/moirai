@@ -21,9 +21,9 @@ while read local_ref local_sha remote_ref remote_sha; do
 
   non_md=$(echo "$changed" | grep -v '\.md$' || true)
   if [ -n "$non_md" ]; then
-    npm run lint
-    npm run typecheck
-    npm run build
+    pnpm lint
+    pnpm typecheck
+    pnpm build
     exit 0
   fi
 done

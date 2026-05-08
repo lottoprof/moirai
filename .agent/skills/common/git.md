@@ -57,10 +57,10 @@ bash scripts/git-hooks/install.sh
 
 Что сейчас стоит:
 
-- **pre-commit** — `npm run lint`. Пропускается, если в стейдже
+- **pre-commit** — `pnpm lint`. Пропускается, если в стейдже
   только `*.md` или если `package.json` ещё нет (pre-scaffold
   состояние).
-- **pre-push** — `npm run lint && npm run typecheck && npm run build`.
+- **pre-push** — `pnpm lint && pnpm typecheck && pnpm build`.
   Скип на тех же условиях.
 
 Не запускать `git commit --no-verify` без явного запроса

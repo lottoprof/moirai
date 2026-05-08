@@ -83,7 +83,7 @@ hosting:     Cloudflare Pages
 public:      Vanilla JS + CSS-only animations
 app (ЛК):    Astro islands, Vidstack media player
 storage:     D1 / KV / R2 (по необходимости, биндинги через wrangler.toml)
-tooling:     wrangler, npm, eslint, typescript, vitest (опц.), playwright (e2e)
+tooling:     wrangler, pnpm, eslint, typescript, vitest (опц.), playwright (e2e)
 ```
 
 ## LINTING AND CHECKS
@@ -91,9 +91,9 @@ tooling:     wrangler, npm, eslint, typescript, vitest (опц.), playwright (e2
 См. `.agent/rules/quality-gates.md`. Каноничные команды:
 
 ```bash
-npm run lint        # eslint
-npm run typecheck   # astro check + tsc --noEmit (через astro)
-npm run build       # astro build (включая wrangler types)
+pnpm lint        # eslint
+pnpm typecheck   # astro check + tsc --noEmit (через astro)
+pnpm build       # astro build (включая wrangler types)
 ```
 
 ## ARCHITECTURAL RULES
