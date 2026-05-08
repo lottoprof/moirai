@@ -17,7 +17,7 @@ fi
 #    Цены живут в Content Collections (тиры) и D1 (runs), не в шаблонах.
 #    Игнорируем .md (декларативный контент) и сам hook-каталог.
 code_staged=$(echo "$staged" \
-  | grep -vE '\.md$|^scripts/git-hooks/' || true)
+  | grep -vE '\.md$|^scripts/git-hooks/|^docs/' || true)
 
 if [ -n "$code_staged" ]; then
   # \$<digits> или {€£¥₽}<digits> — захардкоженная цена в коде
