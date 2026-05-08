@@ -113,3 +113,65 @@ Architecture v0.8.1) `rules/boundaries.md` начал ссылаться на
 маппится на UI-зоны Architecture v0.8.1 (public / dashboard /
 admin / content / server / schema), что упрощает routing задач
 и ревью boundaries.
+
+---
+
+## 2026-05-08: Sprint 0 bootstrap — output mode, locales, tooling
+
+**Контекст.** Architecture.md §arch оставила открытыми технические
+параметры до первого скаффолда: `output` mode (`server` vs `hybrid`),
+стартовый список локалей, `compatibility_date`, версия pnpm.
+Stage 2 Sprint 0 фиксирует эти решения через первые конфиги
+(`astro.config.mjs`, `wrangler.toml`, `package.json`, `.nvmrc`).
+
+**Решение.**
+
+- **`output: "server"`.** Адаптер `@astrojs/cloudflare` требует
+  `server` (`hybrid` deprecated в Astro 5). Публичные SEO-страницы
+  по факту статика — будут добавлять `export const prerender = true`
+  per-template (Stage 3+). SSR-default только для runs/dashboard/
+  admin/api роутов.
+- **Локали `["en", "ru"]`.** Architecture v0.5 заменила `es → ru`,
+  EN базовый. `defaultLocale: "en"`, `prefixDefaultLocale: true`,
+  `redirectToDefaultLocale: false` (root `/` редиректится middleware'ом
+  по `Accept-Language`). Список — данные, расширение через
+  `astro.config.mjs`.
+- **`compatibility_date: "2026-05-01"`.** Ближайшая стабильная под
+  текущий wrangler 4.90. `compatibility_flags: ["nodejs_compat"]`
+  включён превентивно — отдельные пакеты (`resend`, опц.) могут
+  дёргать Node-API; флаг безопасен на CF runtime.
+- **Node 22 LTS** через `.nvmrc` + `engines.node >= 22`.
+  Wrangler 4 требует Node 22+.
+- **pnpm 10.18 через corepack** (`packageManager` поле). pnpm 11
+  по дефолту блокирует postinstall-скрипты для esbuild/sharp/workerd
+  с интерактивным `pnpm approve-builds`, что не работает в
+  не-TTY-окружении (CI, agent). pnpm 10 имеет старое разрешительное
+  поведение + `pnpm.onlyBuiltDependencies` allow-list в package.json.
+  Апгрейд до 11 — отдельная задача, когда появится автомат для
+  approve-builds.
+- **Runtime types через `wrangler types`** (`worker-configuration.d.ts`)
+  вместо `@cloudflare/workers-types`. Wrangler 4 deprecated пакет,
+  runtime types точнее (отражают реальный compatibility_date и flags).
+  Файл коммитится (gitignore-fix `3416cbc` снял игнор).
+- **ESLint flat config** (`eslint.config.mjs`) с
+  `typescript-eslint strictTypeChecked` + `eslint-plugin-astro`.
+  Type-aware правила требуют отдельного `tsconfig.eslint.json`
+  (commit `dd76be1` фиксировал требование, теперь файл создан).
+
+**Альтернативы.**
+
+- `output: "hybrid"` — отказ: Astro 5 признал deprecated, Core
+  рекомендует `server` + per-route `prerender = true`.
+- `output: "static"` без адаптера — отказ: SSR-роуты (runs/D1,
+  dashboard, admin, api) фундаментальны для платформы. Статика
+  не закроет.
+- pnpm 11 — отложено до решения approve-builds в non-TTY.
+- npm/yarn — отказ: pnpm стандарт стека (commit `d67e379`
+  Architecture v0.8.1 stage1).
+- `@cloudflare/workers-types` — отказ: deprecated в новых wrangler.
+
+**Причина.** Минимально-достаточный bootstrap, который проходит
+`pnpm install`, `pnpm lint`, `pnpm typecheck` без ошибок и не
+блокирует pre-commit hook. Все решения откатываемы (можно
+переехать на pnpm 11 / расширить локали / поменять
+compatibility_date) без перестройки структуры.

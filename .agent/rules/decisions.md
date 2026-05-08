@@ -20,3 +20,9 @@
   без локали, role=admin) и `content` (`src/content/**` +
   `drafts/**`). D1-миграции переехали в `migrations/` (top-level)
   + `db/types.ts` (ручные TS-типы, без ORM).
+- **2026-05-08** — Sprint 0 bootstrap: `output: "server"` (опт-ин
+  prerender per-route для статики), locales `[en, ru]`,
+  `prefixDefaultLocale: true`, `compatibility_date 2026-05-01`,
+  Node 22 LTS, pnpm 10.18 через corepack, `wrangler types` →
+  `worker-configuration.d.ts` (runtime types заменили
+  `@cloudflare/workers-types`).
