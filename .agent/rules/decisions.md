@@ -14,3 +14,9 @@
   adapter + Cloudflare Pages; публичный SEO-слой = vanilla JS +
   CSS-only анимации; защищённая зона (ЛК) = Astro islands +
   Vidstack; деплой и dev — через wrangler.
+- **2026-05-08** — Agent roster v0.8.1: ростер `.agent/agents/`
+  выровнен с Architecture v0.8.1. `astro-app` → `astro-dashboard`
+  (`[locale]/dashboard/**`), добавлены `astro-admin` (`/admin/**`,
+  без локали, role=admin) и `content` (`src/content/**` +
+  `drafts/**`). D1-миграции переехали в `migrations/` (top-level)
+  + `db/types.ts` (ручные TS-типы, без ORM).
