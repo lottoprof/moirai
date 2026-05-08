@@ -1,0 +1,137 @@
+/*
+ * Moirai — Design System v0.1 design tokens.
+ * Source of truth: docs/Design_system.md §3–7 + §11.
+ * Используется глобально через импорт в Layout. Никаких хардкодов
+ * цветов/spacing/типографики в компонентах — только эти переменные.
+ *
+ * @font-face декларации, fallback с size-adjust и иконки sprite —
+ * отдельные файлы (fonts.css, base.css), добавляются позже.
+ */
+
+:root {
+  /* ============================================
+     Fonts (families only; @font-face — fonts.css)
+     ============================================ */
+  --font-display: "Cormorant Garamond", "Cormorant Fallback", Georgia, serif;
+  --font-body:    "Outfit", "Outfit Fallback", system-ui, sans-serif;
+
+  /* ============================================
+     Colors — raw palette
+     ============================================ */
+  --ink:           #0D0B09;
+  --ink-elevated:  #1A1612;
+  --paper:         #F7F3EC;
+  --paper-muted:   #C8BFB0;
+  --paper-faint:   #7A7168;
+  --amber:         #D4820A;
+  --amber-light:   #F0A830;
+  --amber-faint:   rgba(212, 130, 10, 0.12);
+  --line:          rgba(247, 243, 236, 0.08);
+  --line-strong:   rgba(247, 243, 236, 0.16);
+
+  /* ============================================
+     Colors — semantic tokens (use these in code)
+     ============================================ */
+  --bg:                var(--ink);
+  --bg-elevated:       var(--ink-elevated);
+  --text:              var(--paper);
+  --text-muted:        var(--paper-muted);
+  --text-faint:        var(--paper-faint);
+  --text-accent:       var(--amber);
+  --text-accent-hover: var(--amber-light);
+  --button-bg:         var(--amber);
+  --button-bg-hover:   var(--amber-light);
+  --button-text:       var(--ink);
+  --link:              var(--amber);
+  --link-hover:        var(--amber-light);
+  --border:            var(--line);
+  --border-strong:     var(--line-strong);
+  --focus-ring:        var(--amber);
+
+  /* ============================================
+     Typography — scale (responsive via clamp)
+     ============================================ */
+  --type-display-xl:   clamp(64px, 8vw, 120px);   /* hero h1 */
+  --type-display-lg:   clamp(48px, 6vw, 80px);    /* final CTA */
+  --type-display-md:   clamp(32px, 3.5vw, 48px);  /* section h2 */
+  --type-display-sm:   clamp(24px, 2.5vw, 32px);  /* small h2 */
+  --type-body-lg:      18px;
+  --type-body-md:      16px;
+  --type-body-sm:      14px;
+  --type-micro-lg:     13px;
+  --type-micro-md:     12px;
+  --type-micro-sm:     10px;
+
+  /* ============================================
+     Typography — tracking (letter-spacing)
+     ============================================ */
+  --tracking-tight:    -0.01em;  /* display */
+  --tracking-normal:   0;
+  --tracking-wide:     0.1em;    /* CTA, secondary */
+  --tracking-wider:    0.14em;   /* eyebrow */
+  --tracking-widest:   0.2em;    /* extreme caps */
+
+  /* ============================================
+     Typography — line height
+     ============================================ */
+  --leading-tight:     0.95;     /* hero h1 */
+  --leading-snug:      1.1;      /* h2 */
+  --leading-normal:    1.5;      /* body */
+  --leading-relaxed:   1.7;      /* long form */
+
+  /* ============================================
+     Spacing — 4-point grid
+     ============================================ */
+  --space-2xs:  4px;
+  --space-xs:   8px;
+  --space-sm:   12px;
+  --space-md:   16px;
+  --space-lg:   24px;
+  --space-xl:   32px;
+  --space-2xl:  48px;
+  --space-3xl:  64px;
+  --space-4xl:  96px;
+  --space-5xl:  128px;
+  --space-6xl:  192px;          /* между большими секциями */
+
+  /* ============================================
+     Layout — container
+     ============================================ */
+  --container-max:     1200px;
+  --container-pad:     clamp(20px, 5vw, 48px);
+
+  /* ============================================
+     Animation
+     ============================================ */
+  --ease-out:        cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:     cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast:   150ms;
+  --duration-normal: 250ms;
+  --duration-slow:   400ms;
+  --duration-rise:   900ms;
+}
+
+/*
+ * Breakpoints — CSS custom properties не работают в @media, поэтому
+ * только справочные значения (используй literals в @media):
+ *   sm  ≥ 640px   phones large
+ *   md  ≥ 768px   tablets
+ *   lg  ≥ 1024px  desktops small
+ *   xl  ≥ 1280px  desktops
+ *   2xl ≥ 1536px  wide desktops
+ */
+
+/*
+ * Reduced motion — глобально гасим анимации/transitions.
+ * См. docs/Design_system.md §11.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
