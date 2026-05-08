@@ -50,6 +50,8 @@
 ## M5. Качество и e2e
 
 - [ ] ESLint flat config с `eslint-plugin-astro`.
+- [ ] `tsconfig.eslint.json` в корне (см. `skills/js-ts/lint.md`)
+      — отдельный конфиг для type-aware линта серверного кода.
 - [ ] (опц.) Vitest + workers-pool для серверного кода.
 - [ ] Playwright smoke-тесты против `wrangler pages dev`.
 - [ ] CI (отдельным решением): запуск lint/typecheck/build.

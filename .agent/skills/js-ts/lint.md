@@ -21,15 +21,60 @@ import ts from "typescript-eslint";
 export default [
   ...ts.configs.recommended,
   ...astro.configs.recommended,
+
+  // Type-aware линт серверного кода (no-floating-promises и т.п.)
   {
+    files: ["src/pages/api/**/*.ts", "src/lib/server/**/*.ts", "src/middleware.ts"],
+    languageOptions: {
+      parserOptions: {
+        project: "./tsconfig.eslint.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
     rules: {
-      // проектные правила
-    }
-  }
+      "@typescript-eslint/no-floating-promises": ["error", { ignoreVoid: true }],
+    },
+  },
 ];
 ```
 
 Список плагинов и зависимостей — в `package.json` (`devDependencies`).
+
+## tsconfig.eslint.json (обязательный артефакт)
+
+Отдельный TypeScript-конфиг **только для type-aware ESLint** —
+ускоряет линт и сужает зону анализа. Лежит в корне проекта рядом
+с `tsconfig.json`.
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.astro",
+    "worker-configuration.d.ts"
+  ]
+}
+```
+
+Зачем отдельный, а не основной `tsconfig.json`:
+- основной `tsconfig.json` (генерируется Astro) тащит widening
+  настройки и может быть медленным для type-aware прогона на каждом
+  изменении;
+- здесь явно указаны нужные `types: ["@cloudflare/workers-types"]`,
+  чтобы биндинги/`Env` корректно резолвились в линте;
+- `include` минимальный: только то, что хотим проверять
+  type-aware-правилами.
+
+Подключается через `parserOptions.project` в flat-config (см. выше).
 
 ## Правила (рекомендуемая базовая линия)
 
