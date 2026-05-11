@@ -1,39 +1,41 @@
 ---
 name: deploy
-description: Use this skill for any moirai deployment to Cloudflare Pages. Covers wrangler-driven deploys, git-driven deploys (Pages connected to repo), preview deploys per branch, secret rotation, and post-deploy verification. Always read skills/wrangler/SKILL.md first.
+description: Use this skill for any moirai deployment to Cloudflare Pages. Covers wrangler-driven deploys (production/preview), local smoke via CF runtime emulator, post-deploy verification, and rollback. Always read .agent/skills/wrangler/SKILL.md first.
 ---
 
 # Deploy — Cloudflare Pages
 
 ## Scope
 
-В скоупе SKILL — деплой Astro 5 проекта moirai на Cloudflare Pages.
+Деплой Astro 5 проекта **moirai** на Cloudflare Pages через wrangler 4.
 
-Поддерживаются два пути:
-
-1. **Wrangler-driven** — явный `wrangler pages deploy` с локальной
-   машины или из CI.
-2. **Git-driven** — Pages-проект подключён к Git-репозиторию,
-   деплой триггерится `git push`.
-
-Конкретный путь для production фиксируется отдельным решением в
-`decisions.md`.
+Поддерживается **wrangler-driven** путь — явный `wrangler pages
+deploy` с локальной машины или из CI. Git-driven (Pages подключён к
+GitHub-репозиторию с auto-build на push) — отдельная задача после
+валидации ручного пайплайна.
 
 ## Out of scope
 
-- Деплой Cloudflare Workers (отдельных воркеров вне Pages) — если
-  понадобится, оформить отдельным skill'ом.
-- DNS-настройки и привязка кастомного домена — операция
-  пользователя в Cloudflare Dashboard.
+- Workers (отдельные воркеры вне Pages) — другой skill.
+- DNS / привязка кастомного домена `moirai.film` — операция
+  пользователя в CF Dashboard. Отдельный план после первого
+  `*.pages.dev` деплоя.
+- Биндинги (D1/KV/R2/secrets) — добавятся когда появятся фичи,
+  требующие persistent storage. На первом деплое все биндинги в
+  `wrangler.toml` закомментированы.
 
 ## Prerequisites
 
 1. Прочитан `.agent/skills/wrangler/SKILL.md`.
-2. `wrangler` авторизован (`pnpm exec wrangler login`) — операция
-   пользователя.
-3. Pages-проект существует. Если нет — `pnpm exec wrangler pages project
-   create moirai`.
-4. Сборка прошла локально без ошибок:
+2. Wrangler авторизован — операция пользователя (один раз):
+
+   ```bash
+   ! corepack pnpm exec wrangler login
+   ```
+
+   Откроется браузер, OAuth-токен ляжет в `~/.config/.wrangler/`.
+
+3. Quality gates пройдены локально:
 
    ```bash
    pnpm lint
@@ -41,108 +43,165 @@ description: Use this skill for any moirai deployment to Cloudflare Pages. Cover
    pnpm build
    ```
 
+   `dist/` должен существовать перед `wrangler pages deploy`.
+
+## Preflight checklist (агент перед триггером деплоя)
+
+- [ ] `git status` чистый (нет незакоммиченных файлов, иначе
+      `--commit-dirty` пометит деплой как «грязный»).
+- [ ] `pnpm build` отработал, `dist/` существует и не пустой.
+- [ ] `wrangler.toml` валиден (см. `wrangler` skill — `name`,
+      `compatibility_date`, `pages_build_output_dir`).
+- [ ] Биндинги, реально используемые в коде, объявлены в
+      `wrangler.toml` (для первого деплоя — пусто, биндингов нет).
+- [ ] Понятно, куда деплоим: production (`main`) или preview (ветка).
+
+## Local smoke (CF runtime emulator)
+
+Перед production-деплоем — обязательный smoke на локальном
+miniflare. Auth НЕ требуется.
+
+```bash
+pnpm build
+pnpm exec wrangler pages dev ./dist
+# открыть http://localhost:8788
+```
+
+Проверить:
+- `/` → 302 на `/en/` или `/ru/` (`Accept-Language`-зависимо)
+  + `X-Robots-Tag: noindex` на корне.
+- `/en/` и `/ru/` рендерят HTML, hreflang/canonical в `<head>`.
+- `/sitemap-index.xml` отдаётся.
+- В консоли wrangler нет фатальных ошибок (warnings про KV
+  `SESSION` сейчас игнорируем — биндинг закомментирован).
+
+Если smoke падает — фиксим до production. На прод не выкатываем
+неработающее.
+
 ## Wrangler-driven deploy
 
 ### Production
 
 ```bash
-# Полный пайплайн
-pnpm build
-pnpm exec wrangler pages deploy ./dist --project-name moirai
+pnpm deploy
+# = pnpm build && wrangler pages deploy ./dist \
+#     --project-name moirai --branch main
 ```
+
+При первом запуске wrangler:
+- спросит создать Pages-проект `moirai` (Enter — соглашаемся);
+- зальёт `dist/`;
+- вернёт URL вида `https://<hash>.moirai.pages.dev`;
+- production URL — `https://moirai.pages.dev` (или с суффиксом
+  если имя занято).
 
 Маркеры успеха в выводе:
 - `✨ Deployment complete!`
-- URL вида `https://<hash>.moirai.pages.dev`
-- Production URL `https://moirai.pages.dev` (или кастомный домен)
-  обновляется, если деплой шёл в production-окружение.
+- Уникальный preview URL вида `https://<hash>.moirai.pages.dev`.
+- Production алиас, если деплой на production-ветку (`main`).
 
-**Не выполнять без явного запроса пользователя.**
+**Не выполнять без явного `go` от пользователя.**
 
 ### Preview / branch deploy
 
 ```bash
-pnpm exec wrangler pages deploy ./dist \
-  --project-name moirai \
-  --branch preview/<feature-name>
+pnpm deploy:preview
+# = pnpm build && wrangler pages deploy ./dist --project-name moirai
 ```
 
-URL: `https://<branch>.moirai.pages.dev`. Удобно для e2e-агента и
-ручной проверки.
+Wrangler автоопределит текущую git-ветку и зальёт как preview
+(URL вида `https://<branch>.moirai.pages.dev`). На production
+не повлияет.
 
-## Git-driven deploy
-
-Если Pages-проект подключён к репозиторию:
-
-1. `git push` на ветку, привязанную к production (`main`/`master`),
-   — Pages запустит сборку.
-2. Pull request / push в feature-ветку — Pages автоматически создаст
-   preview-URL и опубликует его в комментарии PR (если включено).
-
-В этом случае wrangler нужен только для:
-- секретов (`wrangler pages secret put`),
-- D1-миграций (`wrangler d1 execute`),
-- генерации типов (`wrangler types`).
-
-Build-команда и output-директория задаются в Pages dashboard
-(`pnpm build` и `dist/` соответственно для Astro).
+Удобно для e2e-агента и ручной проверки фич до merge в `main`.
 
 ## Post-deploy verification
 
 ```bash
-# Health-check публичной страницы
-curl -sI https://<deploy-url>/ | head -5
-# → HTTP/2 200, content-type: text/html
+DEPLOY_URL="https://moirai.pages.dev"
 
-# Health-check API-эндпоинта (если есть /api/health)
-curl -s https://<deploy-url>/api/health
-# → {"ok": true, ...}
+# Root redirect
+curl -sI "$DEPLOY_URL/" | head -10
+# → HTTP/2 302, Location: /en/ или /ru/, X-Robots-Tag: noindex
+
+# Locales render
+curl -s "$DEPLOY_URL/en/" | head -30
+curl -s "$DEPLOY_URL/ru/" | head -30
+
+# SEO meta
+curl -s "$DEPLOY_URL/en/" | grep -E '<title>|hreflang|canonical|og:'
+
+# Sitemap
+curl -s "$DEPLOY_URL/sitemap-index.xml"
 ```
 
-Для production — открыть смок-сценарии:
-- Публичная главная рендерится, в HTML видны корректные SEO-метатеги.
-- Логин в ЛК работает.
-- Ключевые API-эндпоинты возвращают ожидаемые статусы.
+Внешние инструменты (опционально для первого деплоя):
+- Google Rich Results Test — главная не падает.
+- Open Graph debugger (Facebook / LinkedIn) — OG-теги читаются.
+- Lighthouse / PSI — baseline (доводка 100/100 — Stage 8).
 
-E2E-проверка через `agents/e2e.md` — против deploy-URL или preview.
+E2E через `agents/e2e.md` — против deploy-URL или preview.
 
-## Логи
+## Logs / inspection
 
 ```bash
-# Tail production
-pnpm exec wrangler pages deployment tail --project-name moirai
-
 # Список последних деплоев
 pnpm exec wrangler pages deployment list --project-name moirai
+
+# Tail логов конкретного деплоя
+pnpm exec wrangler pages deployment tail --project-name moirai
+
+# Удалить конкретный deployment (редко нужно)
+pnpm exec wrangler pages deployment delete <deployment-id> \
+  --project-name moirai
 ```
 
-## Откат
+## Rollback
 
-```bash
-# Список деплоев → найти предыдущий стабильный
-pnpm exec wrangler pages deployment list --project-name moirai
+Wrangler 4 **не имеет** first-class `rollback` команды для Pages.
+Откат делается одним из путей:
 
-# Откатить production на конкретный deploy
-pnpm exec wrangler pages deployment alias --project-name moirai \
-  <deploy-id> production
-```
+1. **Через CF Dashboard** (предпочтительно, быстрее всего):
+   Pages → moirai → Deployments → найти последний стабильный →
+   "Rollback to this deployment". Production алиас переключится
+   мгновенно.
 
-(Точный синтаксис может отличаться по версии wrangler — проверять
-`pnpm exec wrangler pages deployment --help` перед использованием.)
+2. **Re-deploy предыдущего коммита из git**:
+
+   ```bash
+   git checkout <good-commit>
+   pnpm deploy
+   git checkout main
+   ```
+
+   Новый deployment станет production, broken — уйдёт в историю.
+
+3. **Аварийное отключение** — в CF Dashboard → Pages → moirai →
+   Settings → Custom domains / Routing → отключить production
+   route. Restore — обратное действие.
 
 ## Pitfalls
 
 1. **`./dist` не существует** — `wrangler pages deploy` упадёт.
-   Сначала `pnpm build`.
-2. **Секреты не доступны после деплоя** — забыли
-   `wrangler pages secret put` для production. Проверить
-   `wrangler pages secret list` перед первым smoke-тестом.
-3. **`wrangler.toml` не подхватывается** — для Pages-проекта
-   wrangler читает `wrangler.toml` из корня. Если нет файла —
-   биндингов не будет.
-4. **`compatibility_date` устарел** — ошибки при деплое.
-   Обновить дату в `wrangler.toml` отдельным коммитом с проверкой
-   совместимости.
-5. **Деплой без `pnpm typecheck`** — типичная ловушка. Build
-   может пройти, а runtime сломается на edge. Quality gates
-   обязательны (`rules/quality-gates.md`).
+   `pnpm deploy` это решает (`pnpm build` встроен в скрипт), но
+   при ручном вызове проверяй сам.
+2. **`--branch main` важен для production** — без него wrangler
+   возьмёт текущую git-ветку. Если deploy запускается из ветки
+   `feat/...`, без `--branch main` уйдёт preview-деплой.
+3. **`compatibility_date` устарел** — runtime может ругнуться при
+   деплое. Обновлять отдельным коммитом с прогоном гейтов.
+4. **Биндинги в коде vs `wrangler.toml`** — если код читает
+   `Astro.locals.runtime.env.DB`, а в `wrangler.toml` нет
+   `[[d1_databases]]` — runtime упадёт. Биндинги добавляются
+   парой: код + `wrangler.toml` + `pnpm exec wrangler types` +
+   commit.
+5. **Секреты для production** — `.dev.vars` не уезжает на прод.
+   `wrangler pages secret put <NAME> --project-name moirai` для
+   каждого секрета.
+6. **`--commit-dirty=true`** wrangler ставит автоматически если
+   `git status` грязный — это видно в имени деплоя в Dashboard.
+   Не критично, но для production предпочтительно деплоить с
+   чистого worktree.
+7. **Деплой без `pnpm typecheck`** — build может пройти, а edge
+   runtime сломается на типах. Гейты обязательны
+   (`rules/quality-gates.md`).

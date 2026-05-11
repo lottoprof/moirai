@@ -12,7 +12,9 @@
     "preview": "astro preview",
     "lint": "eslint .",
     "typecheck": "astro check",
-    "prepare": "wrangler types || true"
+    "prepare": "wrangler types || true",
+    "deploy": "pnpm build && wrangler pages deploy ./dist --project-name moirai --branch main",
+    "deploy:preview": "pnpm build && wrangler pages deploy ./dist --project-name moirai"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.7",
