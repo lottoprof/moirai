@@ -3,18 +3,44 @@
 Пользовательский one-pager. Полные технические детали и pitfalls
 — `.agent/skills/deploy/SKILL.md`.
 
+## Production state (snapshot)
+
+| Что | Значение |
+|---|---|
+| CF account | `nastya.zasypkina@gmail.com` (ID `f168a42429d35c55d7f43a6e40350e18`) |
+| Pages project | `moirai` → `https://moirai-c6e.pages.dev` |
+| Production branch | `main` |
+| Custom domain (canonical) | `https://moiraionline.pro` (apex) |
+| Custom domain (alias) | `https://www.moiraionline.pro` |
+| Zone ID | `8d1fe5f529fd8a010c6086b6623b44b3` |
+| TLS | Google CA, auto-renew |
+| Bindings (D1/KV/R2) | нет, всё закомментировано в `wrangler.toml` |
+
+Dashboard:
+- Account: `dash.cloudflare.com/f168a42429d35c55d7f43a6e40350e18/home/overview`
+- Pages: `dash.cloudflare.com/f168a42429d35c55d7f43a6e40350e18/workers-and-pages/view/moirai`
+- Zone: `dash.cloudflare.com/f168a42429d35c55d7f43a6e40350e18/moiraionline.pro`
+
 ## Однократная подготовка
 
-1. Аккаунт на dashboard.cloudflare.com.
+1. Аккаунт `nastya.zasypkina@gmail.com` на dashboard.cloudflare.com.
 2. Авторизация wrangler в терминале:
 
    ```bash
    ! corepack pnpm exec wrangler login
    ```
 
-   Откроется браузер → подтвердить доступ. Токен ляжет в
-   `~/.config/.wrangler/`. После этого `wrangler` авторизован для
-   всех проектов на этом аккаунте.
+   Откроется браузер → подтвердить доступ под нужным email. Токен
+   ляжет в `~/.config/.wrangler/`.
+
+3. Проверить:
+
+   ```bash
+   ! corepack pnpm exec wrangler whoami
+   ```
+
+   Должен показать `nastya.zasypkina@gmail.com`. Если другой
+   аккаунт — `wrangler logout` и заново.
 
 ## Preflight (перед каждым production-деплоем)
 
@@ -34,6 +60,7 @@ pnpm exec wrangler pages dev ./dist
 Чек-лист smoke (1 минута):
 - [ ] `/` → 302 на `/en/` или `/ru/` (зависит от `Accept-Language`)
 - [ ] `/en/` рендерится, в `<head>` корректный `hreflang`/`canonical`
+      на `https://moiraionline.pro/...`
 - [ ] `/ru/` рендерится
 - [ ] `/sitemap-index.xml` отдаётся
 - [ ] В консоли wrangler нет красных ошибок
@@ -50,9 +77,10 @@ pnpm deploy
 - `pnpm build` пересоберёт `dist/`.
 - `wrangler pages deploy` зальёт его на CF Pages в проект `moirai`
   на ветку `main` (production).
-- **Первый раз** wrangler спросит создать проект `moirai` — Enter.
-- В выводе: уникальный preview URL `https://<hash>.moirai.pages.dev`
-  + production алиас `https://moirai.pages.dev`.
+- В выводе: уникальный preview URL `https://<hash>.moirai-c6e.pages.dev`
+  + production алиас `https://moirai-c6e.pages.dev` обновится.
+- Custom domain `https://moiraionline.pro` начнёт отдавать новый
+  контент через ~10-30 сек (CF edge propagation).
 
 ## Preview-деплой (без затрагивания prod)
 
@@ -61,31 +89,32 @@ pnpm deploy:preview
 ```
 
 Wrangler возьмёт текущую git-ветку и зальёт как preview-deployment.
-URL вида `https://<branch>.moirai.pages.dev`. Production не
-обновится.
+URL вида `https://<branch>.moirai-c6e.pages.dev`. Production и
+custom domain не обновятся.
 
 ## Production validation (после `pnpm deploy`)
 
 ```bash
 # Root redirect + noindex
-curl -sI https://moirai.pages.dev/ | head -10
+curl -sI https://moiraionline.pro/ | head -10
 
 # Локали отдают HTML
-curl -s https://moirai.pages.dev/en/ | head -20
-curl -s https://moirai.pages.dev/ru/ | head -20
+curl -s https://moiraionline.pro/en/ | head -20
+curl -s https://moiraionline.pro/ru/ | head -20
 
 # SEO meta
-curl -s https://moirai.pages.dev/en/ | \
+curl -s https://moiraionline.pro/en/ | \
   grep -E '<title>|hreflang|canonical|og:'
 
 # Sitemap
-curl -s https://moirai.pages.dev/sitemap-index.xml
+curl -s https://moiraionline.pro/sitemap-index.xml
 ```
 
 Ожидания:
 - Корень — `HTTP/2 302`, `Location: /en/` или `/ru/`, заголовок
-  `X-Robots-Tag: noindex`.
-- `/en/`, `/ru/` — `HTTP/2 200`, валидный HTML, метатеги на месте.
+  `x-robots-tag: noindex`.
+- `/en/`, `/ru/` — `HTTP/2 200`, валидный HTML, метатеги на месте,
+  canonical = `https://moiraionline.pro/<locale>/`.
 - Sitemap — XML со ссылками на `sitemap-0.xml`.
 
 ## Если что-то сломалось на проде
@@ -94,7 +123,8 @@ curl -s https://moirai.pages.dev/sitemap-index.xml
 
 1. **CF Dashboard** (10 секунд):
    Pages → moirai → Deployments → последний стабильный → "Rollback
-   to this deployment". Production-алиас переключится мгновенно.
+   to this deployment". Production-алиас и custom domain переключатся
+   мгновенно.
 
 2. **Re-deploy старого коммита**:
 
@@ -105,21 +135,26 @@ curl -s https://moirai.pages.dev/sitemap-index.xml
    ```
 
 3. **Полное отключение** (аварийный режим):
-   Dashboard → Pages → moirai → Settings → отключить production
-   route / custom domain.
+   Dashboard → Pages → moirai → Custom domains → отключить
+   `moiraionline.pro`. DNS-записи останутся, но Pages перестанет
+   отвечать. Restore — обратное действие.
 
 ## Что НЕ в этом runbook (отдельные процедуры)
 
-- Кастомный домен `moirai.film` — отдельный план после первого
-  `*.pages.dev` деплоя.
-- Git-driven auto-deploy на push в `main` — после ручной валидации
-  pipeline.
-- GitHub Actions CI/CD — после git-driven базовой настройки.
-- Биндинги (D1/KV/R2/secrets) — добавляются вместе с фичами,
-  которые их требуют. Сейчас в `wrangler.toml` все биндинги
-  закомментированы.
-- PSI / Lighthouse 100/100 — Stage 8 после полной стилизации и
-  шрифтов.
+- **www → apex 308 redirect** — сейчас оба домена отдают одинаковый
+  контент, canonical в HTML ведёт Google к apex. Если понадобится
+  жёсткий redirect — через CF Dashboard → moiraionline.pro → Rules
+  → Redirect Rules.
+- **HSTS / security headers** — Stage 8 (PSI audit).
+- **Git-driven auto-deploy на push в `main`** — после нескольких
+  ручных deploys, когда pipeline стабилен.
+- **Биндинги D1/KV/R2/secrets** — добавляются вместе с фичами.
+  Сейчас все закомментированы в `wrangler.toml`.
+- **PSI / Lighthouse 100/100** — Stage 8 после полной стилизации
+  и шрифтов.
+- **Media subdomain `media.moiraionline.pro`** — упоминается в
+  `SeoHead.astro` как MEDIA_BASE для OG, но пока пустой. Появится
+  с R2 + image pipeline.
 
 ## Дополнительные команды
 
@@ -141,6 +176,6 @@ pnpm exec wrangler whoami
 
 - `.agent/skills/deploy/SKILL.md` — полная процедура, pitfalls.
 - `.agent/skills/wrangler/SKILL.md` — wrangler 4 CLI.
-- `.agent/plans/active/sprint0-deploy-first.md` — план первого
-  деплоя (этапы 4d-1 … 4d-6).
+- `.agent/plans/done/sprint0-deploy-first.md` — выполненный план
+  первого деплоя.
 - Cloudflare Pages docs: developers.cloudflare.com/pages/

@@ -26,3 +26,13 @@
   Node 22 LTS, pnpm 10.18 через corepack, `wrangler types` →
   `worker-configuration.d.ts` (runtime types заменили
   `@cloudflare/workers-types`).
+- **2026-05-11** — Production domain & deploy-first: canonical =
+  `https://moiraionline.pro` (apex, без www); www — alias того же
+  Pages-проекта. CF аккаунт `nastya.zasypkina@gmail.com` (ID
+  `f168a4…`), Pages project `moirai` (URL `moirai-c6e.pages.dev`
+  — глобальное имя `moirai` было занято, CF добавил суффикс).
+  Зона `moiraionline.pro` (ID `8d1fe5f5…`): SSL=strict,
+  always_use_https=on, min_tls=1.2, cname_flattening on, HSTS off.
+  Apex и www подключены через Pages API + ручные CNAME-записи на
+  `moirai-c6e.pages.dev`. Полный snapshot в
+  `.agent/skills/deploy/SKILL.md` § Production state.
