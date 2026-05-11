@@ -1,0 +1,87 @@
+---
+/*
+ * <Hero /> — герой-секция публичной главной (LCP элемент).
+ *
+ * Контент приходит пропами (Content Collection home.{locale}.mdx →
+ * sections.hero). Заголовок ожидает HTML (содержит <em>...</em>) —
+ * рендерится через set:html.
+ *
+ * Stagger reveal: eyebrow / title / lede / cta входят с задержками
+ * 0.2 / 0.35 / 0.5 / 0.65s. `prefers-reduced-motion: reduce`
+ * глобально гасится через base.css/tokens.css.
+ *
+ * Источник CSS: docs/moirai-home.html.
+ */
+
+import Btn from "./Btn.astro";
+
+interface Props {
+  eyebrow: string;
+  /** HTML — допускается <em> для амбер-акцента */
+  title: string;
+  lede: string;
+  ctaText: string;
+  ctaHref: string;
+}
+
+const { eyebrow, title, lede, ctaText, ctaHref } = Astro.props;
+---
+
+<section class="hero" aria-labelledby="hero-title">
+  <span class="hero__eyebrow eyebrow">{eyebrow}</span>
+  <h1 id="hero-title" class="hero__title h1" set:html={title}></h1>
+  <p class="hero__lede text-muted">{lede}</p>
+  <div class="hero__cta">
+    <Btn href={ctaHref} variant="primary" size="lg" arrow>{ctaText}</Btn>
+  </div>
+</section>
+
+<style>
+  .hero {
+    min-height: 100vh;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 120px var(--container-pad) var(--space-4xl);
+    max-width: var(--container-max);
+    margin-inline: auto;
+  }
+
+  .hero__eyebrow {
+    margin-bottom: var(--space-2xl);
+    opacity: 0;
+    animation: rise var(--duration-rise) 0.2s var(--ease-out) both;
+  }
+
+  .hero__title {
+    margin-bottom: var(--space-2xl);
+    max-width: 14ch;
+    opacity: 0;
+    animation: rise var(--duration-rise) 0.35s var(--ease-out) both;
+  }
+
+  .hero__lede {
+    font-size: var(--type-body-lg);
+    max-width: 56ch;
+    margin-bottom: var(--space-3xl);
+    opacity: 0;
+    animation: rise var(--duration-rise) 0.5s var(--ease-out) both;
+  }
+
+  .hero__cta {
+    opacity: 0;
+    animation: rise var(--duration-rise) 0.65s var(--ease-out) both;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+</style>
