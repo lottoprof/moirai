@@ -5,7 +5,7 @@ import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
 
 export default defineConfig({
-  site: "https://moirai.film",
+  site: "https://moiraionline.pro",
   output: "server",
   adapter: cloudflare({
     platformProxy: { enabled: true },
