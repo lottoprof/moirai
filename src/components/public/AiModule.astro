@@ -1,0 +1,77 @@
+---
+/*
+ * <AiModule /> — teaser-блок про будущий AI-модуль программы.
+ * Центрированный card с амбер-бейджем "Coming Soon" и ghost CTA
+ * на waitlist. Дизайн новый (не из docs/moirai-home.html — там
+ * блока нет), но согласован с design system: те же шрифты,
+ * spacing, цвета.
+ *
+ * Композируется через `.section section--alt` на странице,
+ * сам компонент — внутренний card.
+ */
+
+import Btn from "./Btn.astro";
+
+interface Props {
+  /** Текст бейджа — обычно "Coming Soon" / "Скоро" */
+  badge: string;
+  title: string;
+  body: string;
+  ctaText: string;
+  ctaHref: string;
+}
+
+const { badge, title, body, ctaText, ctaHref } = Astro.props;
+---
+
+<div class="ai-module">
+  <span class="ai-module__badge">{badge}</span>
+  <h2 class="ai-module__title">{title}</h2>
+  <p class="ai-module__body">{body}</p>
+  <Btn href={ctaHref} variant="ghost" size="lg" arrow>{ctaText}</Btn>
+</div>
+
+<style>
+  .ai-module {
+    max-width: 720px;
+    margin-inline: auto;
+    padding: var(--space-3xl) var(--space-2xl);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    text-align: center;
+    position: relative;
+  }
+
+  .ai-module__badge {
+    display: inline-block;
+    padding: 6px 14px;
+    margin-bottom: var(--space-lg);
+    background: var(--amber-faint);
+    color: var(--amber);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    border: 1px solid var(--amber);
+  }
+
+  .ai-module__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-sm);
+    font-weight: 300;
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-tight);
+    margin-bottom: var(--space-md);
+    max-width: 24ch;
+    margin-inline: auto;
+  }
+
+  .ai-module__body {
+    color: var(--text-muted);
+    font-size: var(--type-body-md);
+    line-height: var(--leading-normal);
+    margin-bottom: var(--space-2xl);
+    max-width: 56ch;
+    margin-inline: auto;
+  }
+</style>

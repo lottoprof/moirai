@@ -1,0 +1,87 @@
+---
+/*
+ * <Faq /> — нативный `<details>/<summary>` аккордеон.
+ * Без JS — браузер сам управляет open-состоянием и a11y
+ * (Enter/Space раскрывают, Tab между вопросами).
+ *
+ * Schema.org FAQPage JSON-LD — отдельным компонентом в Stage 6.
+ *
+ * Источник CSS: docs/moirai-home.html.
+ */
+
+interface Props {
+  /** Заголовок секции — обычно "Common questions" / "Вопросы и ответы" */
+  title: string;
+  items: { q: string; a: string }[];
+}
+
+const { title, items } = Astro.props;
+---
+
+<div class="faq">
+  <h2 class="h2">{title}</h2>
+  {items.map((qa) => (
+    <details class="faq__item">
+      <summary class="faq__question">{qa.q}</summary>
+      <p class="faq__answer">{qa.a}</p>
+    </details>
+  ))}
+</div>
+
+<style>
+  .faq {
+    max-width: 800px;
+    margin-inline: auto;
+  }
+
+  .faq > .h2 {
+    margin-bottom: var(--space-2xl);
+  }
+
+  .faq__item {
+    border-bottom: 1px solid var(--border);
+  }
+  .faq__item[open] {
+    padding-bottom: var(--space-md);
+  }
+
+  .faq__question {
+    list-style: none;
+    cursor: pointer;
+    padding: var(--space-lg) 0;
+    font-size: var(--type-body-md);
+    font-weight: 400;
+    color: var(--paper);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .faq__question:hover {
+    color: var(--amber);
+  }
+  .faq__question::-webkit-details-marker {
+    display: none;
+  }
+  .faq__question::after {
+    content: "+";
+    font-family: var(--font-display);
+    font-size: 24px;
+    color: var(--amber);
+    font-weight: 300;
+    transition: transform var(--duration-normal) var(--ease-out);
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .faq__item[open] .faq__question::after {
+    transform: rotate(45deg);
+  }
+
+  .faq__answer {
+    padding-bottom: var(--space-md);
+    color: var(--text-muted);
+    line-height: 1.7;
+    max-width: 65ch;
+  }
+</style>
