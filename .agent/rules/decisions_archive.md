@@ -200,3 +200,56 @@ compatibility_date) без перестройки структуры.
 - **Кастомное имя `moirai.pages.dev` без суффикса**. Невозможно: имя `moirai` глобально занято в namespace `*.pages.dev`. Суффикс `-c6e` — нормальная плата.
 
 **Причина.** Чем раньше боевой URL — тем дешевле отладка edge-incompat, compat-флагов, размеров bundle. Stage 4 стилизация продолжается параллельно, каждый `pnpm deploy` теперь даёт видимую разницу на `moiraionline.pro`. Доменные настройки (SSL strict, force HTTPS, TLS 1.2) сделаны заранее, чтобы при включении HSTS в Stage 8 не пришлось чинить mixed-content / редиректы.
+
+
+---
+
+## 2026-05-12: body font Outfit → Manrope (Cyrillic-driven)
+
+**Контекст.** Design system v0.1 (docs/Design_system.md §3) фиксировала
+body font = Outfit. На Stage 5 при попытке self-host (скачать woff2,
+положить в `public/fonts/`) обнаружилось: репо `Outfitio/Outfit-Fonts`
+поддерживает только Latin + Latin Extended + Vietnamese. Google Fonts
+CSS для Outfit возвращает 2 @font-face (latin + latin-ext), Cyrillic
+subset не существует. Для bilingual проекта (en + ru) это блокер: на
+`/ru/` весь UI-текст падал бы на system-ui (Arial / system fallback),
+нарушая бренд-консистентность и метрики size-adjust fallback'ов.
+
+**Решение.**
+
+- Заменить Outfit на **Manrope Variable** в семантическом токене
+  `--font-body`.
+- Manrope — Mikhail Sharanda (https://manropefont.com/), OFL, активный
+  maintenance, один Variable Font (weight range 200–800), полная
+  Cyrillic + Cyrillic-Extended поддержка (subsets раздаются Fontsource
+  по Google Fonts convention).
+- Файлы (subset-split): `manrope-vf-{latin,latin-ext,cyrillic,cyrillic-ext}.woff2`
+  в `public/fonts/`. На EN — браузер качает только latin + latin-ext
+  (~40KB); на RU добавляется cyrillic (~14KB). Cyrillic-ext (2.5KB) —
+  только если встретятся редкие glyph'и.
+- Обновлены: `src/styles/tokens.css` (`--font-body`), `docs/Design_system.md`
+  §3 (с заметкой о замене), `.agent/plans/active/sprint0-stage5-fonts.md`
+  (переписан под фактический набор файлов).
+- `--font-display` = Cormorant Garamond Light 300 + 300-italic —
+  оставлен без изменений. Cormorant имеет Cyrillic из коробки
+  (репо `CatharsisFonts/Cormorant`).
+
+**Альтернативы.**
+
+- Inter Variable — самый универсальный, де-факто стандарт modern web
+  sans. Отказ: слишком нейтрально-IBM-ish для бренда.
+- Onest Variable — родом из России (Rosen Type), оптимизирован под
+  кириллицу. Отказ: слишком "русский" характер для bilingual бренда.
+- Outfit для EN + другой font для RU через unicode-range swap.
+  Отказ: overengineering, два источника, потенциально неконсистентный
+  UX между локалями.
+- Outfit + system-ui fallback на RU. Отказ: на `/ru/` сайт выглядит
+  как Arial-кит, теряется бренд.
+- Custom subset Outfit с дорисованной кириллицей. Отказ: OFL позволяет,
+  но требует дизайнерской работы + shape consistency check.
+
+**Причина.** Manrope максимально близок к изначально выбранной
+геометрической эстетике Outfit (rounded modern sans, средняя
+контрастность), при этом без блокера по subset. Один шрифтовой движок
+— одно качество на обеих локалях. Cost: ~5 минут редактуры доки +
+tokens.css. Возврат: фундаментальная корректность bilingual типографики.

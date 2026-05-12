@@ -85,23 +85,36 @@ Inter.
 инструкторов, акцентные слова в курсиве. Weight 300 (light) — это
 главный выразительный вес проекта. Italic 300 — для выделений (`<em>`).
 
-**Body:** `Outfit` — UI-текст, описания, навигация, кнопки. Weight 400
-(regular) и 500 (medium). Никаких bold (700+) — слишком тяжело
+**Body:** `Manrope` (Variable Font) — UI-текст, описания, навигация,
+кнопки. Weight range 200–800 в одном VF. Используем 400 (regular) и
+500 (medium). Никаких bold (700+) свободным текстом — слишком тяжело
 рядом с light Cormorant.
+
+> **2026-05-12 — замена body-шрифта.** Изначально планировался Outfit
+> (см. v0.1 истории design system). При попытке self-host выяснилось,
+> что Outfit не содержит Cyrillic glyph'ов (репо `Outfitio/Outfit-Fonts`
+> поддерживает только Latin + Latin Extended + Vietnamese). Для
+> bilingual проекта это блокер. Manrope Variable — близкий
+> геометрический sans с полным покрытием Cyrillic + Cyrillic Extended,
+> один VF файл на все веса, OFL, активная поддержка (Mikhail Sharanda).
 
 ### Self-hosting и preload
 
-Загружаем сами с Cloudflare R2 (`media.moirai.film/fonts/`), не Google
-Fonts. Subset до Latin Extended + Cyrillic Extended (для en + ru).
+Загружаем сами с домена проекта (`public/fonts/` → `/fonts/*.woff2`),
+не Google Fonts. Subset-split по `unicode-range` (Google Fonts
+convention): браузер загружает только те subsets, которые реально
+встречаются на странице.
 
 ```html
 <link rel="preload" href="/fonts/cormorant-300.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/outfit-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/manrope-vf-latin.woff2" as="font" type="font/woff2" crossorigin>
 ```
 
-Препоадим **только два файла**: Cormorant-300 (используется в LCP-элементе
-hero h1) и Outfit-400 (навигация). Cormorant-300-italic, Outfit-500 —
-загружаются обычным `@font-face` без preload.
+Препоадим **только два файла**: Cormorant-300 (LCP элемент — hero h1)
+и Manrope latin (body на всех страницах). `manrope-vf-cyrillic.woff2`
+догружается обычным `@font-face` когда страница содержит cyrillic
+glyph'и (RU локаль). Cormorant-300-italic — без preload, грузится
+когда `<em>` уже на экране.
 
 ### @font-face декларации
 

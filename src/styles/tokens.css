@@ -13,7 +13,7 @@
      Fonts (families only; @font-face — fonts.css)
      ============================================ */
   --font-display: "Cormorant Garamond", "Cormorant Fallback", Georgia, serif;
-  --font-body:    "Outfit", "Outfit Fallback", system-ui, sans-serif;
+  --font-body:    "Manrope", "Manrope Fallback", system-ui, sans-serif;
 
   /* ============================================
      Colors — raw palette

@@ -26,6 +26,11 @@
   Node 22 LTS, pnpm 10.18 через corepack, `wrangler types` →
   `worker-configuration.d.ts` (runtime types заменили
   `@cloudflare/workers-types`).
+- **2026-05-12** — Body font: Outfit → **Manrope Variable**. Outfit
+  не содержит Cyrillic glyph'ов (только Latin + Latin Ext + Vietnamese),
+  для bilingual проекта блокер. Manrope VF — близкий geometric sans,
+  полная Cyrillic+Cyrillic-Ext поддержка, OFL, активная поддержка.
+  Обновлены `tokens.css`, `Design_system.md` §3, Stage 5 план.
 - **2026-05-11** — Production domain & deploy-first: canonical =
   `https://moiraionline.pro` (apex, без www); www — alias того же
   Pages-проекта. CF аккаунт `nastya.zasypkina@gmail.com` (ID
