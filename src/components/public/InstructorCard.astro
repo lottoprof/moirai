@@ -1,0 +1,76 @@
+---
+/*
+ * <InstructorCard /> — карточка преподавателя. Реальные данные
+ * подключаются в Stage 9 из коллекции `instructors` (vladimir-popov,
+ * anastasia-zasypkina). Компонент уже работает с любыми props —
+ * page подставит данные когда коллекция появится.
+ *
+ * Декоративная буква-инициал (`.instructor-card__initial`)
+ * позиционируется absolute в правом верхнем углу карточки.
+ *
+ * Источник CSS: docs/moirai-home.html.
+ */
+
+interface Props {
+  name: string;
+  role: string;
+  body: string;
+  /** Первая буква имени, рендерится крупным декоративным элементом */
+  initial?: string;
+}
+
+const { name, role, body, initial } = Astro.props;
+const initialChar = initial ?? name.trim().charAt(0).toUpperCase();
+---
+
+<article class="instructor-card">
+  <span class="instructor-card__initial" aria-hidden="true">{initialChar}</span>
+  <h3 class="instructor-card__name">{name}</h3>
+  <p class="instructor-card__role">{role}</p>
+  <p class="instructor-card__body">{body}</p>
+</article>
+
+<style>
+  .instructor-card {
+    background: var(--bg-elevated);
+    padding: var(--space-2xl);
+    position: relative;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .instructor-card__initial {
+    position: absolute;
+    top: 16px;
+    right: 24px;
+    font-family: var(--font-display);
+    font-size: 96px;
+    font-weight: 300;
+    color: var(--amber-faint);
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .instructor-card__name {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 300;
+    margin-bottom: var(--space-2xs);
+  }
+
+  .instructor-card__role {
+    font-size: var(--type-micro-md);
+    font-weight: 400;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: var(--space-lg);
+  }
+
+  .instructor-card__body {
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: var(--space-lg);
+  }
+</style>

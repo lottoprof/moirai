@@ -1,0 +1,85 @@
+---
+/*
+ * <ProgrammeCard /> — большая карточка уровня программы
+ * (Beginner / Intermediate) в секции Curriculum. Hover: рамка
+ * amber + расширение gap у ссылки.
+ *
+ * Композируется внутри `<div class="programme-grid">` (utilities.css).
+ *
+ * Источник CSS: docs/moirai-home.html.
+ */
+
+interface Props {
+  /** Например "Level 01" */
+  label: string;
+  title: string;
+  lede: string;
+  linkHref: string;
+  linkText: string;
+}
+
+const { label, title, lede, linkHref, linkText } = Astro.props;
+---
+
+<article class="programme-card">
+  <div class="programme-card__label">{label}</div>
+  <h3 class="programme-card__title">{title}</h3>
+  <p class="programme-card__lede">{lede}</p>
+  <a href={linkHref} class="programme-card__link">
+    {linkText}
+    <span aria-hidden="true">→</span>
+  </a>
+</article>
+
+<style>
+  .programme-card {
+    background: var(--bg-elevated);
+    padding: var(--space-2xl);
+    border: 1px solid var(--border);
+    transition: border-color var(--duration-normal) var(--ease-out);
+  }
+  .programme-card:hover {
+    border-color: var(--amber);
+  }
+
+  .programme-card__label {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 300;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: var(--space-md);
+  }
+
+  .programme-card__title {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 300;
+    line-height: 1.1;
+    margin-bottom: var(--space-md);
+  }
+
+  .programme-card__lede {
+    color: var(--text-muted);
+    margin-bottom: var(--space-xl);
+    line-height: 1.6;
+  }
+
+  .programme-card__link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--type-micro-lg);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--amber);
+    border-bottom: 1px solid var(--amber);
+    padding-bottom: 2px;
+    transition: gap var(--duration-fast) var(--ease-out);
+  }
+  .programme-card__link:hover {
+    gap: var(--space-sm);
+  }
+</style>

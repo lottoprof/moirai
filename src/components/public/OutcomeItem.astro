@@ -1,0 +1,35 @@
+---
+/*
+ * <OutcomeItem /> — элемент списка "After the program" (что будет
+ * по итогу). Без числового маркера. Композируется внутри
+ * `<ul class="outcomes-grid">` (utilities.css).
+ *
+ * Источник CSS: docs/moirai-home.html.
+ */
+
+interface Props {
+  title: string;
+  body: string;
+}
+
+const { title, body } = Astro.props;
+---
+
+<li class="outcome">
+  <h3 class="outcome__title">{title}</h3>
+  <p class="outcome__body">{body}</p>
+</li>
+
+<style>
+  .outcome__title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: var(--space-xs);
+  }
+
+  .outcome__body {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    line-height: 1.6;
+  }
+</style>

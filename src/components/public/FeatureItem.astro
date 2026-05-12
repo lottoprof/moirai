@@ -1,0 +1,48 @@
+---
+/*
+ * <FeatureItem /> — элемент списка "What's included" с числовым
+ * маркером. Композируется внутри `<ul class="features-grid">` —
+ * сетка живёт в utilities.css.
+ *
+ * Источник CSS: docs/moirai-home.html.
+ */
+
+interface Props {
+  num: number;
+  title: string;
+  body: string;
+}
+
+const { num, title, body } = Astro.props;
+const numLabel = String(num).padStart(2, "0");
+---
+
+<li class="feature">
+  <div class="feature__num">{numLabel}</div>
+  <h3 class="feature__title">{title}</h3>
+  <p class="feature__body">{body}</p>
+</li>
+
+<style>
+  .feature__num {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--amber);
+    margin-bottom: var(--space-md);
+    line-height: 1;
+  }
+
+  .feature__title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: var(--space-xs);
+  }
+
+  .feature__body {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    line-height: 1.6;
+  }
+</style>

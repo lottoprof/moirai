@@ -218,3 +218,89 @@
 .btn:hover .btn__arrow {
   transform: translateX(4px);
 }
+
+/* ============================================================
+   Layout grids — контейнеры под карточки.
+   Card-блоки (.who-card, .programme-card, .feature, .outcome,
+   .tier-card, .instructor-card) живут scoped в .astro компонентах;
+   здесь только обёртки задают сетку.
+   ============================================================ */
+
+.who-grid {
+  display: grid;
+  gap: var(--space-2xl);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .who-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3xl) var(--space-2xl);
+  }
+}
+
+.programme-grid {
+  display: grid;
+  gap: var(--space-xl);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .programme-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.features-grid {
+  display: grid;
+  gap: var(--space-2xl);
+  grid-template-columns: 1fr;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+@media (min-width: 768px) {
+  .features-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3xl) var(--space-2xl);
+  }
+}
+@media (min-width: 1024px) {
+  .features-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.outcomes-grid {
+  display: grid;
+  gap: var(--space-xl);
+  grid-template-columns: 1fr;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+@media (min-width: 768px) {
+  .outcomes-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.instructor-grid {
+  display: grid;
+  gap: var(--space-xl);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .instructor-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.pricing-grid {
+  display: grid;
+  gap: var(--space-md);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 768px) {
+  .pricing-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

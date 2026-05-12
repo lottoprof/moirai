@@ -1,0 +1,170 @@
+---
+/*
+ * <TierCard /> — карточка тарифа в Pricing-секции.
+ * Реальные данные (цены, фичи, ссылки на checkout) подключаются в
+ * Stage 9 из коллекций `programmes` и `bundles`. Сейчас компонент
+ * принимает уже-готовые пропы — page рендерит их по факту наличия
+ * данных в коллекциях.
+ *
+ * `featured` модификатор перекрашивает карточку в амбер (выделенный
+ * план).
+ *
+ * Источник CSS: docs/moirai-home.html.
+ */
+
+interface Props {
+  badge?: string;
+  name: string;
+  price: string;
+  sub?: string;
+  features: string[];
+  ctaText: string;
+  ctaHref: string;
+  featured?: boolean;
+}
+
+const {
+  badge,
+  name,
+  price,
+  sub,
+  features,
+  ctaText,
+  ctaHref,
+  featured = false,
+} = Astro.props;
+---
+
+<article class={featured ? "tier-card tier-card--featured" : "tier-card"}>
+  {badge && <div class="tier-card__badge">{badge}</div>}
+  <div class="tier-card__name">{name}</div>
+  <div class="tier-card__price">{price}</div>
+  {sub && <div class="tier-card__sub">{sub}</div>}
+  <ul class="tier-card__features">
+    {features.map((f) => <li>{f}</li>)}
+  </ul>
+  <a href={ctaHref} class="tier-card__cta">{ctaText}</a>
+</article>
+
+<style>
+  .tier-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    padding: var(--space-2xl);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: border-color var(--duration-normal) var(--ease-out);
+  }
+  .tier-card:hover {
+    border-color: var(--border-strong);
+  }
+
+  .tier-card--featured {
+    background: var(--amber);
+    border-color: var(--amber);
+  }
+  .tier-card--featured * {
+    color: var(--ink) !important;
+  }
+
+  .tier-card__badge {
+    position: absolute;
+    top: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--amber);
+    color: var(--ink);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    padding: 6px 18px;
+    white-space: nowrap;
+  }
+  .tier-card--featured .tier-card__badge {
+    background: var(--ink);
+    color: var(--amber);
+  }
+
+  .tier-card__name {
+    font-size: var(--type-micro-lg);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: var(--space-md);
+  }
+
+  .tier-card__price {
+    font-family: var(--font-display);
+    font-size: 64px;
+    font-weight: 300;
+    line-height: 1;
+    margin-bottom: var(--space-2xs);
+  }
+
+  .tier-card__sub {
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    margin-bottom: var(--space-xl);
+  }
+
+  .tier-card__features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--space-2xl) 0;
+    flex-grow: 1;
+  }
+  .tier-card__features li {
+    display: flex;
+    gap: var(--space-sm);
+    font-size: var(--type-body-sm);
+    color: var(--paper-muted);
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .tier-card__features li::before {
+    content: "—";
+    color: var(--amber);
+    flex-shrink: 0;
+  }
+  .tier-card--featured .tier-card__features li {
+    color: rgba(13, 11, 9, 0.85);
+    border-color: rgba(13, 11, 9, 0.15);
+  }
+  .tier-card--featured .tier-card__features li::before {
+    color: var(--ink);
+  }
+
+  .tier-card__cta {
+    display: block;
+    text-align: center;
+    padding: 14px;
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    text-decoration: none;
+    border: 1px solid var(--border-strong);
+    color: var(--paper);
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+  .tier-card__cta:hover {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: var(--ink);
+  }
+  .tier-card--featured .tier-card__cta {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--paper);
+  }
+  .tier-card--featured .tier-card__cta:hover {
+    background: transparent;
+    color: var(--ink);
+  }
+</style>
