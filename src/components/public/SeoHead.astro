@@ -54,6 +54,14 @@ const robotsContent = seo.noindex
   : "index, follow, max-image-preview:large";
 ---
 
+{/* Font preload — критичные файлы для LCP (hero h1 + body на старте).
+    crossorigin обязателен даже для same-origin, иначе preload не
+    match'ится с @font-face запросом и грузится дважды. */}
+<link rel="preload" href="/fonts/cormorant-300.woff2"
+      as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="/fonts/manrope-vf-latin.woff2"
+      as="font" type="font/woff2" crossorigin />
+
 <title>{seo.title}</title>
 <meta name="description" content={seo.description} />
 

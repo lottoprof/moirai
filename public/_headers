@@ -1,0 +1,10 @@
+# Cloudflare Pages headers — статика
+# Docs: https://developers.cloudflare.com/pages/configuration/headers/
+
+# Шрифты — immutable, hash-stable, 1 год + immutable hint
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Astro asset bundle — hash в имени файла → immutable
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable

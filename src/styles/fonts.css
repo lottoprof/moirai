@@ -1,0 +1,115 @@
+/*
+ * Self-hosted шрифты — Cormorant Garamond (display, 300 + 300-italic)
+ * и Manrope Variable (body, weight 200-800). См. план
+ * `.agent/plans/active/sprint0-stage5-fonts.md` и
+ * `decisions_archive.md` 2026-05-12.
+ *
+ * Файлы — в `public/fonts/`, доступны по `/fonts/*.woff2`.
+ * Cache-Control — в `public/_headers` (1 год, immutable).
+ *
+ * Manrope раздаётся subset-split по Google Fonts convention:
+ * браузер скачивает только subsets, реально встречающиеся на странице.
+ * EN → latin + latin-ext (~40KB). RU → +cyrillic (~14KB).
+ */
+
+/* ------------------------------------------------------------
+ * Cormorant Garamond Light 300 — display headings.
+ * Один файл на стиль: combined Latin + Latin-Ext + Cyrillic
+ * (из google-webfonts-helper).
+ * ------------------------------------------------------------ */
+@font-face {
+  font-family: "Cormorant Garamond";
+  src: url("/fonts/cormorant-300.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cormorant Garamond";
+  src: url("/fonts/cormorant-300-italic.woff2") format("woff2");
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------
+ * Manrope Variable — body text.
+ * Subset-split. unicode-range взяты из текущей Google Fonts
+ * Manrope CSS (январь 2026).
+ * ------------------------------------------------------------ */
+
+/* latin */
+@font-face {
+  font-family: "Manrope";
+  src: url("/fonts/manrope-vf-latin.woff2") format("woff2-variations");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* latin-ext */
+@font-face {
+  font-family: "Manrope";
+  src: url("/fonts/manrope-vf-latin-ext.woff2") format("woff2-variations");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF,
+    U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* cyrillic */
+@font-face {
+  font-family: "Manrope";
+  src: url("/fonts/manrope-vf-cyrillic.woff2") format("woff2-variations");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+/* cyrillic-ext */
+@font-face {
+  font-family: "Manrope";
+  src: url("/fonts/manrope-vf-cyrillic-ext.woff2") format("woff2-variations");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F,
+    U+FE2E-FE2F;
+}
+
+/* ------------------------------------------------------------
+ * Size-adjust fallback fonts — устраняют CLS при swap.
+ * Имена ("Cormorant Fallback", "Manrope Fallback") match'атся
+ * с fallback chains в tokens.css (--font-display / --font-body).
+ *
+ * Значения — стартовая аппроксимация. Точная калибровка делается
+ * через `npx fontaine` или Monica Dinculescu Font Style Matcher,
+ * визуально на hero h1 + body p (диф в layout-shift = 0).
+ * ------------------------------------------------------------ */
+@font-face {
+  font-family: "Cormorant Fallback";
+  src: local("Georgia");
+  size-adjust: 105%;
+  ascent-override: 90%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Manrope Fallback";
+  src: local("Arial");
+  size-adjust: 102%;
+  ascent-override: 100%;
+  descent-override: 25%;
+  line-gap-override: 0%;
+}
