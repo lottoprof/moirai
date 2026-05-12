@@ -1,0 +1,91 @@
+---
+/*
+ * <LangSwitcher /> — переключатель локалей в Nav.
+ *
+ * Базовый вариант — обычные `<a>` со сменой /{locale}/ префикса,
+ * работает без JS. JS-апгрейд сохраняет явный выбор в cookie
+ * `locale_pref`; middleware на следующем визите корня уважит cookie
+ * поверх Accept-Language.
+ *
+ * См. план `.agent/plans/active/sprint0-stage11-language-switcher.md`.
+ */
+
+interface Props {
+  current: "en" | "ru";
+  pathname: string;
+}
+
+const { current, pathname } = Astro.props;
+
+// Strip leading /{locale}/ → построение href с любой другой локалью.
+const stripped = pathname.replace(/^\/(en|ru)(\/|$)/, "/");
+const target = (locale: "en" | "ru"): string =>
+  stripped === "/" || stripped === "" ? `/${locale}/` : `/${locale}${stripped}`;
+
+const items: { code: "en" | "ru"; label: string }[] = [
+  { code: "en", label: "EN" },
+  { code: "ru", label: "RU" },
+];
+---
+
+<div class="lang-switcher" role="group" aria-label="Language">
+  {items.map((item, i) => (
+    <>
+      {i > 0 && <span class="lang-switcher__sep" aria-hidden="true">/</span>}
+      <a
+        href={target(item.code)}
+        class:list={[
+          "lang-switcher__item",
+          { "is-active": current === item.code },
+        ]}
+        hreflang={item.code}
+        lang={item.code}
+        data-locale={item.code}
+        aria-current={current === item.code ? "true" : undefined}
+      >{item.label}</a>
+    </>
+  ))}
+</div>
+
+<style>
+  .lang-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+  .lang-switcher__item {
+    color: var(--text-muted);
+    padding: 2px 4px;
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .lang-switcher__item:hover {
+    color: var(--amber);
+  }
+  .lang-switcher__item.is-active {
+    color: var(--paper);
+  }
+  .lang-switcher__sep {
+    color: var(--text-faint);
+  }
+</style>
+
+<script>
+  /*
+   * Сохраняем явный выбор в cookie `locale_pref` на 1 год.
+   * Middleware на следующем визите корня уважит cookie поверх
+   * Accept-Language. Без JS работает как обычная ссылка.
+   */
+  document.querySelectorAll<HTMLAnchorElement>(".lang-switcher__item").forEach((a) => {
+    a.addEventListener("click", () => {
+      const locale = a.dataset.locale;
+      if (locale === "en" || locale === "ru") {
+        document.cookie = `locale_pref=${locale}; path=/; max-age=31536000; samesite=lax; secure`;
+      }
+    });
+  });
+</script>

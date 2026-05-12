@@ -15,17 +15,27 @@ function isSupportedLocale(value: string): value is Locale {
 }
 
 /**
- * Detect preferred locale из заголовка Accept-Language.
- * Простой парсер: берём первые 2 символа каждого тега, ищем совпадение.
- * Q-фактор не учитываем (избыточно для двух локалей; усложним когда
- * добавим третью).
+ * Detect preferred locale. Приоритет:
+ *   1. Cookie `locale_pref` — явный пользовательский выбор через
+ *      <LangSwitcher /> (Stage 11).
+ *   2. Заголовок `Accept-Language` — первое совпадение по 2-символьному
+ *      языковому тегу. Q-фактор не учитываем (избыточно для 2 локалей).
+ *   3. DEFAULT_LOCALE (`en`).
  */
-function detectLocale(acceptLanguage: string | null): Locale {
-  if (!acceptLanguage) return DEFAULT_LOCALE;
-  const tags = acceptLanguage.split(",");
-  for (const raw of tags) {
-    const tag = raw.trim().split(";")[0]?.toLowerCase().slice(0, 2) ?? "";
-    if (isSupportedLocale(tag)) return tag;
+function detectLocale(
+  cookie: string | null,
+  acceptLanguage: string | null,
+): Locale {
+  if (cookie) {
+    const m = cookie.match(/(?:^|;\s*)locale_pref=(en|ru)(?:;|$)/);
+    if (m && isSupportedLocale(m[1])) return m[1];
+  }
+  if (acceptLanguage) {
+    const tags = acceptLanguage.split(",");
+    for (const raw of tags) {
+      const tag = raw.trim().split(";")[0]?.toLowerCase().slice(0, 2) ?? "";
+      if (isSupportedLocale(tag)) return tag;
+    }
   }
   return DEFAULT_LOCALE;
 }
@@ -35,7 +45,10 @@ export const onRequest = defineMiddleware((ctx, next) => {
   // чтобы / не плодил duplicate content с локализованными версиями.
   // См. docs/Home_page_SEO.md §3, docs/Architecture.md §3.
   if (ctx.url.pathname === "/") {
-    const locale = detectLocale(ctx.request.headers.get("accept-language"));
+    const locale = detectLocale(
+      ctx.request.headers.get("cookie"),
+      ctx.request.headers.get("accept-language"),
+    );
     return new Response(null, {
       status: 302,
       headers: {

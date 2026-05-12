@@ -46,7 +46,7 @@ const pathname = Astro.url.pathname;
   <body>
     <a href="#main" class="skip-link">Skip to main content</a>
 
-    <Nav locale={locale} />
+    <Nav locale={locale} pathname={pathname} />
 
     <main id="main">
       <slot />
