@@ -6,9 +6,10 @@
  * Секции — free-form в zod schema (`pages` коллекция); этот шаблон
  * локально декларирует HomeSections тип для type-safe рендера.
  *
- * Рендер сейчас stub-like: семантика + текст из frontmatter без
- * стилизации компонентов. Стилизация (Hero/Section/Card BEM-классы,
- * @keyframes rise, ticker animation, pricing cards) — Stage 4.
+ * Stage 4f integration: stub-разметка заменена композицией компонентов
+ * из `src/components/public/` (Stage 4a-4e). Визуально страница
+ * соответствует `docs/moirai-home.html`. Шрифты — fallback chain
+ * (Stage 5 добавит self-hosted woff2). Schema.org JSON-LD — Stage 6.
  *
  * `prerender = true` — статика по умолчанию для SEO-страниц
  * (см. ADR `dd7d91c` Sprint 0 bootstrap).
@@ -16,6 +17,15 @@
 
 import { getEntry } from "astro:content";
 import Layout from "../../layouts/public/Layout.astro";
+import Hero from "../../components/public/Hero.astro";
+import Ticker from "../../components/public/Ticker.astro";
+import WhoCard from "../../components/public/WhoCard.astro";
+import ProgrammeCard from "../../components/public/ProgrammeCard.astro";
+import FeatureItem from "../../components/public/FeatureItem.astro";
+import OutcomeItem from "../../components/public/OutcomeItem.astro";
+import AiModule from "../../components/public/AiModule.astro";
+import Faq from "../../components/public/Faq.astro";
+import FinalCta from "../../components/public/FinalCta.astro";
 
 export const prerender = true;
 
@@ -56,6 +66,7 @@ interface Track {
 interface CurriculumLevel {
   id: string;
   title: string;
+  lede: string;
   tracks: Track[];
   final: { title: string; body: string };
 }
@@ -79,136 +90,134 @@ if (!sections) {
 
 const seo = home.data.seo;
 const faqs: { q: string; a: string }[] = home.data.faqs ?? [];
+
+// UI-строки, не привязанные к данным коллекций. Когда появится
+// общий dictionary (Stage 7 translation-pair validator + i18n
+// helpers), переедет туда.
+const ui = typedLocale === "ru"
+  ? {
+      explore: (title: string) => `Узнать про ${title}`,
+      pendingStage9: "Карточки появятся в Stage 9 — данные подключаются из коллекций.",
+      faqHeading: "Вопросы и ответы",
+      levelLabel: (i: number) => `Уровень ${String(i + 1).padStart(2, "0")}`,
+    }
+  : {
+      explore: (title: string) => `Explore ${title}`,
+      pendingStage9: "Cards will appear in Stage 9 — data wired from collections.",
+      faqHeading: "Common questions",
+      levelLabel: (i: number) => `Level ${String(i + 1).padStart(2, "0")}`,
+    };
 ---
 
 <Layout locale={typedLocale} seo={seo}>
-  {/* Hero — LCP element (<h1>); preload шрифтов добавится в Stage 5 */}
-  <section class="section">
-    <p class="eyebrow">{sections.hero.eyebrow}</p>
-    <h1 set:html={sections.hero.title}></h1>
-    <p>{sections.hero.lede}</p>
-    <a href={sections.hero.cta_href}>{sections.hero.cta_text}</a>
+  <Hero
+    eyebrow={sections.hero.eyebrow}
+    title={sections.hero.title}
+    lede={sections.hero.lede}
+    ctaText={sections.hero.cta_text}
+    ctaHref={sections.hero.cta_href}
+  />
+
+  <Ticker items={sections.ticker.items} />
+
+  <section class="section center" aria-labelledby="who-title">
+    <header class="section__head">
+      <p class="eyebrow">{sections.who.eyebrow}</p>
+      <h2 id="who-title" class="h2" set:html={sections.who.title}></h2>
+    </header>
+    <div class="who-grid">
+      {sections.who.audiences.map((a, i) => (
+        <WhoCard num={i + 1} title={a.title} body={a.body} />
+      ))}
+    </div>
   </section>
 
-  {/* Ticker — декоративный, screen readers пропускают */}
-  <div class="ticker" aria-hidden="true">
-    {sections.ticker.items.map((item, i) => (
-      <Fragment>
-        {i > 0 && <span> · </span>}
-        <span>{item}</span>
-      </Fragment>
-    ))}
-  </div>
-
-  {/* Who is this for */}
-  <section class="section">
-    <p class="eyebrow">{sections.who.eyebrow}</p>
-    <h2 set:html={sections.who.title}></h2>
-    {sections.who.audiences.map((a) => (
-      <article>
-        <h3>{a.title}</h3>
-        <p>{a.body}</p>
-      </article>
-    ))}
+  <section class="section section--alt center" aria-labelledby="curriculum-title">
+    <header class="section__head">
+      <p class="eyebrow">{sections.curriculum.eyebrow}</p>
+      <h2 id="curriculum-title" class="h2">{sections.curriculum.title}</h2>
+      <p class="text-muted">{sections.curriculum.intro}</p>
+    </header>
+    <div class="programme-grid">
+      {sections.curriculum.levels.map((lvl, i) => (
+        <ProgrammeCard
+          label={ui.levelLabel(i)}
+          title={lvl.title}
+          lede={lvl.lede}
+          linkHref={`/${typedLocale}/${lvl.id}`}
+          linkText={ui.explore(lvl.title)}
+        />
+      ))}
+    </div>
   </section>
 
-  {/* Curriculum */}
-  <section class="section">
-    <p class="eyebrow">{sections.curriculum.eyebrow}</p>
-    <h2>{sections.curriculum.title}</h2>
-    <p>{sections.curriculum.intro}</p>
-    {sections.curriculum.levels.map((lvl) => (
-      <div>
-        <h3>{lvl.title}</h3>
-        {lvl.tracks.map((tr) => (
-          <article>
-            <h4>{tr.name}</h4>
-            <p><em>{tr.tagline}</em></p>
-            <p>{tr.body}</p>
-            <ul>{tr.topics.map((t) => <li>{t}</li>)}</ul>
-          </article>
-        ))}
-        <article>
-          <h4>{lvl.final.title}</h4>
-          <p>{lvl.final.body}</p>
-        </article>
-      </div>
-    ))}
-  </section>
-
-  {/* What's included */}
-  <section class="section">
-    <p class="eyebrow">{sections.included.eyebrow}</p>
-    <h2>{sections.included.title}</h2>
-    <ul>
-      {sections.included.items.map((item) => (
-        <li>
-          <h3>{item.title}</h3>
-          <p>{item.body}</p>
-        </li>
+  <section class="section center" aria-labelledby="included-title">
+    <header class="section__head">
+      <p class="eyebrow">{sections.included.eyebrow}</p>
+      <h2 id="included-title" class="h2">{sections.included.title}</h2>
+    </header>
+    <ul class="features-grid">
+      {sections.included.items.map((item, i) => (
+        <FeatureItem num={i + 1} title={item.title} body={item.body} />
       ))}
     </ul>
   </section>
 
-  {/* Instructors — карточки рендерятся из коллекции instructors,
-      когда появятся первые vladimir-popov.{en,ru}.mdx и
-      anastasia-zasypkina.{en,ru}.mdx (Stage 9). */}
-  <section class="section">
-    <p class="eyebrow">{sections.instructors.eyebrow}</p>
-    <h2 set:html={sections.instructors.title}></h2>
-    <p><em>Instructor cards: pending instructors collection (Stage 9).</em></p>
+  {/* Instructors — карточки рендерятся из коллекции instructors
+      (vladimir-popov, anastasia-zasypkina) в Stage 9. */}
+  <section class="section section--alt center" aria-labelledby="instructors-title">
+    <header class="section__head">
+      <p class="eyebrow">{sections.instructors.eyebrow}</p>
+      <h2 id="instructors-title" class="h2" set:html={sections.instructors.title}></h2>
+    </header>
+    <p class="text-faint">{ui.pendingStage9}</p>
   </section>
 
-  {/* After the program */}
-  <section class="section">
-    <p class="eyebrow">{sections.after.eyebrow}</p>
-    <h2 set:html={sections.after.title}></h2>
-    <p>{sections.after.intro}</p>
-    <ul>
+  <section class="section center" aria-labelledby="after-title">
+    <header class="section__head">
+      <p class="eyebrow">{sections.after.eyebrow}</p>
+      <h2 id="after-title" class="h2" set:html={sections.after.title}></h2>
+      <p class="text-muted">{sections.after.intro}</p>
+    </header>
+    <ul class="outcomes-grid">
       {sections.after.items.map((item) => (
-        <li>
-          <h3>{item.title}</h3>
-          <p>{item.body}</p>
-        </li>
+        <OutcomeItem title={item.title} body={item.body} />
       ))}
     </ul>
   </section>
 
-  {/* Pricing — карточки рендерятся из programmes + bundles
-      коллекций (Stage 9). */}
-  <section class="section">
-    <p class="eyebrow">{sections.pricing.eyebrow}</p>
-    <h2>{sections.pricing.title}</h2>
-    <p><em>{sections.pricing.note}</em></p>
+  {/* Pricing — TierCard'ы рендерятся из programmes + bundles
+      коллекций в Stage 9. */}
+  <section class="section center" aria-labelledby="pricing-title">
+    <header class="section__head">
+      <p class="eyebrow">{sections.pricing.eyebrow}</p>
+      <h2 id="pricing-title" class="h2">{sections.pricing.title}</h2>
+    </header>
+    <p class="text-faint">{ui.pendingStage9}</p>
   </section>
 
-  {/* AI Module */}
-  <section class="section">
-    <p class="eyebrow">{sections.ai_module.badge}</p>
-    <h2>{sections.ai_module.title}</h2>
-    <p>{sections.ai_module.body}</p>
-    <a href={sections.ai_module.cta_href}>{sections.ai_module.cta_text}</a>
+  <section class="section section--alt center" aria-labelledby="ai-module-title">
+    <AiModule
+      badge={sections.ai_module.badge}
+      title={sections.ai_module.title}
+      body={sections.ai_module.body}
+      ctaText={sections.ai_module.cta_text}
+      ctaHref={sections.ai_module.cta_href}
+    />
   </section>
 
-  {/* FAQ — Schema.org FAQPage компонент будет в Stage 6 */}
   {faqs.length > 0 && (
-    <section class="section">
-      <h2>{typedLocale === "ru" ? "Вопросы и ответы" : "Common questions"}</h2>
-      {faqs.map((qa) => (
-        <details>
-          <summary>{qa.q}</summary>
-          <p>{qa.a}</p>
-        </details>
-      ))}
+    <section class="section center">
+      <Faq title={ui.faqHeading} items={faqs} />
     </section>
   )}
 
-  {/* Final CTA */}
-  <section class="section">
-    <p class="eyebrow">{sections.final_cta.eyebrow}</p>
-    <h2 set:html={sections.final_cta.title}></h2>
-    <p>{sections.final_cta.body}</p>
-    <p><strong>{sections.final_cta.urgency}</strong></p>
-    <a href={sections.final_cta.cta_href}>{sections.final_cta.cta_text}</a>
-  </section>
+  <FinalCta
+    eyebrow={sections.final_cta.eyebrow}
+    title={sections.final_cta.title}
+    body={sections.final_cta.body}
+    ctaText={sections.final_cta.cta_text}
+    ctaHref={sections.final_cta.cta_href}
+    urgency={sections.final_cta.urgency}
+  />
 </Layout>
