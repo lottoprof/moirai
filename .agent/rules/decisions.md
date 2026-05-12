@@ -26,6 +26,14 @@
   Node 22 LTS, pnpm 10.18 через corepack, `wrangler types` →
   `worker-configuration.d.ts` (runtime types заменили
   `@cloudflare/workers-types`).
+- **2026-05-12** — Auth model: multi-method (password + OAuth) с
+  отдельной таблицей `auth_methods`. Переработка `users` (убраны
+  `password_hash` + `oauth_provider/oauth_id` колонки). Добавлены
+  `audit_log`. OAuth: Google + Discord на старте, Discord БЕЗ email
+  отклоняется. JWT 15min access + D1 refresh-session. PBKDF2-SHA256
+  600k iter (OWASP 2023). Login fail → generic `invalid_login` +
+  UI-подсказка "Forgot? Or use social". Native Astro endpoints (без
+  Hono). Architecture §9: 17 → 19 таблиц.
 - **2026-05-12** — Body font: Outfit → **Manrope Variable**. Outfit
   не содержит Cyrillic glyph'ов (только Latin + Latin Ext + Vietnamese),
   для bilingual проекта блокер. Manrope VF — близкий geometric sans,

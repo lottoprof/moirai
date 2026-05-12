@@ -253,3 +253,174 @@ subset не существует. Для bilingual проекта (en + ru) эт
 контрастность), при этом без блокера по subset. Один шрифтовой движок
 — одно качество на обеих локалях. Cost: ~5 минут редактуры доки +
 tokens.css. Возврат: фундаментальная корректность bilingual типографики.
+
+
+---
+
+## 2026-05-12: auth model — multi-method + Google/Discord OAuth
+
+**Контекст.** Architecture v0.8.1 §9 фиксировала `users` таблицу с
+`password_hash TEXT NOT NULL` и не описывала OAuth-провайдеров. Для
+выхода в продакшн нужен полный auth: регистрация по паролю И через
+OAuth (Google + Discord для старта, расширяемо). Изучили
+работающий продакшн `~/git/301/` (OAuth + password + Telegram
+WebApp на CF Workers через Hono + Turnstile + JWT/refresh) —
+взяли архитектурные паттерны, скорректировали схему под
+multi-method (один user может иметь и password И Google И Discord
+linked одновременно).
+
+**Решение.**
+
+### Schema
+
+- **`users`** — убраны `password_hash`, `oauth_provider`, `oauth_id`.
+  Остаются только identity + profile поля (email, name, locale,
+  role, referral_code). Email — единственный канонический identity
+  ключ.
+- **Новая таблица `auth_methods`** — многие на одного user. Колонки:
+  `kind` (`password`/`google`/`discord`), `secret_hash` (для
+  password — PBKDF2), `provider_user_id` (sub/snowflake для OAuth),
+  `provider_email`, `provider_email_verified`, `created_at`,
+  `last_used_at`. UNIQUE (`user_id, kind`) — один метод каждого типа.
+  UNIQUE (`kind, provider_user_id`) — один OAuth ID не у двух users.
+- **`auth_sessions`** (уже была в §9) — расширена `ip_hash` (sha256
+  для GDPR), `user_agent`, `revoked_at` (soft-revoke).
+- **Новая таблица `audit_log`** — все auth-события (`register`,
+  `login`, `logout`, `oauth_link`, `password_set`, `email_verify`,
+  `password_reset`). Включаем сразу для compliance + forensic.
+
+Итого: 17 → 19 таблиц.
+
+### Field type conventions (для всей схемы)
+
+- **IDs** — TEXT, UUID v7 или nanoid. Не INTEGER AUTOINCREMENT
+  (предсказуемость id хуже для security + сложнее распределённо).
+- **Timestamps** — INTEGER unix-seconds. Не TEXT ISO 8601 (compactness,
+  native numeric compare, простые индексы по времени).
+- **Booleans** — INTEGER 0/1 (SQLite не имеет нативного bool).
+- **Money** — INTEGER cents (избегаем floating point math).
+- **Enums** — TEXT с явным CHECK constraint.
+- **IP-адреса** — sha256(ip+salt) для GDPR. Plaintext IP не хранится.
+
+### Hash + crypto
+
+- **PBKDF2-SHA256, 600 000 iterations** (OWASP 2023 minimum). Формат
+  хранения: `salt:hash` base64.
+- Argon2id рассматривался — отказ: требует WASM в CF Workers, лишний
+  cold-start overhead; PBKDF2 нативен через Web Crypto API.
+- **Password policy:** min 10 символов, без обязательной complexity
+  (NIST SP 800-63B 2017+ — length > rules), blacklist common
+  passwords (топ-100 + проектные слова).
+
+### OAuth
+
+- **На старте:** Google + Discord. Архитектурно — n-providers,
+  добавление = одна запись в config + два endpoint (start +
+  callback).
+- **Flow:** PKCE (state + verifier в KV с TTL=10min) + JWKS
+  верификация id_token (для Google). Discord — fetch
+  `/users/@me` после code exchange.
+- **Discord без email отклоняется.** Если user не grant'нул `email`
+  scope ИЛИ `email=null` ИЛИ `verified=false` — flow завершается
+  с сообщением *"To complete sign-in, please grant email access in
+  Discord or use a different sign-in method."*. Никаких orphan-учёток
+  без email (payment receipts и recovery link невозможны).
+- **Account linking:** auto-link при email-match **только если
+  провайдер сообщает `email_verified=true`**. Иначе создаётся
+  новый user и/или требуется отдельная верификация email.
+- **Email verification:** OAuth-зарегистрированные автоматически
+  `email_verified_at=now` (если провайдер верифицировал). Password-
+  зарегистрированные — отдельный email-link flow (KV токен).
+  Verification обязательна перед первой оплатой.
+
+### Session
+
+- **Hybrid: JWT access (15min) + refresh session в D1.**
+  Access token — HS256 JWT с claims (user_id, role, iat, exp) +
+  fingerprint (sha256(ip+ua) → claim `fp`). Validated на каждом
+  request — отвергаем если fp не совпадает.
+- **Refresh token** — opaque secret в HttpOnly Secure cookie, TTL
+  30 дней, хэш в `auth_sessions`. Revoke = `revoked_at = now`,
+  следующая попытка refresh → отказ → user re-login.
+
+### Bot/spam protection
+
+- **Cloudflare Turnstile** — first-line на register/login/reset
+  формах. Site key + secret в env.
+- **Rate-limit** через KV-counter — second-line. Лимиты:
+  - `auth:register:ip:<ip>` — 5/час
+  - `auth:register:email:<email>` — 3/час
+  - `auth:login:ip:<ip>` — 20/час
+  - `auth:login:email:<email>` — 10/час
+
+### Error UX
+
+- **`POST /api/auth/login` всегда возвращает generic** `invalid_login`
+  (не различает: email не существует / нет password method / неверный
+  пароль). Не утекает существование email.
+- Под формой login отображается статичный hint: *"Forgot your
+  password? Or sign in with Google / Discord."* Это покрывает оба
+  кейса (no password method и забыл пароль) без раскрытия деталей.
+- Password reset flow по сути выясняет существование email, но
+  reset endpoint возвращает 200 одинаково независимо от того,
+  существует email или нет — email уходит только если user найден.
+
+### Stack
+
+- **Native Astro 5 API endpoints** (`src/pages/api/**.ts`) — не Hono.
+  Astro 5 + `@astrojs/cloudflare` дают type-safe routing, middleware
+  через `src/middleware.ts`, прямой доступ к
+  `Astro.locals.runtime.env`. Hono — для случаев когда endpoint'ов
+  становится много + нужны сложные middleware-цепочки; на старте
+  нет смысла добавлять второй framework layer.
+- **D1 binding:** `DB` (`env.DB` через worker binding,
+  `Astro.locals.runtime.env.DB` в Astro context).
+- **KV bindings:** `KV_OAUTH_STATE` (PKCE state + verifiers, TTL
+  10min), `KV_VERIFY_TOKENS` (email verification + password reset
+  tokens, TTL 1h), `KV_RATELIMIT` (rate-limit counters, TTL = window).
+- **Secrets:** `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+  `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `TURNSTILE_SECRET`,
+  `IP_HASH_SALT`. Все через `wrangler pages secret put`. Никогда
+  не в `.env` коммитнутом.
+
+### Что НЕ берём из 301
+
+- **Multi-tenant** (`accounts` + `account_members` + `invitations`) —
+  moirai single-tenant. Роль на user, не на membership.
+- **`users.oauth_provider`/`oauth_id` колонки** — заменены на
+  `auth_methods` таблицу (множественные провайдеры на user).
+- **PBKDF2 100k iter** — поднимаем до 600k (OWASP 2023).
+- **Telegram WebApp auth** — не пока. Если когда-нибудь — добавим
+  третьим OAuth-методом.
+- **Hono** — оставляем native Astro.
+
+**Альтернативы.**
+
+- **Single OAuth-provider на user (как в 301)** — отказ: user должен
+  иметь возможность linked Google + Discord одновременно.
+  `auth_methods` table — стандарт (Auth0/Clerk/Supabase Auth тоже
+  раздельно хранят identities).
+- **Argon2id вместо PBKDF2** — отказ: WASM overhead в edge runtime
+  + Web Crypto API нативно даёт PBKDF2. 600k iter PBKDF2-SHA256
+  достаточно по 2026 OWASP.
+- **Variant A (collision = strict error "Use Google to sign in")** —
+  отказ: утекает email + провайдер. Variant C + generic error +
+  UI-подсказка покрывает UX без leak.
+- **`password_hash` nullable на `users`** (как 301) — отказ: ломает
+  invariant что у user может быть N методов; в `users` colonm
+  семантически принадлежит "первому" методу. Чище — отдельная
+  таблица.
+- **Stateless JWT only (без refresh в D1)** — отказ: невозможно
+  revoke до истечения TTL. Hybrid стандарт для serious products.
+- **Hono framework** — рассматривали (301 использует). Отказ для
+  старта: native Astro 5 + `@astrojs/cloudflare` адекватны для
+  ~20 auth endpoints. Если когда-нибудь дойдём до сложных middleware
+  цепочек — мигрируем на Hono поверх Astro endpoints без поломки
+  внешних URL.
+
+**Причина.** 301-проект показал что combinaition (Turnstile + JWT 15min
++ refresh-D1 + PKCE OAuth) работает в продакшн на CF Pages. Берём
+проверенный паттерн + докручиваем под наши требования (multi-method,
+strict Discord email policy, более жёсткий PBKDF2, audit log
+обязательно). Результат — современный production-grade auth без
+сторонних SaaS (Auth0/Clerk дорогие, vendor lock-in).

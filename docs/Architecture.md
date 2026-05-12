@@ -1,4 +1,4 @@
-# Moirai — Architecture v0.8.1
+# Moirai — Architecture v0.8.2
 
 > **Status:** working draft. Зафиксированы: технологический стек, локализация
 > через path-prefix, архитектура контента, модель программ и запусков
@@ -551,7 +551,21 @@ Astro island с `client:visible`. Публичный сайт — native `<video
 
 ## 9. Схема D1
 
-17 таблиц.
+**19 таблиц.** Изменения v0.8.2 (2026-05-12):
+- `users.password_hash` и `users.oauth_provider/oauth_id` удалены
+- Новая таблица **`auth_methods`** — multi-method auth (один user
+  может иметь password + N OAuth identities одновременно)
+- Новая таблица **`audit_log`** — audit-trail для всех auth-событий
+  (compliance + forensic)
+- См. `decisions_archive.md` 2026-05-12 — auth model overhaul.
+
+**Type conventions (для всей схемы):**
+- IDs: `TEXT` (UUID v7 или nanoid), не `INTEGER AUTOINCREMENT`
+- Timestamps: `INTEGER` unix-seconds, не `TEXT` ISO
+- Booleans: `INTEGER 0/1` (SQLite не имеет нативного bool)
+- Money: `INTEGER` cents
+- Enums: `TEXT` с `CHECK` constraint
+- IP-адреса: `sha256(ip + IP_HASH_SALT)`, plaintext не хранится (GDPR)
 
 ### Образовательное ядро
 
@@ -736,25 +750,61 @@ resource_consumption (
 )
 ```
 
-### Auth и финансы
+### Auth, identity, audit
 
 ```sql
 users (
-  id              TEXT PRIMARY KEY,
-  email           TEXT UNIQUE NOT NULL,
-  password_hash   TEXT NOT NULL,
-  name            TEXT,
-  locale          TEXT NOT NULL,
-  role            TEXT NOT NULL,                  -- 'student' / 'instructor' / 'admin'
-  referral_code   TEXT UNIQUE NOT NULL,           -- генерируется при регистрации
-  created_at      TIMESTAMP NOT NULL
+  id                TEXT PRIMARY KEY,             -- UUID v7 / nanoid
+  email             TEXT UNIQUE NOT NULL,
+  email_verified_at INTEGER,                      -- NULL = не верифицирован
+  name              TEXT,
+  locale            TEXT NOT NULL CHECK(locale IN ('en','ru')),
+  role              TEXT NOT NULL DEFAULT 'student'
+                    CHECK(role IN ('student','instructor','admin')),
+  referral_code     TEXT UNIQUE NOT NULL,
+  created_at        INTEGER NOT NULL,
+  updated_at        INTEGER NOT NULL
+)
+-- НЕТ password_hash, oauth_provider, oauth_id — см. auth_methods
+
+auth_methods (
+  id                TEXT PRIMARY KEY,
+  user_id           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind              TEXT NOT NULL
+                    CHECK(kind IN ('password','google','discord')),
+  -- password: PBKDF2-SHA256 600k iter, формат `salt:hash` base64
+  secret_hash       TEXT,
+  -- OAuth: stable provider user id (Google "sub", Discord snowflake)
+  provider_user_id  TEXT,
+  provider_email    TEXT,
+  provider_email_verified INTEGER,                -- 0/1, что сказал провайдер на момент link
+  created_at        INTEGER NOT NULL,
+  last_used_at      INTEGER,
+  UNIQUE(user_id, kind),                          -- один password / один google / один discord на user
+  UNIQUE(kind, provider_user_id)                  -- один Google ID = один user
 )
 
 auth_sessions (
-  id              TEXT PRIMARY KEY,
-  user_id         TEXT REFERENCES users,
-  token_hash      TEXT NOT NULL,
-  expires_at      TIMESTAMP NOT NULL
+  id              TEXT PRIMARY KEY,               -- refresh token id (opaque)
+  user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash      TEXT NOT NULL,                  -- sha256(refresh_secret)
+  expires_at      INTEGER NOT NULL,
+  created_at      INTEGER NOT NULL,
+  last_seen_at    INTEGER,
+  user_agent      TEXT,
+  ip_hash         TEXT,                           -- sha256(ip + IP_HASH_SALT), GDPR-safe
+  revoked_at      INTEGER                         -- soft-revoke
+)
+
+audit_log (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT REFERENCES users(id) ON DELETE SET NULL,
+  event         TEXT NOT NULL,                    -- register / login / logout / oauth_link / password_set / email_verify / password_reset / login_failed
+  method        TEXT,                             -- password / google / discord
+  ip_hash       TEXT,
+  user_agent    TEXT,
+  metadata      TEXT,                             -- JSON: причина failure, провайдер, etc.
+  created_at    INTEGER NOT NULL
 )
 
 payments (
@@ -784,7 +834,17 @@ payments (
 - Новые таблицы: `promo_codes`, `referrals`
 - D1: 15 → 17 таблиц
 
-Детализация типов, индексов, FK ON DELETE — см. `[TBD-2]`.
+**v0.8.2 (2026-05-12):**
+- `users` урезан: убраны `password_hash`, добавлен `email_verified_at`
+- Новая таблица `auth_methods` — multi-method auth (`password` +
+  N OAuth providers per user)
+- `auth_sessions` расширена: `ip_hash` (GDPR), `user_agent`, `revoked_at`
+- Новая таблица `audit_log`
+- D1: 17 → 19 таблиц
+- Field type conventions formalized (TEXT IDs, INTEGER timestamps, etc)
+
+Детализация индексов, FK ON DELETE — частично закрыта в v0.8.2 для
+auth-таблиц; для остальных — см. `[TBD-2]`.
 
 ---
 
@@ -1051,9 +1111,15 @@ base. Нужен слой experiment assignment (per-user / per-cookie) — от
   публичные цены до регистрации; промо-коды (своя таблица, применение
   на нашей стороне до MoR); реферальная система (`users.referral_code`
   + `referrals` таблица, MVP reward = `discount_on_next`); D1 → 17 таблиц
-- **v0.8.1 — текущая** — убран Drizzle ORM из стека. БД делаем сами:
-  нативный D1 API через Worker binding, SQL-миграции через
-  `wrangler d1 migrations`, TS-типы пишем вручную рядом со схемой.
-  Zod остаётся — он про валидацию runtime API-входа, не про БД.
-- v0.9 — после детализации D1 (`[TBD-2]`)
+- v0.8.1 — убран Drizzle ORM из стека. БД делаем сами: нативный D1
+  API через Worker binding, SQL-миграции через `wrangler d1 migrations`,
+  TS-типы пишем вручную рядом со схемой. Zod остаётся — он про
+  валидацию runtime API-входа, не про БД.
+- **v0.8.2 — текущая** — auth model overhaul: multi-method auth через
+  `auth_methods` table (password + N OAuth identities per user);
+  OAuth providers Google + Discord на старте (расширяемо); JWT 15min
+  + refresh-session в D1; PBKDF2-SHA256 600k iter; Discord без email
+  отклоняется; native Astro endpoints (без Hono); field type
+  conventions формализованы. D1: 17 → 19 таблиц.
+- v0.9 — после полной детализации D1 (`[TBD-2]`) для остальных таблиц
 - v1.0 — готов к Sprint 0
