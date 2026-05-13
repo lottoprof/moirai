@@ -24,6 +24,7 @@
 export type Locale = "en" | "ru";
 export type UserRole = "student" | "instructor" | "admin";
 export type AuthMethodKind = "password" | "google" | "discord";
+export type JwtKeyStatus = "active" | "deprecated" | "revoked";
 
 /** События в audit_log.event — открытое множество, расширяется по
  *  мере добавления auth-flow'ов; CHECK constraint в SQL отсутствует
@@ -115,6 +116,27 @@ export interface AuditLogRow {
   user_agent: string | null;
   metadata: string | null;  // JSON-encoded
   created_at: number;
+}
+
+/**
+ * jwt_keys — HS256 signing keys для access JWT.
+ *
+ * `secret_encrypted` — JSON-encoded AES-GCM blob (`{iv, ct, tag}` в
+ * base64), зашифрован env.MASTER_SECRET. Plaintext signing key
+ * НИКОГДА не хранится в БД.
+ *
+ * Статусы: 'active' (единственный одновременно), 'deprecated' (только
+ * verify, не sign), 'revoked' (отвергается всегда). См. Architecture
+ * §9 v0.8.3 + decisions_archive.md 2026-05-14.
+ */
+export interface JwtKeyRow {
+  kid: string;                        // "v1-YYYY-MM-DD-<uuid8>"
+  secret_encrypted: string;           // JSON-encoded AES-GCM blob
+  status: JwtKeyStatus;
+  created_at: number;
+  expires_at: number;
+  rotated_at: number | null;          // когда active → deprecated
+  revoked_at: number | null;          // когда → revoked
 }
 
 // ============================================================

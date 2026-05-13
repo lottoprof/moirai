@@ -36,6 +36,12 @@ id      = "13731e63893d4077b391688a0b0fdc22"
 binding = "KV_RATELIMIT"
 id      = "67ba23d314ae46dca543deb2bf175562"
 
+# General short-TTL cache: JWT active-key cache (5 мин) + creation lock
+# Architecture §9 v0.8.3 / decisions_archive 2026-05-14
+[[kv_namespaces]]
+binding = "KV_CACHE"
+id      = "e25c15615afa4732a82fed14e9282636"
+
 # ============================================================
 # R2 — медиа (видео, og-картинки, инструктор-фото).
 # Добавится когда подключим image pipeline + первый R2-зависимый

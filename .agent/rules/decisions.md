@@ -26,6 +26,15 @@
   Node 22 LTS, pnpm 10.18 через corepack, `wrangler types` →
   `worker-configuration.d.ts` (runtime types заменили
   `@cloudflare/workers-types`).
+- **2026-05-14** — JWT keys: переход на 301-стиль 3-уровневой
+  rotation схемы. `MASTER_SECRET` (env) шифрует signing keys в
+  таблице `jwt_keys` (kid + status active/deprecated/revoked).
+  Auto-init первого ключа с KV-lock от race. JWT header содержит
+  `kid`, verifier выбирает ключ по нему. Преимущества: rotation
+  без инвалидации всех JWTs, per-key revoke, защита от
+  компрометации БД без master. Новая таблица `jwt_keys`
+  (Architecture §9: 19 → 20). Новый KV namespace `KV_CACHE`
+  для active-key cache + creation lock. Порт из `~/git/301/`.
 - **2026-05-12** — Auth model: multi-method (password + OAuth) с
   отдельной таблицей `auth_methods`. Переработка `users` (убраны
   `password_hash` + `oauth_provider/oauth_id` колонки). Добавлены

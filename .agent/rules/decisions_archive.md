@@ -424,3 +424,116 @@ linked одновременно).
 strict Discord email policy, более жёсткий PBKDF2, audit log
 обязательно). Результат — современный production-grade auth без
 сторонних SaaS (Auth0/Clerk дорогие, vendor lock-in).
+
+
+---
+
+## 2026-05-14: JWT keys → master + jwt_keys table (rotation-ready)
+
+**Контекст.** Stage 19 plan изначально предполагал простой `JWT_SECRET`
+(один HMAC-ключ в env). В discussion с пользователем уточнили подход
+из `~/git/301/src/api/lib/jwt.ts`: там не один секрет, а трёхуровневая
+система с key rotation. Решено: копируем 301-паттерн.
+
+**Решение.**
+
+### Иерархия
+
+```
+MASTER_SECRET (env)
+  └─ AES-GCM encrypt/decrypt ────────► jwt_keys.secret_encrypted
+                                          │
+                                          ▼
+                                     HS256 signing key
+                                          │
+                                          ▼
+                                     JWT (header: kid → match row)
+```
+
+- `env.MASTER_SECRET` — 256-bit рандом, base64-encoded, через
+  `wrangler pages secret put MASTER_SECRET`. Используется ТОЛЬКО как
+  encryption key для шифрования signing keys в БД (через AES-GCM).
+  Никогда напрямую не подписывает JWT.
+- **Таблица `jwt_keys`** хранит множественные HS256-ключи. Колонки:
+  `kid` (PK, формат `v1-YYYY-MM-DD-<uuid8>`), `secret_encrypted` (JSON
+  encrypted blob), `status` (`active`/`deprecated`/`revoked`),
+  `created_at`, `expires_at`, `rotated_at`, `revoked_at`.
+- **JWT header содержит `kid`** — verifier берёт ключ по `kid` (не
+  только active!), позволяя продлевать жизнь старых deprecated JWTs
+  до их истечения.
+- **Auto-init.** При первом запросе если active-ключа нет — генерится
+  256-bit рандом, шифруется через MASTER_SECRET, кладётся в БД.
+  Защита от race condition через KV-lock в `KV_CACHE`.
+- **Cache active-ключа** в `KV_CACHE` (TTL 5 мин) — избегаем D1 SELECT
+  на каждый sign.
+
+### Состояния ключа
+
+- `active` — единственный одновременно (enforced partial unique index
+  `WHERE status='active'`). Им подписываются новые JWTs.
+- `deprecated` — старый ключ, JWTs с его kid ещё валидируются
+  (grace period для уже выданных токенов до их exp). Новых JWTs не
+  подписывает.
+- `revoked` — компрометирован или истёк по политике; JWTs с его kid
+  отвергаются мгновенно.
+
+### Rotation flow
+
+1. Завести новый ключ со `status='active'` (atomically: переводим
+   текущий active → deprecated, новый → active в одной транзакции).
+2. Старые JWTs (выданные deprecated key'ем) ещё валидны до их `exp`
+   (15 мин для access). Refresh-сессии остаются валидными — они
+   живут в `auth_sessions`, не зависят от JWT key.
+3. Через TTL (например, 30 дней) deprecated → `revoked`.
+
+### Compromise-resistance
+
+- Снимок D1 без MASTER_SECRET не даёт signing keys (они зашифрованы
+  AES-GCM с auth tag).
+- MASTER_SECRET редко читается (только при encrypt/decrypt текущего
+  ключа, и то с KV-кэшем) → меньше шансов утечки через память/логи.
+- Per-key revoke не требует ротации всей инфраструктуры.
+
+### KV_CACHE namespace
+
+4-й KV namespace добавляется к существующим трём:
+- `KV_CACHE` — active JWT key cache (key: `cache:jwt:active_key`,
+  TTL 5 мин) + creation lock (key: `lock:jwt:key:creation`, TTL 60 сек).
+  Также future-purpose: любые другие short-TTL caches.
+
+### Encryption
+
+- AES-GCM 256, IV 12 байт, auth tag 16 байт. Все через Web Crypto API
+  (нативно в CF Workers, нет deps).
+- Формат `secret_encrypted` в БД — JSON-encoded `{ iv, ct, tag }` все
+  в base64. Стандартная wire-форма для AES-GCM blob.
+
+### Что НЕ копируем буквально из 301
+
+- `KV_SESSIONS` в 301 — multi-purpose. У нас раздельные namespaces
+  (KV_OAUTH_STATE / KV_VERIFY_TOKENS / KV_RATELIMIT / KV_CACHE) —
+  чётче scope каждого, проще TTL-политики.
+- `jwt_keys.created_at`/`expires_at` в 301 — TEXT ISO. У нас INTEGER
+  unix-seconds (наш v0.8.2 type convention).
+- 301 `jwt_keys` отсутствует partial unique index на active. У нас
+  добавляем `CREATE UNIQUE INDEX ... WHERE status='active'` — БД сама
+  enforce'ит "ровно один active key".
+
+**Альтернативы.**
+
+- Простой `JWT_SECRET` (один статический ключ). Отказ: rotation
+  делать ретроактивно больно (нужно добавлять `kid` в header,
+  мигрировать все JWTs). Лучше сразу с rotation-ready схемой.
+- **`MASTER_SECRET` + HKDF derivation в памяти** (без БД). Отказ:
+  derived keys тоже статичны без БД-trail. Нет rotation, нет revoke.
+- **Asymmetric keys (RS256 / ES256)** — pub/priv pair. Отказ: HMAC
+  быстрее, не нужны JWKS endpoint (мы не выдаём JWT внешним
+  системам, только себе).
+- **KMS / external HSM.** Отказ: дорого, vendor lock-in, не нужно для
+  нашей шкалы.
+
+**Причина.** 301-команда прошла этот путь на проде. Их финальное
+решение — production-ready и protect от типовых JWT-проблем (key
+compromise, ratchet rotation, replay через deprecated tokens).
+Стоимость портирования — ~150 LoC + одна миграция + 4-й KV. Возврат
+— rotation/revoke на день 1, не на день 365.

@@ -1,4 +1,4 @@
-# Moirai — Architecture v0.8.2
+# Moirai — Architecture v0.8.3
 
 > **Status:** working draft. Зафиксированы: технологический стек, локализация
 > через path-prefix, архитектура контента, модель программ и запусков
@@ -551,7 +551,13 @@ Astro island с `client:visible`. Публичный сайт — native `<video
 
 ## 9. Схема D1
 
-**19 таблиц.** Изменения v0.8.2 (2026-05-12):
+**20 таблиц.** Изменения v0.8.3 (2026-05-14):
+- Добавлена таблица **`jwt_keys`** — multiple HS256-ключи с rotation
+  (active/deprecated/revoked), шифруются `MASTER_SECRET` через AES-GCM.
+  301-стиль 3-уровневой системы (см. `decisions_archive.md`
+  2026-05-14).
+
+Изменения v0.8.2 (2026-05-12):
 - `users.password_hash` и `users.oauth_provider/oauth_id` удалены
 - Новая таблица **`auth_methods`** — multi-method auth (один user
   может иметь password + N OAuth identities одновременно)
@@ -806,6 +812,19 @@ audit_log (
   metadata      TEXT,                             -- JSON: причина failure, провайдер, etc.
   created_at    INTEGER NOT NULL
 )
+
+jwt_keys (
+  kid               TEXT PRIMARY KEY,             -- "v1-YYYY-MM-DD-<uuid8>"
+  secret_encrypted  TEXT NOT NULL,                -- AES-GCM blob (JSON: iv, ct, tag in base64), encrypted via env.MASTER_SECRET
+  status            TEXT NOT NULL DEFAULT 'active'
+                    CHECK(status IN ('active','deprecated','revoked')),
+  created_at        INTEGER NOT NULL,
+  expires_at        INTEGER NOT NULL,
+  rotated_at        INTEGER,                      -- когда active → deprecated
+  revoked_at        INTEGER                       -- когда → revoked
+)
+-- Partial unique index: ровно один active ключ одновременно
+-- CREATE UNIQUE INDEX idx_jwt_keys_one_active ON jwt_keys(status) WHERE status='active';
 
 payments (
   id                TEXT PRIMARY KEY,
@@ -1115,7 +1134,11 @@ base. Нужен слой experiment assignment (per-user / per-cookie) — от
   API через Worker binding, SQL-миграции через `wrangler d1 migrations`,
   TS-типы пишем вручную рядом со схемой. Zod остаётся — он про
   валидацию runtime API-входа, не про БД.
-- **v0.8.2 — текущая** — auth model overhaul: multi-method auth через
+- **v0.8.3 — текущая** — JWT keys rotation system: таблица `jwt_keys`
+  (active/deprecated/revoked) + `MASTER_SECRET` (env, AES-GCM
+  encrypt/decrypt signing keys в БД) + `KV_CACHE` namespace. Порт из
+  `~/git/301/`. D1: 19 → 20 таблиц.
+- v0.8.2 — auth model overhaul: multi-method auth через
   `auth_methods` table (password + N OAuth identities per user);
   OAuth providers Google + Discord на старте (расширяемо); JWT 15min
   + refresh-session в D1; PBKDF2-SHA256 600k iter; Discord без email
