@@ -3,22 +3,44 @@ compatibility_date = "2026-05-01"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./dist"
 
-# Биндинги добавляются по мере необходимости.
 # После любой правки этого файла — выполнить:
-#   pnpm exec wrangler types
+#   corepack pnpm exec wrangler types
 # и закоммитить worker-configuration.d.ts вместе с wrangler.toml.
 
-# [[d1_databases]]
-# binding         = "DB"
-# database_name   = "moirai-prod"
-# database_id     = "<uuid>"
-# migrations_dir  = "migrations"
+# ============================================================
+# D1 — основная реляционная БД (Architecture v0.8.2 §9).
+# Создана 2026-05-13, region ENAM.
+# ============================================================
+[[d1_databases]]
+binding         = "DB"
+database_name   = "moirai-prod"
+database_id     = "14d13be4-07a7-47fc-aa92-3dbe8840c0b6"
+migrations_dir  = "migrations"
 
-# [[kv_namespaces]]
-# binding    = "KV_CONFIG"
-# id         = "<id>"
-# preview_id = "<preview-id>"
+# ============================================================
+# KV — короткоживущие данные для auth flow (Stage 19).
+# ============================================================
 
+# PKCE state + verifier для OAuth flow (TTL ~10 мин)
+[[kv_namespaces]]
+binding = "KV_OAUTH_STATE"
+id      = "dda85b650a914602b94cfe39462edabd"
+
+# Email verification + password reset токены (TTL ~1 ч)
+[[kv_namespaces]]
+binding = "KV_VERIFY_TOKENS"
+id      = "13731e63893d4077b391688a0b0fdc22"
+
+# Rate-limit counters для auth endpoints (TTL = window)
+[[kv_namespaces]]
+binding = "KV_RATELIMIT"
+id      = "67ba23d314ae46dca543deb2bf175562"
+
+# ============================================================
+# R2 — медиа (видео, og-картинки, инструктор-фото).
+# Добавится когда подключим image pipeline + первый R2-зависимый
+# контент (Sprint 1+).
+# ============================================================
 # [[r2_buckets]]
 # binding     = "MEDIA"
 # bucket_name = "moirai-media"
