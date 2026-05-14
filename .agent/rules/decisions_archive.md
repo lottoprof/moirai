@@ -537,3 +537,77 @@ MASTER_SECRET (env)
 compromise, ratchet rotation, replay через deprecated tokens).
 Стоимость портирования — ~150 LoC + одна миграция + 4-й KV. Возврат
 — rotation/revoke на день 1, не на день 365.
+
+
+---
+
+## 2026-05-14: auth flow conventions (Stage 19a-c, e-f notes)
+
+**Контекст.** Реализованы password-flow auth libs + endpoints + UI
+(Stages 19a/b/c/e/f). По ходу всплыло несколько паттернов, которые
+будут переиспользоваться в OAuth + protected-endpoints stages:
+
+### Astro 5 CSRF guard
+
+`astro.config.mjs` по умолчанию (Astro 5+) включает
+`security.checkOrigin: true`. Это блокирует POST с `Origin`, не
+совпадающим с host, **возвращая 403 `Cross-site POST form submissions
+are forbidden`** ДО того как endpoint выполнится. Решение оставлено
+включённым — браузерные fetch к same-origin автоматически правильно
+ставят Origin. cURL без `-H "Origin: ..."` ловит 403 — это правильное
+поведение, не баг.
+
+### Forms ↔ endpoints contract
+
+- **HTML-форма** имеет `<form action="/api/auth/X" method="POST">` для
+  no-JS graceful degradation (хотя сейчас все формы зависят от JS из-за
+  Turnstile). Submit обработчик через `fetch()` посылает **JSON body**
+  (не FormData) — endpoint парсит `await request.json()`.
+- **Turnstile token** включается в JSON-body как `turnstileToken`
+  (camelCase в JSON по нашей конвенции). Виджет рендерит hidden input
+  `cf-turnstile-response` в форму; JS-handler читает его через
+  `formData.get("cf-turnstile-response")`.
+- **Errors** возвращаются в формате `{ error: "code", message?: "...",
+  issues?: [...] }` с правильным HTTP-статусом (400/401/403/409/429).
+  UI рендерит понятный message через локальный dict (`t.errors[code]`)
+  с fallback'ом если кода нет.
+- **`credentials: "same-origin"`** обязательно в fetch — без этого
+  refresh cookie не отправится/не получится.
+
+### Token storage on client
+
+- **Access JWT** — `sessionStorage.setItem("moirai_access_token", ...)`.
+  Очищается на logout. Чтение через JS для добавления в `Authorization:
+  Bearer` header при API-запросах из браузера.
+- **Refresh** — HttpOnly cookie `__Host-moirai_refresh`. JS не читает.
+  Браузер шлёт автоматически на same-origin requests.
+
+### SSR vs prerender для auth pages
+
+- **prerender = true** только для статических pages БЕЗ env-чтения и
+  без auth-guard: например, `verify-email-pending`.
+- **prerender = false** (SSR) — login/register/password-reset (нужен
+  `TURNSTILE_SITE_KEY` из env), account (нужна auth-guard через
+  `verifyRefreshSession`).
+- Astro frontmatter SSR-пейджа выполняется через @astrojs/cloudflare
+  адаптер на каждый запрос; `Astro.locals.runtime.env` доступен.
+
+### Info-hiding в endpoints
+
+- **Login fail** — всегда generic `invalid_login` (401), не различает
+  "user не существует" / "нет password method" / "wrong password".
+  Дифференциация только в `audit_log.metadata.reason`.
+- **Password reset request** — всегда 200, даже если email не
+  зарегистрирован. Email уходит только при positive match.
+- **Password reset confirm** — token consume **до** strength check,
+  чтобы attacker не мог угадать "был ли token валиден" через timing.
+
+### Что осталось вне Stage 19
+
+- **Email provider** — `sendEmail()` сейчас STUB (`console.log`).
+  Без реального сервиса verify-link и reset-link не уходят. См.
+  отдельное решение об email-сервисе (Resend / Postmark / etc.).
+- **i18n dict** — UI-строки в auth pages inline. Миграция в
+  `src/lib/i18n/dict.{en,ru}.ts` — Stage 7 (translation-pair validator).
+- **JWT-middleware для protected /api/*** — Stage 19g, когда появятся
+  endpoints вне `/api/auth/*` требующие user-контекст.

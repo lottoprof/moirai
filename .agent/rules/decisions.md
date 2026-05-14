@@ -26,6 +26,12 @@
   Node 22 LTS, pnpm 10.18 через corepack, `wrangler types` →
   `worker-configuration.d.ts` (runtime types заменили
   `@cloudflare/workers-types`).
+- **2026-05-14** — Auth flow conventions (Stage 19a-f): Astro 5 CSRF guard
+  оставлен default-on (POST требует Origin); forms ↔ endpoints через
+  JSON-body + fetch + `credentials:same-origin`; access JWT в
+  `sessionStorage`, refresh в `__Host-` cookie; login fail → generic
+  `invalid_login` (info-hiding); SSR для pages с env/auth-guard,
+  prerender только для static. См. archive 2026-05-14.
 - **2026-05-14** — JWT keys: переход на 301-стиль 3-уровневой
   rotation схемы. `MASTER_SECRET` (env) шифрует signing keys в
   таблице `jwt_keys` (kid + status active/deprecated/revoked).

@@ -92,13 +92,15 @@ IP_HASH_SALT=...
 | Этап | Что | Status | Commit |
 |---|---|---|---|
 | 19a | Server libs: crypto / hash / password / jwt | ✅ done | `9d75db7` |
-| 19b | Session module (refresh sessions + cookie helpers) | ⏳ next |  |
-| 19c | Support utils: turnstile / ratelimit / audit / user-ops | ⏳ |  |
+| 19b | Session module (refresh sessions + cookie helpers) | ✅ done | `29691d4` |
+| 19c | Support utils: turnstile / ratelimit / audit / user-ops | ✅ done | `7fcb58e` |
 | 19d | OAuth helpers (oauth.ts state mgmt + google.ts + discord.ts) | ⏳ ждёт GOOGLE_CLIENT_*, DISCORD_CLIENT_* |  |
-| 19e | API endpoints (`src/pages/api/auth/**.ts`) | ⏳ |  |
-| 19f | UI pages (login/register/account/verify-email-pending/password-reset) | ⏳ |  |
-| 19g | Middleware JWT verification для /api/* | ⏳ |  |
-| 19h | E2E verification | ⏳ |  |
+| 19e | API endpoints (`src/pages/api/auth/**.ts`) | ✅ done (password flow) | `59846e6` |
+| 19f | UI pages (login/register/account/verify-email-pending/password-reset) | ✅ done | `f6d5527` |
+| 19g | Middleware JWT verification для /api/* | ⏳ (когда появятся protected endpoints вне /api/auth) |  |
+| 19h | E2E verification (deployed prod smoke) | 🟡 partial — формы видны, нужен реальный email чтобы пройти full flow |  |
+| —   | **Email service** — sendEmail() сейчас STUB; нужен реальный провайдер для verify + reset link | ⏳ next |  |
+| —   | i18n: UI-строки сейчас inline в .astro; миграция в `dict.{en,ru}.ts` — Stage 7 | ⏳ |  |
 
 ## Этапы
 
