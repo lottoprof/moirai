@@ -34,5 +34,8 @@ declare namespace Cloudflare {
     // === Cloudflare Turnstile — anti-bot на login/register формах ===
     TURNSTILE_SITE_KEY?: string;   // public, рендерится в HTML <div data-sitekey>
     TURNSTILE_SECRET?: string;     // server-side siteverify
+
+    // === Resend — transactional email (verify links, password reset) ===
+    RESEND_API_KEY?: string;       // Bearer для api.resend.com/emails
   }
 }
