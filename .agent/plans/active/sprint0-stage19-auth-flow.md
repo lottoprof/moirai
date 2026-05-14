@@ -87,6 +87,19 @@ JWT_SECRET=...
 IP_HASH_SALT=...
 ```
 
+## Progress
+
+| Этап | Что | Status | Commit |
+|---|---|---|---|
+| 19a | Server libs: crypto / hash / password / jwt | ✅ done | `9d75db7` |
+| 19b | Session module (refresh sessions + cookie helpers) | ⏳ next |  |
+| 19c | Support utils: turnstile / ratelimit / audit / user-ops | ⏳ |  |
+| 19d | OAuth helpers (oauth.ts state mgmt + google.ts + discord.ts) | ⏳ ждёт GOOGLE_CLIENT_*, DISCORD_CLIENT_* |  |
+| 19e | API endpoints (`src/pages/api/auth/**.ts`) | ⏳ |  |
+| 19f | UI pages (login/register/account/verify-email-pending/password-reset) | ⏳ |  |
+| 19g | Middleware JWT verification для /api/* | ⏳ |  |
+| 19h | E2E verification | ⏳ |  |
+
 ## Этапы
 
 ### 19a — server libs
