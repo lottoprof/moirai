@@ -1,12 +1,16 @@
 ---
 /*
  * <Nav /> — фиксированная навигация на всех публичных страницах.
- * Минимум: лого + один CTA (Apply Now). Fade-in на ~20px scroll
- * через `.is-scrolled` класс, добавляемый vanilla `<script>`.
+ * Лого + lang switcher + Sign in / Sign up CTA. Fade-in на ~20px
+ * scroll через `.is-scrolled` класс, добавляемый vanilla `<script>`.
  *
- * Стили scoped (`<style>` без is:global) — Astro прибавит скоуп
- * к `.nav` элементу; runtime-toggling `.is-scrolled` совместим
- * с скоупом (data-attribute остаётся на элементе).
+ * Стили scoped — Astro прибавит скоуп к `.nav` элементу; runtime
+ * toggling `.is-scrolled` совместим со скопом (data-attribute
+ * остаётся на элементе).
+ *
+ * Auth-aware: client JS пытается fetch /api/auth/me и если 200 →
+ * переключает Sign in/up на Account link. SSR-default — unauth
+ * state (Sign in/up видны), JS убирает flicker когда юзер залогинен.
  *
  * Источник CSS: docs/moirai-home.html.
  */
@@ -21,15 +25,37 @@ interface Props {
 const { locale, pathname } = Astro.props;
 
 const labels = locale === "ru"
-  ? { aria: "Главная", cta: "Подать заявку →" }
-  : { aria: "Primary", cta: "Apply now →" };
+  ? {
+      aria: "Главная",
+      signIn: "Войти",
+      signUp: "Регистрация →",
+      account: "Кабинет →",
+    }
+  : {
+      aria: "Primary",
+      signIn: "Sign in",
+      signUp: "Sign up →",
+      account: "Account →",
+    };
 ---
 
 <nav class="nav" aria-label={labels.aria}>
   <a href={`/${locale}/`} class="nav__logo">Moirai.</a>
   <div class="nav__right">
     <LangSwitcher current={locale} pathname={pathname} />
-    <a href={`/${locale}/apply`} class="nav__cta">{labels.cta}</a>
+
+    {/* Unauth state — visible by default */}
+    <a href={`/${locale}/login?return_to=${pathname}`} class="nav__link js-auth-unauth">
+      {labels.signIn}
+    </a>
+    <a href={`/${locale}/register`} class="nav__cta js-auth-unauth">
+      {labels.signUp}
+    </a>
+
+    {/* Authed state — hidden by default, JS shows если /api/auth/me OK */}
+    <a href={`/${locale}/account`} class="nav__cta js-auth-authed" hidden>
+      {labels.account}
+    </a>
   </div>
 </nav>
 
@@ -74,6 +100,21 @@ const labels = locale === "ru"
     opacity: 0.95;
   }
 
+  /* Subtle text link (Sign in) — не CTA */
+  .nav__link {
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .nav__link:hover {
+    color: var(--paper);
+  }
+
+  /* Primary CTA (Sign up / Account) — amber underline */
   .nav__cta {
     font-size: var(--type-micro-md);
     font-weight: 500;
@@ -82,6 +123,7 @@ const labels = locale === "ru"
     color: var(--amber);
     border-bottom: 1px solid var(--amber);
     padding-bottom: 2px;
+    text-decoration: none;
     transition:
       color var(--duration-fast) var(--ease-out),
       border-color var(--duration-fast) var(--ease-out);
@@ -90,19 +132,82 @@ const labels = locale === "ru"
     color: var(--amber-light);
     border-bottom-color: var(--amber-light);
   }
+
+  /* JS toggle handles via .hidden attribute */
+  [hidden] { display: none !important; }
 </style>
 
 <script>
   /*
-   * Toggle .is-scrolled на nav элементе после ~20px scroll.
-   * Vanilla, без зависимостей. Passive listener — perf-friendly.
+   * Auth-aware nav toggle.
+   * - Сначала default state: Sign in / Sign up видны.
+   * - Если access token в sessionStorage — пробуем /api/auth/me.
+   *   200 → показываем Account, прячем unauth links.
+   *   401/expired → пробуем refresh, потом ещё раз me. Если опять
+   *   неуспех — остаёмся в unauth state.
+   *
+   * + scroll-fade nav background (как раньше).
    */
   const nav = document.querySelector(".nav");
   if (nav instanceof HTMLElement) {
-    const update = (): void => {
+    const updateScroll = (): void => {
       nav.classList.toggle("is-scrolled", window.scrollY > 20);
     };
-    update();
-    window.addEventListener("scroll", update, { passive: true });
+    updateScroll();
+    window.addEventListener("scroll", updateScroll, { passive: true });
   }
+
+  async function fetchMe(token: string | null): Promise<boolean> {
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch("/api/auth/me", {
+      method: "GET",
+      headers,
+      credentials: "same-origin",
+    });
+    return res.ok;
+  }
+
+  async function tryRefresh(): Promise<string | null> {
+    const res = await fetch("/api/auth/refresh", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!res.ok) return null;
+    try {
+      const data = (await res.json()) as { access_token?: string };
+      if (data.access_token) {
+        sessionStorage.setItem("moirai_access_token", data.access_token);
+        return data.access_token;
+      }
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  async function syncAuthUI() {
+    let token = sessionStorage.getItem("moirai_access_token");
+    let authed = false;
+    if (token) {
+      authed = await fetchMe(token);
+    }
+    if (!authed) {
+      // Может быть refresh cookie живой — попытка обновить access
+      token = await tryRefresh();
+      if (token) authed = await fetchMe(token);
+    }
+
+    const unauthEls = document.querySelectorAll<HTMLElement>(".js-auth-unauth");
+    const authedEls = document.querySelectorAll<HTMLElement>(".js-auth-authed");
+
+    if (authed) {
+      unauthEls.forEach((el) => { el.hidden = true; });
+      authedEls.forEach((el) => { el.hidden = false; });
+    } else {
+      // default state остаётся (unauth visible) — ничего не меняем
+      sessionStorage.removeItem("moirai_access_token");
+    }
+  }
+
+  syncAuthUI();
 </script>
