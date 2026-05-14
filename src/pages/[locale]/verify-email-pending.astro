@@ -1,0 +1,69 @@
+---
+/*
+ * /{locale}/verify-email-pending — статичная страница после успешного
+ * register. Просит проверить inbox.
+ *
+ * Принимает ?error=invalid_token (если пользователь пришёл по
+ * невалидной/протухшей ссылке из email — см. /api/auth/verify-email).
+ *
+ * Prerender — query handling делается inline JS.
+ */
+
+import Layout from "../../layouts/public/Layout.astro";
+
+export const prerender = true;
+
+export function getStaticPaths() {
+  return [{ params: { locale: "en" } }, { params: { locale: "ru" } }];
+}
+
+const { locale } = Astro.params;
+
+const t = locale === "ru"
+  ? {
+      eyebrow: "Почти готово",
+      title: "Проверьте почту.",
+      lede: "Мы отправили ссылку для подтверждения email. Ссылка действует 1 час.",
+      footer: "Письмо не пришло? Проверьте папку «Спам».",
+      errorInvalidToken: "Ссылка недействительна или истекла. Попробуйте зарегистрироваться заново.",
+      seo: { title: "Подтвердите email — Moirai", description: "Подтвердите email для завершения регистрации." },
+    }
+  : {
+      eyebrow: "Almost there",
+      title: "Check your email.",
+      lede: "We've sent a verification link. It's valid for 1 hour.",
+      footer: "No email? Check your spam folder.",
+      errorInvalidToken: "The link is invalid or expired. Please register again.",
+      seo: { title: "Verify email — Moirai", description: "Verify your email to complete sign up." },
+    };
+---
+
+<Layout
+  locale={locale as "en" | "ru"}
+  seo={{ title: t.seo.title, description: t.seo.description, noindex: true }}
+>
+  <section class="section center" aria-labelledby="verify-title">
+    <header class="section__head">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1 id="verify-title" class="h1">{t.title}</h1>
+      <p class="text-muted">{t.lede}</p>
+    </header>
+
+    <div class="form">
+      <div class="form__error js-error" role="alert" hidden data-msg={t.errorInvalidToken}></div>
+      <p class="form__hint" style="text-align: center;">{t.footer}</p>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  // Показать error если ?error=invalid_token
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("error") === "invalid_token") {
+    const el = document.querySelector<HTMLElement>(".js-error");
+    if (el) {
+      el.textContent = el.dataset.msg ?? "Invalid token";
+      el.hidden = false;
+    }
+  }
+</script>

@@ -1,0 +1,145 @@
+---
+/*
+ * /{locale}/account — приватная страница, требует валидную refresh-сессию.
+ *
+ * SSR + auth-guard: читаем refresh cookie → verifyRefreshSession →
+ * findUserById + getUserAuthMethods → рендерим, либо redirect на login.
+ *
+ * Sign out и unlink — POST на API через JS.
+ */
+
+import Layout from "../../layouts/public/Layout.astro";
+import Btn from "../../components/public/Btn.astro";
+import { verifyRefreshSession } from "../../lib/server/session";
+import { findUserById, getUserAuthMethods } from "../../lib/server/user-ops";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/account");
+}
+
+const env = Astro.locals.runtime.env;
+const session = await verifyRefreshSession(env, Astro.request);
+if (!session) {
+  return Astro.redirect(`/${locale}/login?return_to=/${locale}/account`);
+}
+const user = await findUserById(env, session.userId);
+if (!user) {
+  return Astro.redirect(`/${locale}/login`);
+}
+const methods = await getUserAuthMethods(env, user.id);
+
+const verifiedBadge = Astro.url.searchParams.get("verified") === "1";
+
+const t = locale === "ru"
+  ? {
+      eyebrow: "Личный кабинет",
+      titleHi: (n: string | null) => n ? `Привет, ${n}.` : "Личный кабинет",
+      emailLabel: "Почта",
+      verified: "верифицирована",
+      unverified: "не верифицирована",
+      verifiedNote: "✅ Email подтверждён.",
+      methodsTitle: "Способы входа",
+      methodKindPassword: "Email + пароль",
+      methodKindGoogle: "Google",
+      methodKindDiscord: "Discord",
+      addedOn: (ts: number) => `Добавлен ${new Date(ts * 1000).toLocaleDateString("ru")}`,
+      signOut: "Выйти",
+      refCode: "Реферальный код",
+      seo: { title: "Личный кабинет — Moirai", description: "Управление аккаунтом Moirai." },
+    }
+  : {
+      eyebrow: "Account",
+      titleHi: (n: string | null) => n ? `Hi ${n}.` : "Account",
+      emailLabel: "Email",
+      verified: "verified",
+      unverified: "not verified",
+      verifiedNote: "✅ Email verified.",
+      methodsTitle: "Sign-in methods",
+      methodKindPassword: "Email + password",
+      methodKindGoogle: "Google",
+      methodKindDiscord: "Discord",
+      addedOn: (ts: number) => `Added ${new Date(ts * 1000).toLocaleDateString("en")}`,
+      signOut: "Sign out",
+      refCode: "Referral code",
+      seo: { title: "Account — Moirai", description: "Manage your Moirai account." },
+    };
+
+function methodLabel(kind: string): string {
+  if (kind === "password") return t.methodKindPassword;
+  if (kind === "google") return t.methodKindGoogle;
+  if (kind === "discord") return t.methodKindDiscord;
+  return kind;
+}
+---
+
+<Layout
+  locale={locale}
+  seo={{ title: t.seo.title, description: t.seo.description, noindex: true }}
+>
+  <section class="section center" aria-labelledby="account-title">
+    <header class="section__head">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1 id="account-title" class="h1">{t.titleHi(user.name)}</h1>
+    </header>
+
+    {verifiedBadge && (
+      <div class="form" role="status">
+        <p class="form__hint">{t.verifiedNote}</p>
+      </div>
+    )}
+
+    <div class="form">
+      <div class="form__field">
+        <span class="form__label">{t.emailLabel}</span>
+        <p class="text-muted">
+          {user.email} —{" "}
+          <span class={user.email_verified_at ? "text-accent" : "text-faint"}>
+            {user.email_verified_at ? t.verified : t.unverified}
+          </span>
+        </p>
+      </div>
+
+      <div class="form__field">
+        <span class="form__label">{t.refCode}</span>
+        <p class="text-muted">{user.referral_code}</p>
+      </div>
+
+      <div class="form__field">
+        <span class="form__label">{t.methodsTitle}</span>
+        <ul class="form__hint" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-xs);">
+          {methods.map((m) => (
+            <li>
+              <strong style="color: var(--text);">{methodLabel(m.kind)}</strong>{" "}
+              <span>· {t.addedOn(m.created_at)}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <Btn type="button" variant="ghost" size="lg" class="js-signout">{t.signOut}</Btn>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  document.querySelectorAll(".js-signout").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const res = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+      });
+      sessionStorage.removeItem("moirai_access_token");
+      if (res.ok) {
+        // Локаль в URL
+        const path = window.location.pathname;
+        const m = /^\/(en|ru)\//.exec(path);
+        const locale = m ? m[1] : "en";
+        window.location.href = `/${locale}/`;
+      }
+    });
+  });
+</script>

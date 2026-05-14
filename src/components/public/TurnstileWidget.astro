@@ -1,0 +1,37 @@
+---
+/*
+ * <TurnstileWidget /> — Cloudflare Turnstile виджет.
+ *
+ * Рендерит `<div class="cf-turnstile" data-sitekey="...">` + загрузку
+ * CF Turnstile API script. После прохождения challenge виджет
+ * добавляет hidden input `cf-turnstile-response` в ближайшую форму.
+ * На submit'е форма посылает токен на server, тот верифицирует через
+ * siteverify (см. `src/lib/server/turnstile.ts`).
+ *
+ * Использование:
+ *   <form ...>
+ *     <TurnstileWidget />
+ *     <input type="submit" ... />
+ *   </form>
+ *
+ * Должен быть внутри `<form>` чтобы скрытый input оказался в form data.
+ */
+
+interface Props {
+  /** CF site key (public). По умолчанию — env.TURNSTILE_SITE_KEY. */
+  sitekey?: string;
+  /** Light/dark theme. По умолчанию — auto (CF определяет). */
+  theme?: "light" | "dark" | "auto";
+}
+
+const env = Astro.locals.runtime.env;
+const { sitekey = env.TURNSTILE_SITE_KEY, theme = "auto" } = Astro.props;
+---
+
+<div
+  class="cf-turnstile"
+  data-sitekey={sitekey}
+  data-theme={theme}
+></div>
+
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer is:inline></script>

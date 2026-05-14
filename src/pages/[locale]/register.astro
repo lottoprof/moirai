@@ -1,0 +1,194 @@
+---
+/*
+ * /{locale}/register — форма регистрации email+password.
+ * SSR (нужен TURNSTILE_SITE_KEY).
+ */
+
+import Layout from "../../layouts/public/Layout.astro";
+import Btn from "../../components/public/Btn.astro";
+import TurnstileWidget from "../../components/public/TurnstileWidget.astro";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/register");
+}
+
+const error = Astro.url.searchParams.get("error");
+
+const t = locale === "ru"
+  ? {
+      eyebrow: "Регистрация",
+      title: "Создайте аккаунт.",
+      lede: "Получите доступ к программе и личному кабинету.",
+      email: "Email",
+      password: "Пароль",
+      passwordHint: "Минимум 10 символов.",
+      name: "Имя",
+      nameHint: "Опционально — как обращаться к вам.",
+      submit: "Зарегистрироваться",
+      or: "или",
+      google: "Через Google",
+      discord: "Через Discord",
+      have: "Уже есть аккаунт?",
+      login: "Войти",
+      seo: {
+        title: "Регистрация — Moirai",
+        description: "Создайте аккаунт Moirai.",
+      },
+      errors: {
+        email_exists: "Этот email уже зарегистрирован. Войдите или восстановите пароль.",
+        too_short: "Пароль слишком короткий — минимум 10 символов.",
+        too_long: "Пароль слишком длинный — максимум 128 символов.",
+        too_common: "Пароль слишком распространённый. Выберите менее предсказуемый.",
+        rate_limited: "Слишком много попыток. Подождите час.",
+        turnstile_failed: "Не удалось пройти проверку. Перезагрузите страницу.",
+      } as Record<string, string>,
+    }
+  : {
+      eyebrow: "Sign up",
+      title: "Create an account.",
+      lede: "Get access to the program and your dashboard.",
+      email: "Email",
+      password: "Password",
+      passwordHint: "Minimum 10 characters.",
+      name: "Name",
+      nameHint: "Optional — how should we address you?",
+      submit: "Create account",
+      or: "or",
+      google: "Continue with Google",
+      discord: "Continue with Discord",
+      have: "Already have an account?",
+      login: "Sign in",
+      seo: {
+        title: "Sign up — Moirai",
+        description: "Create your Moirai account.",
+      },
+      errors: {
+        email_exists: "This email is already registered. Sign in or reset your password.",
+        too_short: "Password too short — minimum 10 characters.",
+        too_long: "Password too long — maximum 128 characters.",
+        too_common: "Password too common. Choose something less guessable.",
+        rate_limited: "Too many attempts. Please wait an hour.",
+        turnstile_failed: "Verification failed. Reload the page and try again.",
+      } as Record<string, string>,
+    };
+
+const errorMessage = error && t.errors[error] ? t.errors[error] : null;
+---
+
+<Layout
+  locale={locale}
+  seo={{ title: t.seo.title, description: t.seo.description, noindex: true }}
+>
+  <section class="section center" aria-labelledby="register-title">
+    <header class="section__head">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1 id="register-title" class="h1">{t.title}</h1>
+      <p class="text-muted">{t.lede}</p>
+    </header>
+
+    <form class="form" id="register-form" method="POST" action="/api/auth/register" novalidate>
+      <input type="hidden" name="locale" value={locale} />
+
+      {errorMessage && (
+        <div class="form__error" role="alert">{errorMessage}</div>
+      )}
+
+      <div class="form__field">
+        <label class="form__label" for="register-email">{t.email}</label>
+        <input
+          class="form__input"
+          type="email"
+          id="register-email"
+          name="email"
+          autocomplete="email"
+          required
+        />
+      </div>
+
+      <div class="form__field">
+        <label class="form__label" for="register-password">{t.password}</label>
+        <input
+          class="form__input"
+          type="password"
+          id="register-password"
+          name="password"
+          autocomplete="new-password"
+          minlength="10"
+          required
+        />
+        <p class="form__hint">{t.passwordHint}</p>
+      </div>
+
+      <div class="form__field">
+        <label class="form__label" for="register-name">{t.name}</label>
+        <input
+          class="form__input"
+          type="text"
+          id="register-name"
+          name="name"
+          autocomplete="name"
+        />
+        <p class="form__hint">{t.nameHint}</p>
+      </div>
+
+      <TurnstileWidget />
+
+      <Btn type="submit" variant="primary" size="lg" arrow>{t.submit}</Btn>
+
+      <div class="form__divider">{t.or}</div>
+
+      <div class="oauth-buttons">
+        <Btn href={`/api/auth/oauth/google/start`} variant="ghost" size="lg">{t.google}</Btn>
+        <Btn href={`/api/auth/oauth/discord/start`} variant="ghost" size="lg">{t.discord}</Btn>
+      </div>
+
+      <p class="form__hint">
+        {t.have} <a href={`/${locale}/login`}>{t.login}</a>.
+      </p>
+    </form>
+  </section>
+</Layout>
+
+<script>
+  const form = document.getElementById("register-form") as HTMLFormElement | null;
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const email = fd.get("email");
+      const password = fd.get("password");
+      const name = fd.get("name") || undefined;
+      const locale = fd.get("locale");
+      const turnstileToken = fd.get("cf-turnstile-response");
+
+      if (!turnstileToken) {
+        window.location.search = "?error=turnstile_failed";
+        return;
+      }
+
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, name, locale, turnstileToken }),
+        credentials: "same-origin",
+      });
+
+      if (res.ok) {
+        window.location.href = `/${locale as string}/verify-email-pending`;
+        return;
+      }
+
+      let errCode = "rate_limited";
+      try {
+        const body = (await res.json()) as { error?: string };
+        if (body.error) errCode = body.error;
+      } catch {
+        // ignore
+      }
+      window.location.search = `?error=${encodeURIComponent(errCode)}`;
+    });
+  }
+</script>

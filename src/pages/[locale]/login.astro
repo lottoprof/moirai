@@ -1,0 +1,199 @@
+---
+/*
+ * /{locale}/login — форма входа email+password.
+ *
+ * SSR — нужен Astro.locals.runtime.env.TURNSTILE_SITE_KEY на этапе
+ * рендера + чтение ?error/?return_to query params.
+ *
+ * Все fail-ветки login API возвращают generic `invalid_login` —
+ * статичный hint под формой покрывает оба кейса (no password method
+ * + неверный пароль): "Forgot? Or sign in with Google/Discord".
+ *
+ * UI-строки inline до Stage 7 (i18n dict).
+ */
+
+import Layout from "../../layouts/public/Layout.astro";
+import Btn from "../../components/public/Btn.astro";
+import TurnstileWidget from "../../components/public/TurnstileWidget.astro";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/login");
+}
+
+const error = Astro.url.searchParams.get("error");
+const returnTo = Astro.url.searchParams.get("return_to") ?? "";
+
+const t = locale === "ru"
+  ? {
+      eyebrow: "Вход",
+      title: "С возвращением.",
+      lede: "Войдите в личный кабинет, чтобы продолжить.",
+      email: "Email",
+      password: "Пароль",
+      submit: "Войти",
+      register: "Нет аккаунта?",
+      registerLink: "Зарегистрироваться",
+      forgot: "Забыли пароль?",
+      forgotLink: "Сбросить",
+      or: "или",
+      google: "Войти через Google",
+      discord: "Войти через Discord",
+      hint: "Если вы регистрировались через Google или Discord — войдите через них.",
+      seo: {
+        title: "Вход — Moirai",
+        description: "Войдите в личный кабинет Moirai.",
+      },
+      errors: {
+        invalid_login: "Неверный email или пароль. Попробуйте сбросить пароль или войти через социальную сеть.",
+        rate_limited: "Слишком много попыток. Подождите час и попробуйте снова.",
+        turnstile_failed: "Не удалось пройти проверку. Перезагрузите страницу.",
+        discord_no_email: "Discord не предоставил email. Войдите по email/паролю или через Google.",
+        oauth_failed: "Не удалось войти через социальную сеть. Попробуйте ещё раз.",
+      } as Record<string, string>,
+    }
+  : {
+      eyebrow: "Sign in",
+      title: "Welcome back.",
+      lede: "Sign in to continue to your account.",
+      email: "Email",
+      password: "Password",
+      submit: "Sign in",
+      register: "No account?",
+      registerLink: "Create one",
+      forgot: "Forgot password?",
+      forgotLink: "Reset it",
+      or: "or",
+      google: "Continue with Google",
+      discord: "Continue with Discord",
+      hint: "Signed up with Google or Discord? Use the buttons below.",
+      seo: {
+        title: "Sign in — Moirai",
+        description: "Sign in to your Moirai account.",
+      },
+      errors: {
+        invalid_login: "Invalid email or password. Try resetting your password or signing in with social.",
+        rate_limited: "Too many attempts. Please wait an hour and try again.",
+        turnstile_failed: "Verification failed. Reload the page and try again.",
+        discord_no_email: "Discord didn't provide an email. Use email/password or Google.",
+        oauth_failed: "Couldn't sign in with social. Try again.",
+      } as Record<string, string>,
+    };
+
+const errorMessage = error && t.errors[error] ? t.errors[error] : null;
+---
+
+<Layout
+  locale={locale}
+  seo={{ title: t.seo.title, description: t.seo.description, noindex: true }}
+>
+  <section class="section center" aria-labelledby="login-title">
+    <header class="section__head">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1 id="login-title" class="h1">{t.title}</h1>
+      <p class="text-muted">{t.lede}</p>
+    </header>
+
+    <form class="form" id="login-form" method="POST" action="/api/auth/login" novalidate>
+      <input type="hidden" name="return_to" value={returnTo} />
+
+      {errorMessage && (
+        <div class="form__error" role="alert">{errorMessage}</div>
+      )}
+
+      <div class="form__field">
+        <label class="form__label" for="login-email">{t.email}</label>
+        <input
+          class="form__input"
+          type="email"
+          id="login-email"
+          name="email"
+          autocomplete="email"
+          required
+        />
+      </div>
+
+      <div class="form__field">
+        <label class="form__label" for="login-password">{t.password}</label>
+        <input
+          class="form__input"
+          type="password"
+          id="login-password"
+          name="password"
+          autocomplete="current-password"
+          required
+        />
+      </div>
+
+      <TurnstileWidget />
+
+      <Btn type="submit" variant="primary" size="lg" arrow>{t.submit}</Btn>
+
+      <p class="form__hint">
+        {t.forgot} <a href={`/${locale}/password-reset`}>{t.forgotLink}</a>.
+        {" "}<br />{t.hint}
+      </p>
+
+      <div class="form__divider">{t.or}</div>
+
+      <div class="oauth-buttons">
+        <Btn href={`/api/auth/oauth/google/start?return_to=${returnTo}`} variant="ghost" size="lg">{t.google}</Btn>
+        <Btn href={`/api/auth/oauth/discord/start?return_to=${returnTo}`} variant="ghost" size="lg">{t.discord}</Btn>
+      </div>
+
+      <p class="form__hint">
+        {t.register} <a href={`/${locale}/register`}>{t.registerLink}</a>.
+      </p>
+    </form>
+  </section>
+</Layout>
+
+<script>
+  // Form submit handler — fetch к /api/auth/login, на success
+  // редирект на return_to или /{locale}/account.
+  const form = document.getElementById("login-form") as HTMLFormElement | null;
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const email = formData.get("email");
+      const password = formData.get("password");
+      const turnstileToken = formData.get("cf-turnstile-response");
+      const returnTo = formData.get("return_to") as string | null;
+
+      if (!turnstileToken) {
+        window.location.search = "?error=turnstile_failed";
+        return;
+      }
+
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, turnstileToken }),
+        credentials: "same-origin",
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as { access_token?: string; user?: { locale?: string } };
+        if (data.access_token) {
+          // Store access token in sessionStorage; refresh lives in HttpOnly cookie.
+          sessionStorage.setItem("moirai_access_token", data.access_token);
+        }
+        const userLocale = data.user?.locale ?? "en";
+        window.location.href = returnTo && returnTo.startsWith("/") ? returnTo : `/${userLocale}/account`;
+        return;
+      }
+
+      let errCode = "invalid_login";
+      try {
+        const body = (await res.json()) as { error?: string };
+        if (body.error) errCode = body.error;
+      } catch {
+        // ignore
+      }
+      window.location.search = `?error=${encodeURIComponent(errCode)}`;
+    });
+  }
+</script>
