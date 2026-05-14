@@ -21,7 +21,11 @@
 
 const enc = new TextEncoder();
 
-async function sha256Hex(input: string): Promise<string> {
+/**
+ * SHA-256 → hex string. Generic helper, используется по проекту
+ * (fingerprint, ip_hash, token_hash в auth_sessions, etc).
+ */
+export async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", enc.encode(input));
   const bytes = new Uint8Array(buf);
   let hex = "";
