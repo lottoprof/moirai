@@ -51,5 +51,12 @@ id      = "e25c15615afa4732a82fed14e9282636"
 # binding     = "MEDIA"
 # bucket_name = "moirai-media"
 
-# [vars]
-# ENVIRONMENT = "production"
+# ============================================================
+# Public vars — версионируются в репо. Только публичные значения.
+# Секреты — через `wrangler pages secret put` (не сюда).
+# ============================================================
+[vars]
+# Cloudflare Turnstile public site key — рендерится на login/register
+# в HTML как <div data-sitekey="...">. Парный TURNSTILE_SECRET для
+# server-side siteverify лежит в wrangler pages secret.
+TURNSTILE_SITE_KEY = "0x4AAAAAADOrL7Hh2geV-KJG"
