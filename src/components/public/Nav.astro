@@ -28,15 +28,22 @@ const labels = locale === "ru"
   ? {
       aria: "Главная",
       signIn: "Войти",
-      signUp: "Регистрация →",
+      signUp: "Регистрация",
       account: "Кабинет →",
     }
   : {
       aria: "Primary",
       signIn: "Sign in",
-      signUp: "Sign up →",
+      signUp: "Sign up",
       account: "Account →",
     };
+
+// Скрываем link на ту страницу, где пользователь сейчас находится —
+// одинаковый item в Nav на текущей странице выглядит как ложное
+// "нажми меня". На /login прячем Sign in, на /register — Sign up.
+// На /account auth-aware JS-toggle и так показывает только Account link.
+const onLogin = pathname === `/${locale}/login` || pathname.startsWith(`/${locale}/login/`);
+const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/${locale}/register/`);
 ---
 
 <nav class="nav" aria-label={labels.aria}>
@@ -44,15 +51,19 @@ const labels = locale === "ru"
   <div class="nav__right">
     <LangSwitcher current={locale} pathname={pathname} />
 
-    {/* Unauth state — visible by default */}
-    <a href={`/${locale}/login?return_to=${pathname}`} class="nav__link js-auth-unauth">
-      {labels.signIn}
-    </a>
-    <a href={`/${locale}/register`} class="nav__cta js-auth-unauth">
-      {labels.signUp}
-    </a>
+    {/* Unauth state — visible by default; current-page link скрывается. */}
+    {!onLogin && (
+      <a href={`/${locale}/login?return_to=${pathname}`} class="nav__link js-auth-unauth">
+        {labels.signIn}
+      </a>
+    )}
+    {!onRegister && (
+      <a href={`/${locale}/register`} class="nav__cta js-auth-unauth">
+        {labels.signUp}
+      </a>
+    )}
 
-    {/* Authed state — hidden by default, JS shows если /api/auth/me OK */}
+    {/* Authed state — hidden by default, JS показывает если /api/auth/me OK */}
     <a href={`/${locale}/account`} class="nav__cta js-auth-authed" hidden>
       {labels.account}
     </a>
