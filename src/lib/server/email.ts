@@ -2,26 +2,24 @@
  * Email sender — Resend implementation.
  *
  * Архитектура (decisions_archive.md 2026-05-15):
- *   Domain `moiraionline.pro` верифицирован в Resend через DNS
- *   (SPF + DKIM + MX feedback). Sending выполняется POST'ом на
- *   api.resend.com с Bearer RESEND_API_KEY.
+ *   Domain `moiraionline.pro` верифицирован в Resend (SPF + DKIM + MX
+ *   feedback). Sending — POST на api.resend.com с Bearer
+ *   env.RESEND_API_KEY.
  *
- * From: `Moirai <noreply@moiraionline.pro>` — единый адрес для
- * transactional (verify + password reset). Mailbox не читается; в
- * шаблоне просим не отвечать.
+ * Templates — отдельно в `email-templates.ts` (HTML + text per locale).
+ * Этот модуль только sender + от какого from отправляет.
  *
- * Errors не блокируют caller (register/reset flow): provider downtime
- * не должен валить регистрацию. Логируем в console.error для
- * observability через `wrangler pages deployment tail`. В будущем —
- * dead-letter retry через CF Queue, отдельный stage.
+ * From: `Moirai <noreply@moiraionline.pro>` — единый для transactional.
+ * Mailbox не читается; в шаблоне просим не отвечать.
  *
- * Templates inline (en/ru) — HTML не пока, plain text. HTML-version
- * добавим когда подключим react-email или mjml.
+ * Errors не блокируют caller (register/reset flow). Логируем в
+ * console.error для observability через `wrangler pages deployment tail`.
  */
 
+import { getEmailTemplate, type EmailKind } from "./email-templates";
 import type { Locale } from "../../../db/types";
 
-export type EmailKind = "verify" | "password_reset";
+export type { EmailKind };
 
 export interface SendEmailParams {
   to: string;
@@ -36,65 +34,6 @@ export interface SendEmailParams {
 const FROM = "Moirai <noreply@moiraionline.pro>";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
-interface EmailTemplate {
-  subject: string;
-  text: string;
-}
-
-function buildTemplate(p: SendEmailParams): EmailTemplate {
-  const greeting = p.recipientName
-    ? p.locale === "ru" ? `Привет, ${p.recipientName}!` : `Hi ${p.recipientName},`
-    : p.locale === "ru" ? "Привет!" : "Hi,";
-
-  if (p.kind === "verify") {
-    return p.locale === "ru"
-      ? {
-          subject: "Подтвердите вашу почту — Moirai",
-          text:
-            `${greeting}\n\n` +
-            `Спасибо за регистрацию в Moirai. Подтвердите вашу почту по ссылке:\n\n` +
-            `${p.actionUrl}\n\n` +
-            `Ссылка действует 1 час. Если вы не регистрировались — просто проигнорируйте это письмо.\n\n` +
-            `— Moirai\n` +
-            `https://moiraionline.pro`,
-        }
-      : {
-          subject: "Verify your email — Moirai",
-          text:
-            `${greeting}\n\n` +
-            `Thanks for signing up to Moirai. Confirm your email by following this link:\n\n` +
-            `${p.actionUrl}\n\n` +
-            `The link is valid for 1 hour. If you didn't sign up — ignore this email.\n\n` +
-            `— Moirai\n` +
-            `https://moiraionline.pro`,
-        };
-  }
-  // password_reset
-  return p.locale === "ru"
-    ? {
-        subject: "Сброс пароля — Moirai",
-        text:
-          `${greeting}\n\n` +
-          `Поступил запрос на сброс пароля. Если это были вы, перейдите по ссылке:\n\n` +
-          `${p.actionUrl}\n\n` +
-          `Ссылка действует 1 час. Если вы не запрашивали сброс — просто проигнорируйте.\n\n` +
-          `После смены пароля все активные сессии будут закрыты — потребуется снова войти на всех устройствах.\n\n` +
-          `— Moirai\n` +
-          `https://moiraionline.pro`,
-      }
-    : {
-        subject: "Reset your password — Moirai",
-        text:
-          `${greeting}\n\n` +
-          `A password reset was requested for your account. If this was you, click:\n\n` +
-          `${p.actionUrl}\n\n` +
-          `The link is valid for 1 hour. If you didn't request this — ignore this email.\n\n` +
-          `After password change, all active sessions are revoked — you'll need to sign in again on all devices.\n\n` +
-          `— Moirai\n` +
-          `https://moiraionline.pro`,
-      };
-}
-
 interface ResendResponse {
   id?: string;
   message?: string;
@@ -102,9 +41,8 @@ interface ResendResponse {
 }
 
 /**
- * Отправить email через Resend API.
- * Возвращает void даже при ошибке — флоу не должен зависеть от
- * деливерабельности (audit покрывает critical paths).
+ * Отправить email через Resend API. Возвращает void даже при ошибке —
+ * флоу не должен зависеть от деливерабельности.
  */
 export async function sendEmail(
   env: Cloudflare.Env,
@@ -115,7 +53,12 @@ export async function sendEmail(
     return;
   }
 
-  const tpl = buildTemplate(params);
+  const tpl = getEmailTemplate({
+    kind: params.kind,
+    locale: params.locale,
+    actionUrl: params.actionUrl,
+    recipientName: params.recipientName,
+  });
 
   let res: Response;
   try {
@@ -130,6 +73,7 @@ export async function sendEmail(
         to: [params.to],
         subject: tpl.subject,
         text: tpl.text,
+        html: tpl.html,
       }),
     });
   } catch (err) {
@@ -145,7 +89,7 @@ export async function sendEmail(
       body = await res.text();
     }
     console.error(
-      `[email] resend status ${res.status.toString()} to=${params.to} kind=${params.kind} body=${JSON.stringify(body)}`,
+      `[email] resend status=${res.status.toString()} to=${params.to} kind=${params.kind} body=${JSON.stringify(body)}`,
     );
     return;
   }

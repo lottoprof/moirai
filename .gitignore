@@ -17,6 +17,10 @@ worker-configuration.d.ts
 .env
 .env.*
 .dev.vars
+.secrets
+secrets/
+*.pem
+*.key
 
 # TypeScript / build artefacts
 *.tsbuildinfo
