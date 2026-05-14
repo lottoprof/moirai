@@ -21,6 +21,7 @@
     "@astrojs/mdx": "^4.3.6",
     "@astrojs/sitemap": "^3.6.1",
     "astro": "^5.18.0",
+    "jose": "^6.2.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -34,6 +35,10 @@
     "wrangler": "^4.40.4"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp", "workerd"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
   }
 }

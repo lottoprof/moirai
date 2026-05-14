@@ -3,6 +3,7 @@
   "include": [
     "astro.config.mjs",
     "eslint.config.mjs",
+    "worker-configuration.d.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.astro",
