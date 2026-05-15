@@ -38,10 +38,10 @@ const labels = locale === "ru"
       account: "Account →",
     };
 
-// Скрываем link на ту страницу, где пользователь сейчас находится —
-// одинаковый item в Nav на текущей странице выглядит как ложное
-// "нажми меня". На /login прячем Sign in, на /register — Sign up.
-// На /account auth-aware JS-toggle и так показывает только Account link.
+// Active state на текущей странице — подсвечивается тот item где
+// юзер сейчас находится. Оба item видны всегда (юзер может на /login
+// понять что он уже зарегистрирован и переключиться на Sign in,
+// и наоборот). Pattern такой же как у LangSwitcher (EN / RU).
 const onLogin = pathname === `/${locale}/login` || pathname.startsWith(`/${locale}/login/`);
 const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/${locale}/register/`);
 ---
@@ -51,17 +51,20 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
   <div class="nav__right">
     <LangSwitcher current={locale} pathname={pathname} />
 
-    {/* Unauth state — visible by default; current-page link скрывается. */}
-    {!onLogin && (
-      <a href={`/${locale}/login?return_to=${pathname}`} class="nav__link js-auth-unauth">
-        {labels.signIn}
-      </a>
-    )}
-    {!onRegister && (
-      <a href={`/${locale}/register`} class="nav__cta js-auth-unauth">
-        {labels.signUp}
-      </a>
-    )}
+    {/* Unauth state — пара Sign in / Sign up, как LangSwitcher. */}
+    <div class="nav__auth js-auth-unauth" role="group" aria-label={labels.aria}>
+      <a
+        href={`/${locale}/login?return_to=${pathname}`}
+        class:list={["nav__auth-item", { "is-active": onLogin }]}
+        aria-current={onLogin ? "page" : undefined}
+      >{labels.signIn}</a>
+      <span class="nav__auth-sep" aria-hidden="true">/</span>
+      <a
+        href={`/${locale}/register`}
+        class:list={["nav__auth-item", { "is-active": onRegister }]}
+        aria-current={onRegister ? "page" : undefined}
+      >{labels.signUp}</a>
+    </div>
 
     {/* Authed state — hidden by default, JS показывает если /api/auth/me OK */}
     <a href={`/${locale}/account`} class="nav__cta js-auth-authed" hidden>
@@ -111,21 +114,34 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
     opacity: 0.95;
   }
 
-  /* Subtle text link (Sign in) — не CTA */
-  .nav__link {
+  /* Auth pair (Sign in / Sign up) — паттерн как LangSwitcher: оба
+     item видны всегда, current page подсвечивается через .is-active. */
+  .nav__auth {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
     font-size: var(--type-micro-md);
     font-weight: 500;
     letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
+  }
+  .nav__auth-item {
     color: var(--text-muted);
+    padding: 2px 4px;
     text-decoration: none;
     transition: color var(--duration-fast) var(--ease-out);
   }
-  .nav__link:hover {
+  .nav__auth-item:hover {
+    color: var(--amber);
+  }
+  .nav__auth-item.is-active {
     color: var(--paper);
   }
+  .nav__auth-sep {
+    color: var(--text-faint);
+  }
 
-  /* Primary CTA (Sign up / Account) — amber underline */
+  /* Primary CTA (Account — для залогиненного юзера) — amber underline */
   .nav__cta {
     font-size: var(--type-micro-md);
     font-weight: 500;
