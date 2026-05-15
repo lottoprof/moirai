@@ -141,8 +141,8 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
       <div class="form__divider">{t.or}</div>
 
       <div class="oauth-buttons">
-        <Btn href={`/api/auth/oauth/google/start`} variant="ghost" size="lg">{t.google}</Btn>
-        <Btn href={`/api/auth/oauth/discord/start`} variant="ghost" size="lg">{t.discord}</Btn>
+        <Btn href={`/api/auth/oauth/google/start?locale=${locale}`} variant="ghost" size="lg">{t.google}</Btn>
+        <Btn href={`/api/auth/oauth/discord/start?locale=${locale}`} variant="ghost" size="lg">{t.discord}</Btn>
       </div>
 
       <p class="form__hint">
