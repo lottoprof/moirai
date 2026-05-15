@@ -81,11 +81,23 @@ export async function checkRateLimit(
  * Готовые preset'ы для auth endpoints. Используем в register.ts, login.ts
  * и т.п.
  */
+/*
+ * Rate-limit presets. Балансировка: достаточно жёстко чтобы душить
+ * brute-force / credential-stuffing, но не блокировать legitimate
+ * пользователей при типичных ошибках (опечатка пароля, неверный email,
+ * Turnstile reload).
+ *
+ * Особенно register — пользователь может ошибиться в пароле (too_short),
+ * исправить, попробовать снова — это уже 2 попытки. Email-exists
+ * (попытка зарегаться повторно) — ещё одна. Поэтому 5 на email
+ * адекватный минимум; 10 на IP — для shared connections (office,
+ * корпоративный wifi).
+ */
 export const RATE_LIMITS = {
-  registerByIp:    { max: 5,  windowSec: 3600 },   // 5 register / IP / час
-  registerByEmail: { max: 3,  windowSec: 3600 },   // 3 register / email / час
-  loginByIp:       { max: 20, windowSec: 3600 },   // 20 login attempts / IP / час
+  registerByIp:    { max: 10, windowSec: 3600 },   // 10 register / IP / час
+  registerByEmail: { max: 5,  windowSec: 3600 },   // 5 register / email / час
+  loginByIp:       { max: 30, windowSec: 3600 },   // 30 login attempts / IP / час
   loginByEmail:    { max: 10, windowSec: 3600 },   // 10 login / email / час
-  resetByEmail:    { max: 3,  windowSec: 3600 },   // 3 reset / email / час
+  resetByEmail:    { max: 3,  windowSec: 3600 },   // 3 reset / email / час (узко — анти-абуз reset-link flood)
   oauthByIp:       { max: 30, windowSec: 3600 },   // 30 OAuth flows / IP / час
 } as const satisfies Record<string, RateLimitConfig>;

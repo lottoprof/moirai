@@ -3,25 +3,38 @@
  *
  * Конечная точка email-verify link'a из письма (register flow).
  * Consume one-time token из KV_VERIFY_TOKENS → UPDATE
- * users.email_verified_at → редирект на /{locale}/account?verified=1.
+ * users.email_verified_at → **auto-login** (создаём refresh-сессию
+ * в этом браузере) → 303 redirect на /{locale}/account?verified=1.
+ *
+ * Auto-login по клику на email link решает мульти-браузерный кейс:
+ * юзер регистрируется в Browser A, открывает письмо в Browser B —
+ * клик по link логинит в Browser B автоматически. Стандартный
+ * UX-паттерн (Slack, Linear, Notion). Security trade-off accepted:
+ *   - token single-use (consumed at click)
+ *   - TTL 1 час
+ *   - email compromise в этот час → attacker может войти; это
+ *     общая дыра в "email = identity" модели, не специфично нам.
  *
  * Невалидный/протухший токен → redirect на /{locale}/verify-email-pending?error=invalid_token.
  *
- * 303 See Other (а не 302) — корректный код для GET-link → redirect
- * после "обработки".
+ * 303 See Other — корректный код для GET-link → redirect после
+ * "обработки".
  */
 
 import type { APIRoute } from "astro";
 import { consumeVerifyToken } from "../../../lib/server/verify-tokens";
 import { findUserById, markEmailVerified } from "../../../lib/server/user-ops";
+import { createRefreshSession } from "../../../lib/server/session";
 import { logAuth } from "../../../lib/server/audit";
 
 export const prerender = false;
 
-function redirect(location: string): Response {
+function redirect(location: string, cookieHeader?: string): Response {
+  const headers: Record<string, string> = { Location: location };
+  if (cookieHeader) headers["Set-Cookie"] = cookieHeader;
   return new Response(null, {
     status: 303,
-    headers: { Location: location },
+    headers,
   });
 }
 
@@ -43,11 +56,20 @@ export const GET: APIRoute = async ({ url, request, locals }) => {
     return redirect(`/${payload.locale}/verify-email-pending?error=invalid_token`);
   }
 
-  // Идемпотентно — если уже verified, просто повторяем UPDATE (timestamp перезапишется)
+  // Идемпотентно — если уже verified, повторяем UPDATE (timestamp перезапишется)
   await markEmailVerified(env, user.id);
   await logAuth(env, "email_verify", user.id, null, request, {
     email_domain: user.email.split("@")[1] ?? "",
   });
 
-  return redirect(`/${user.locale}/account?verified=1`);
+  // Auto-login: создаём refresh-сессию в текущем браузере.
+  // Решает мульти-браузерный кейс (register в Browser A, click link в Browser B).
+  // См. comment в header'е файла.
+  const { sessionId, cookieHeader } = await createRefreshSession(env, user.id, request);
+  await logAuth(env, "login", user.id, null, request, {
+    via: "email_verify",
+    session_id: sessionId,
+  });
+
+  return redirect(`/${user.locale}/dashboard?verified=1`, cookieHeader);
 };

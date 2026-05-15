@@ -24,8 +24,15 @@ export interface VerifyTokenPayload {
   createdAt: number;
 }
 
-const DEFAULT_TTL_SECONDS = 3600;     // 1 час
+// Default TTL — fallback если caller не передал ttlSeconds.
+// Конкретные значения per-kind:
+//   email verify     — 30 мин (caller register.ts передаёт 1800)
+//   password reset   — 15 мин (caller password-reset/request.ts передаёт 900)
+const DEFAULT_TTL_SECONDS = 1800;     // 30 мин
 const TOKEN_BYTES = 32;
+
+export const TTL_VERIFY_EMAIL = 30 * 60;   // 30 мин
+export const TTL_PASSWORD_RESET = 15 * 60; // 15 мин
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let s = "";

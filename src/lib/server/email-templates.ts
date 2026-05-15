@@ -28,7 +28,7 @@ const messages: Record<string, string | undefined> = {
   "en:verify:body":      "Tap the button below to confirm your email and activate your account.",
   "en:verify:button":    "Confirm email",
   "en:verify:link_hint": "Or copy this link to your browser:",
-  "en:verify:expires":   "This link is valid for 1 hour.",
+  "en:verify:expires":   "This link is valid for 30 minutes.",
   "en:verify:ignore":    "If you didn't sign up for Moirai — ignore this email.",
 
   "ru:verify:subject":   "Подтвердите ваш email — Moirai",
@@ -37,7 +37,7 @@ const messages: Record<string, string | undefined> = {
   "ru:verify:body":      "Нажмите кнопку ниже, чтобы подтвердить email и активировать аккаунт.",
   "ru:verify:button":    "Подтвердить email",
   "ru:verify:link_hint": "Или скопируйте эту ссылку в браузер:",
-  "ru:verify:expires":   "Ссылка действительна 1 час.",
+  "ru:verify:expires":   "Ссылка действительна 30 минут.",
   "ru:verify:ignore":    "Если вы не регистрировались в Moirai — проигнорируйте это письмо.",
 
   // === PASSWORD RESET ===
@@ -47,7 +47,7 @@ const messages: Record<string, string | undefined> = {
   "en:password_reset:body":      "A password reset was requested for your Moirai account. Tap the button below to set a new password.",
   "en:password_reset:button":    "Reset password",
   "en:password_reset:link_hint": "Or copy this link to your browser:",
-  "en:password_reset:expires":   "This link is valid for 1 hour.",
+  "en:password_reset:expires":   "This link is valid for 15 minutes.",
   "en:password_reset:ignore":    "After password change, all active sessions are revoked — you'll need to sign in again on all devices. If you didn't request this — ignore this email.",
 
   "ru:password_reset:subject":   "Сброс пароля — Moirai",
@@ -56,7 +56,7 @@ const messages: Record<string, string | undefined> = {
   "ru:password_reset:body":      "Поступил запрос на сброс пароля для вашего аккаунта Moirai. Нажмите кнопку ниже, чтобы задать новый пароль.",
   "ru:password_reset:button":    "Сбросить пароль",
   "ru:password_reset:link_hint": "Или скопируйте эту ссылку в браузер:",
-  "ru:password_reset:expires":   "Ссылка действительна 1 час.",
+  "ru:password_reset:expires":   "Ссылка действительна 15 минут.",
   "ru:password_reset:ignore":    "После смены пароля все активные сессии будут закрыты — потребуется заново войти на всех устройствах. Если вы не запрашивали сброс — проигнорируйте это письмо.",
 
   // === COMMON ===

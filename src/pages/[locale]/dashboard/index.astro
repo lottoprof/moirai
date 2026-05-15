@@ -1,0 +1,125 @@
+---
+/*
+ * /{locale}/dashboard — личный кабинет студента (заглушка).
+ *
+ * SSR + auth-guard через refresh cookie. Если сессии нет — redirect
+ * на /login?return_to=/dashboard. Если есть — рендерит приветствие,
+ * placeholder для будущих секций (модули / расписание / задания /
+ * сообщество) и кнопку Sign out.
+ *
+ * Архитектурно (Architecture v0.8.2 §3):
+ *   /{locale}/dashboard/**  — protected zone для студента
+ *   /{locale}/account       — auth settings (методы входа, профиль)
+ *
+ * Заглушка живёт здесь до Sprint 1+ когда подключим коллекции
+ * modules / runs / sessions / enrollments / homework / feedback.
+ */
+
+import Layout from "../../../layouts/public/Layout.astro";
+import Btn from "../../../components/public/Btn.astro";
+import { verifyRefreshSession } from "../../../lib/server/session";
+import { findUserById } from "../../../lib/server/user-ops";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/dashboard");
+}
+
+const env = Astro.locals.runtime.env;
+const session = await verifyRefreshSession(env, Astro.request);
+if (!session) {
+  return Astro.redirect(`/${locale}/login?return_to=/${locale}/dashboard`);
+}
+const user = await findUserById(env, session.userId);
+if (!user) {
+  return Astro.redirect(`/${locale}/login`);
+}
+
+const verifiedBadge = Astro.url.searchParams.get("verified") === "1";
+
+const t = locale === "ru"
+  ? {
+      eyebrow: "Личный кабинет",
+      titleHi: (n: string | null) => n ? `Привет, ${n}.` : "Личный кабинет",
+      lede: "Здесь появятся ваши модули, расписание, задания и материалы курса.",
+      verifiedNote: "✅ Email подтверждён. Добро пожаловать!",
+      sectionsTitle: "Скоро здесь:",
+      sections: [
+        "📚 Модули программы — лекции, упражнения, материалы",
+        "📅 Расписание — ближайшие live-сессии",
+        "✏️ Задания — отправка работ и фидбэк",
+        "🎬 Финальный фильм — статус и review",
+        "👥 Сообщество — связь с когортой",
+      ],
+      settingsLink: "Настройки аккаунта",
+      signOut: "Выйти",
+      seo: { title: "Личный кабинет — Moirai", description: "Личный кабинет студента Moirai." },
+    }
+  : {
+      eyebrow: "Dashboard",
+      titleHi: (n: string | null) => n ? `Hi, ${n}.` : "Dashboard",
+      lede: "Your modules, schedule, assignments, and course materials will appear here.",
+      verifiedNote: "✅ Email verified. Welcome!",
+      sectionsTitle: "Coming here:",
+      sections: [
+        "📚 Programme modules — lectures, exercises, materials",
+        "📅 Schedule — upcoming live sessions",
+        "✏️ Assignments — submit work and get feedback",
+        "🎬 Final film — status and review",
+        "👥 Community — your cohort",
+      ],
+      settingsLink: "Account settings",
+      signOut: "Sign out",
+      seo: { title: "Dashboard — Moirai", description: "Your Moirai student dashboard." },
+    };
+---
+
+<Layout
+  locale={locale}
+  seo={{ title: t.seo.title, description: t.seo.description, noindex: true }}
+>
+  <section class="section center" aria-labelledby="dashboard-title">
+    <header class="section__head">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1 id="dashboard-title" class="h1">{t.titleHi(user.name)}</h1>
+      <p class="text-muted">{t.lede}</p>
+    </header>
+
+    {verifiedBadge && (
+      <div class="form" role="status">
+        <p class="form__hint" style="text-align:center;">{t.verifiedNote}</p>
+      </div>
+    )}
+
+    <div class="form">
+      <div class="form__field">
+        <span class="form__label">{t.sectionsTitle}</span>
+        <ul class="form__hint" style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:var(--space-sm); line-height:1.6;">
+          {t.sections.map((s) => <li>{s}</li>)}
+        </ul>
+      </div>
+
+      <Btn href={`/${locale}/account`} variant="ghost" size="lg">{t.settingsLink}</Btn>
+      <Btn type="button" variant="ghost" size="lg" class="js-signout">{t.signOut}</Btn>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  document.querySelectorAll(".js-signout").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+      });
+      sessionStorage.removeItem("moirai_access_token");
+      const path = window.location.pathname;
+      const m = /^\/(en|ru)\//.exec(path);
+      const locale = m ? m[1] : "en";
+      window.location.href = `/${locale}/`;
+    });
+  });
+</script>

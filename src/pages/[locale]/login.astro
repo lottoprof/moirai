@@ -157,6 +157,8 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
   if (form) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      // Native HTML5 validation — force-sync Chrome autofill
+      if (!form.reportValidity()) return;
       const formData = new FormData(form);
       const email = formData.get("email");
       const password = formData.get("password");
@@ -182,7 +184,7 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
           sessionStorage.setItem("moirai_access_token", data.access_token);
         }
         const userLocale = data.user?.locale ?? "en";
-        window.location.href = returnTo && returnTo.startsWith("/") ? returnTo : `/${userLocale}/account`;
+        window.location.href = returnTo && returnTo.startsWith("/") ? returnTo : `/${userLocale}/dashboard`;
         return;
       }
 

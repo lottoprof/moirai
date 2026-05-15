@@ -18,7 +18,13 @@
  *     устаревший подход, заставляет писать `Passw0rd!`. Длина лучше.
  */
 
-const ITERATIONS = 600_000;          // OWASP 2023 минимум для PBKDF2-SHA256
+// Cloudflare Workers нативно ограничивает PBKDF2 100000 iter (workerd
+// runtime constraint, не наш выбор). OWASP-2023 рекомендует 600k —
+// если когда-нибудь дойдём до строгого требования: миграция на
+// Argon2id через WASM (формат `secret_hash` включает `pbkdf2-sha256$
+// <iter>$...` префикс — алгоритм-агностичный verify).
+// См. decisions_archive.md 2026-05-15.
+const ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const HASH_BYTES = 32;
 const ALG = "pbkdf2-sha256";

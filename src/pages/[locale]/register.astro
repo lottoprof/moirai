@@ -152,11 +152,45 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
   </section>
 </Layout>
 
-<script>
-  const form = document.getElementById("register-form") as HTMLFormElement | null;
+<script define:vars={{ errMap: t.errors }}>
+  /*
+   * Submit handler — inline error display (без reload, без сброса полей).
+   * Только на success делаем navigation. На fail показываем .form__error
+   * и сбрасываем Turnstile token (он single-use; после fail нужен новый).
+   *
+   * `errMap` — локализованные строки ошибок, инжектятся из frontmatter
+   * через define:vars (Astro features).
+   */
+
+  function showError(form, code) {
+    let banner = form.querySelector(".form__error");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.className = "form__error";
+      banner.setAttribute("role", "alert");
+      const firstField = form.querySelector(".form__field");
+      form.insertBefore(banner, firstField ?? form.firstChild);
+    }
+    banner.textContent = errMap[code] ?? code;
+    banner.hidden = false;
+    // Re-render Turnstile token (one-time use)
+    if (window.turnstile) window.turnstile.reset();
+  }
+
+  const form = document.getElementById("register-form");
   if (form) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+
+      // Native HTML5 validation force-syncs Chrome autofill: при
+      // autocomplete="new-password" Chrome заполняет поле визуально,
+      // но input.value пустой до первого user interaction. reportValidity
+      // триггерит chrome's value sync и показывает нативный tooltip
+      // с конкретной причиной (e.g. "minimum 10 chars").
+      if (!form.reportValidity()) {
+        return;
+      }
+
       const fd = new FormData(form);
       const email = fd.get("email");
       const password = fd.get("password");
@@ -165,7 +199,7 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
       const turnstileToken = fd.get("cf-turnstile-response");
 
       if (!turnstileToken) {
-        window.location.search = "?error=turnstile_failed";
+        showError(form, "turnstile_failed");
         return;
       }
 
@@ -177,18 +211,16 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
       });
 
       if (res.ok) {
-        window.location.href = `/${locale as string}/verify-email-pending`;
+        window.location.href = `/${locale}/verify-email-pending`;
         return;
       }
 
       let errCode = "rate_limited";
       try {
-        const body = (await res.json()) as { error?: string };
+        const body = await res.json();
         if (body.error) errCode = body.error;
-      } catch {
-        // ignore
-      }
-      window.location.search = `?error=${encodeURIComponent(errCode)}`;
+      } catch { /* ignore */ }
+      showError(form, errCode);
     });
   }
 </script>

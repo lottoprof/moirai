@@ -23,7 +23,7 @@ import {
 import { verifyTurnstile } from "../../../../lib/server/turnstile";
 import { checkRateLimit, RATE_LIMITS } from "../../../../lib/server/ratelimit";
 import { extractRequestInfo } from "../../../../lib/server/hash";
-import { createVerifyToken } from "../../../../lib/server/verify-tokens";
+import { createVerifyToken, TTL_PASSWORD_RESET } from "../../../../lib/server/verify-tokens";
 import { sendEmail } from "../../../../lib/server/email";
 import { logAuth } from "../../../../lib/server/audit";
 
@@ -81,7 +81,7 @@ export const POST: APIRoute = async ({ request, locals, url }) => {
     userId: user.id,
     email: user.email,
     locale: user.locale,
-  });
+  }, TTL_PASSWORD_RESET);
   const actionUrl = `${url.origin}/${locale}/password-reset?token=${token}`;
 
   await sendEmail(env, {

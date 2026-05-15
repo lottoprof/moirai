@@ -97,10 +97,14 @@ IP_HASH_SALT=...
 | 19d | OAuth helpers (oauth.ts state mgmt + google.ts + discord.ts) | ⏳ ждёт GOOGLE_CLIENT_*, DISCORD_CLIENT_* |  |
 | 19e | API endpoints (`src/pages/api/auth/**.ts`) | ✅ done (password flow) | `59846e6` |
 | 19f | UI pages (login/register/account/verify-email-pending/password-reset) | ✅ done | `f6d5527` |
+| 19f-dashboard | Student dashboard stub (`/{locale}/dashboard`) + redirect targets verify→dashboard, login→dashboard | ✅ done |  |
 | 19g | Middleware JWT verification для /api/* | ⏳ (когда появятся protected endpoints вне /api/auth) |  |
-| 19h | E2E verification (deployed prod smoke) | 🟡 partial — формы видны, нужен реальный email чтобы пройти full flow |  |
-| —   | **Email service** — sendEmail() сейчас STUB; нужен реальный провайдер для verify + reset link | ⏳ next |  |
-| —   | i18n: UI-строки сейчас inline в .astro; миграция в `dict.{en,ru}.ts` — Stage 7 | ⏳ |  |
+| **19h** | **E2E verification на проде** — full flow прошёл с реальным email 2026-05-15 | ✅ **done** |  |
+| —   | Email service (Resend) — настроен, домен verified, HTML+text templates per-locale | ✅ done |  |
+| —   | TTL settings: verify-email 30 мин, password-reset 15 мин | ✅ done |  |
+| —   | Chrome autofill quirk: `form.reportValidity()` force-sync для всех 3 форм | ✅ done |  |
+| —   | Open: Chrome autopassword UX — user reported, отложен для отдельного описания | ⏳ |  |
+| —   | i18n: UI-строки в auth pages inline; миграция в `dict.{en,ru}.ts` — Stage 7 | ⏳ |  |
 
 ## Этапы
 

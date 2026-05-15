@@ -23,7 +23,7 @@ import { findUserByEmail, createUser, linkAuthMethod } from "../../../lib/server
 import { verifyTurnstile } from "../../../lib/server/turnstile";
 import { checkRateLimit, RATE_LIMITS } from "../../../lib/server/ratelimit";
 import { extractRequestInfo } from "../../../lib/server/hash";
-import { createVerifyToken } from "../../../lib/server/verify-tokens";
+import { createVerifyToken, TTL_VERIFY_EMAIL } from "../../../lib/server/verify-tokens";
 import { sendEmail } from "../../../lib/server/email";
 import { logAuth } from "../../../lib/server/audit";
 
@@ -107,8 +107,11 @@ export const POST: APIRoute = async ({ request, locals, url }) => {
     userId: user.id,
     email: user.email,
     locale: user.locale,
-  });
-  const actionUrl = `${url.origin}/${user.locale}/verify-email?token=${token}`;
+  }, TTL_VERIFY_EMAIL);
+  // /api/auth/verify-email — GET endpoint, который consume'ит token и
+  // редиректит на /{locale}/account?verified=1 (или /verify-email-pending
+  // ?error=invalid_token при невалидном/протухшем токене).
+  const actionUrl = `${url.origin}/api/auth/verify-email?token=${token}`;
   await sendEmail(env, {
     to: user.email,
     locale: user.locale,
