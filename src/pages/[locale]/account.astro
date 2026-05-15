@@ -5,7 +5,10 @@
  * SSR + auth-guard: читаем refresh cookie → verifyRefreshSession →
  * findUserById + getUserAuthMethods → рендерим, либо redirect на login.
  *
- * Sign out и unlink — POST на API через JS.
+ * Управление методами входа:
+ *   - Если нет password method → форма "Set password" (POST set-password)
+ *   - У каждого method'a (кроме когда он единственный) → кнопка Unlink (POST unlink)
+ *   - Sign out — POST logout
  */
 
 import Layout from "../../layouts/public/Layout.astro";
@@ -30,6 +33,8 @@ if (!user) {
   return Astro.redirect(`/${locale}/login`);
 }
 const methods = await getUserAuthMethods(env, user.id);
+const hasPassword = methods.some((m) => m.kind === "password");
+const canUnlink = methods.length > 1;
 
 const verifiedBadge = Astro.url.searchParams.get("verified") === "1";
 
@@ -48,7 +53,24 @@ const t = locale === "ru"
       addedOn: (ts: number) => `Добавлен ${new Date(ts * 1000).toLocaleDateString("ru")}`,
       signOut: "Выйти",
       refCode: "Реферальный код",
+      setPasswordTitle: "Добавить пароль",
+      setPasswordHint: "Сейчас вы входите только через социальную сеть. Можете добавить пароль как альтернативный способ.",
+      passwordLabel: "Новый пароль",
+      passwordHint: "Минимум 10 символов.",
+      setPasswordSubmit: "Сохранить пароль",
+      unlink: "Отвязать",
+      lastMethodHint: "Это единственный способ входа. Чтобы отвязать — сначала добавьте другой.",
       seo: { title: "Личный кабинет — Moirai", description: "Управление аккаунтом Moirai." },
+      errors: {
+        too_short: "Пароль слишком короткий — минимум 10 символов.",
+        too_long: "Пароль слишком длинный — максимум 128 символов.",
+        too_common: "Пароль слишком распространённый.",
+        password_already_set: "Пароль уже установлен. Для смены — используйте сброс пароля.",
+        rate_limited: "Слишком много попыток. Подождите час.",
+        cannot_unlink_last_method: "Это единственный способ входа — нельзя отвязать.",
+        method_not_found: "Метод не найден.",
+        unauthenticated: "Сессия истекла. Войдите заново.",
+      } as Record<string, string>,
     }
   : {
       eyebrow: "Account",
@@ -64,7 +86,24 @@ const t = locale === "ru"
       addedOn: (ts: number) => `Added ${new Date(ts * 1000).toLocaleDateString("en")}`,
       signOut: "Sign out",
       refCode: "Referral code",
+      setPasswordTitle: "Add a password",
+      setPasswordHint: "You currently sign in only via social. You can add a password as an alternative.",
+      passwordLabel: "New password",
+      passwordHint: "Minimum 10 characters.",
+      setPasswordSubmit: "Save password",
+      unlink: "Unlink",
+      lastMethodHint: "This is your only sign-in method. To unlink it — add another first.",
       seo: { title: "Account — Moirai", description: "Manage your Moirai account." },
+      errors: {
+        too_short: "Password too short — minimum 10 characters.",
+        too_long: "Password too long — maximum 128 characters.",
+        too_common: "Password is too common.",
+        password_already_set: "Password already set. Use password reset to change it.",
+        rate_limited: "Too many attempts. Please wait an hour.",
+        cannot_unlink_last_method: "This is your only sign-in method — cannot unlink.",
+        method_not_found: "Method not found.",
+        unauthenticated: "Session expired. Sign in again.",
+      } as Record<string, string>,
     };
 
 function methodLabel(kind: string): string {
@@ -109,37 +148,159 @@ function methodLabel(kind: string): string {
 
       <div class="form__field">
         <span class="form__label">{t.methodsTitle}</span>
-        <ul class="form__hint" style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-xs);">
+        <ul class="form__hint" style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:var(--space-sm);">
           {methods.map((m) => (
-            <li>
-              <strong style="color: var(--text);">{methodLabel(m.kind)}</strong>{" "}
-              <span>· {t.addedOn(m.created_at)}</span>
+            <li style="display:flex; align-items:center; justify-content:space-between; gap:var(--space-md);">
+              <span>
+                <strong style="color: var(--text);">{methodLabel(m.kind)}</strong>{" "}
+                <span>· {t.addedOn(m.created_at)}</span>
+              </span>
+              {canUnlink ? (
+                <button
+                  type="button"
+                  class="form__btn-inline js-unlink"
+                  data-kind={m.kind}
+                >{t.unlink}</button>
+              ) : (
+                <span class="text-faint" style="font-size: var(--type-body-sm);">
+                  {t.lastMethodHint}
+                </span>
+              )}
             </li>
           ))}
         </ul>
+        <div class="form__error js-methods-error" role="alert" hidden></div>
       </div>
+
+      {!hasPassword && (
+        <div class="form__field">
+          <span class="form__label">{t.setPasswordTitle}</span>
+          <p class="form__hint">{t.setPasswordHint}</p>
+          <form id="set-password-form" method="POST" action="/api/auth/methods/set-password" novalidate>
+            <div class="form__field">
+              <label class="form__label" for="set-password-input">{t.passwordLabel}</label>
+              <input
+                class="form__input"
+                type="password"
+                id="set-password-input"
+                name="password"
+                autocomplete="new-password"
+                minlength="10"
+                required
+              />
+              <p class="form__hint">{t.passwordHint}</p>
+            </div>
+            <div class="form__error js-set-password-error" role="alert" hidden></div>
+            <Btn type="submit" variant="primary" size="lg" arrow>{t.setPasswordSubmit}</Btn>
+          </form>
+        </div>
+      )}
 
       <Btn type="button" variant="ghost" size="lg" class="js-signout">{t.signOut}</Btn>
     </div>
   </section>
 </Layout>
 
-<script>
+<style>
+  .form__btn-inline {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition:
+      color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+  .form__btn-inline:hover {
+    color: var(--amber);
+    border-color: var(--amber);
+  }
+</style>
+
+<script define:vars={{ errMap: t.errors }}>
+  function showInlineError(selector, code) {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    el.textContent = errMap[code] ?? code;
+    el.hidden = false;
+  }
+  function hideInlineError(selector) {
+    const el = document.querySelector(selector);
+    if (el) el.hidden = true;
+  }
+
+  // Sign out
   document.querySelectorAll(".js-signout").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const res = await fetch("/api/auth/logout", {
+      await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
       });
       sessionStorage.removeItem("moirai_access_token");
+      const path = window.location.pathname;
+      const m = /^\/(en|ru)\//.exec(path);
+      const loc = m ? m[1] : "en";
+      window.location.href = `/${loc}/`;
+    });
+  });
+
+  // Set password
+  const setForm = document.getElementById("set-password-form");
+  if (setForm) {
+    setForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!setForm.reportValidity()) return;
+      hideInlineError(".js-set-password-error");
+      const fd = new FormData(setForm);
+      const res = await fetch("/api/auth/methods/set-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ password: fd.get("password") }),
+      });
       if (res.ok) {
-        // Локаль в URL
-        const path = window.location.pathname;
-        const m = /^\/(en|ru)\//.exec(path);
-        const locale = m ? m[1] : "en";
-        window.location.href = `/${locale}/`;
+        // Reload — server-side rerender уберёт форму, покажет password в списке
+        window.location.reload();
+        return;
       }
+      let code = "invalid_input";
+      try {
+        const body = await res.json();
+        if (body.error) code = body.error;
+      } catch { /* ignore */ }
+      showInlineError(".js-set-password-error", code);
+    });
+  }
+
+  // Unlink
+  document.querySelectorAll(".js-unlink").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      hideInlineError(".js-methods-error");
+      const kind = btn.dataset.kind;
+      if (!kind) return;
+      const res = await fetch("/api/auth/methods/unlink", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ kind }),
+      });
+      if (res.ok) {
+        window.location.reload();
+        return;
+      }
+      let code = "invalid_input";
+      try {
+        const body = await res.json();
+        if (body.error) code = body.error;
+      } catch { /* ignore */ }
+      showInlineError(".js-methods-error", code);
     });
   });
 </script>
