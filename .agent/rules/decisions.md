@@ -10,6 +10,31 @@
 
 ## 2026-05
 
+- **2026-05-16** — Dashboard routing: классический Astro MPA с
+  отдельным SSR-роутом на каждую страницу (`/dashboard/modules/[id].astro`
+  и т.п.), а не SPA-shell с client-side router'ом. Smooth navigation
+  через нативный `<ClientRouter />` (Astro View Transitions API).
+  Islands per-route (Vidstack на странице модуля, HomeworkUploader
+  на форме). Shareable URLs, native browser back/forward, нет client
+  state management, нет JS bundle для роутера. SPA-фреймворки
+  (React-router/TanStack/etc.) запрещены в `[locale]/dashboard/**`.
+  См. archive 2026-05-16.
+- **2026-05-16** — Images model: zod-схема секций требует
+  `{ image: image(), alt: z.string().min(1) }` для каждой картинки;
+  empty alt = build error. Декоративные картинки — через явный helper
+  `decorative()` (explicit opt-in). Public layer использует Astro
+  `<Image>` (Sharp build-time → AVIF/WebP/JPEG + responsive srcset),
+  картинки в `src/assets/images/**`. R2 — только для приватных asset'ов
+  в dashboard (видео + платный контент). См. archive 2026-05-16.
+- **2026-05-16** — Content-driven pages: layout публичных страниц
+  управляется массивом `sections[]` в frontmatter
+  `src/content/pages/<slug>.{en,ru}.mdx` (discriminated union по
+  `kind`). `.astro`-файлы — тонкие композиторы (загрузка коллекции →
+  map по sections → switch по kind, ~50 строк). Контент-команда меняет
+  порядок секций, тексты, изображения, добавляет/убирает блоки **без
+  правки кода**. SEO в frontmatter (`seo.title/description/og_image`).
+  Translation-pair validator (Stage 7) обеспечивает структурную
+  синхронность en↔ru. См. archive 2026-05-16.
 - **2026-05-08** — Стек проекта: Astro 5 (TS) + `@astrojs/cloudflare`
   adapter + Cloudflare Pages; публичный SEO-слой = vanilla JS +
   CSS-only анимации; защищённая зона (ЛК) = Astro islands +
