@@ -41,8 +41,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
     });
   }
 
+  // JWT без role с migration 0003 (multi-role). См. decisions 2026-05-17.
   const accessToken = await signJWT(
-    { sub: user.id, role: user.role, sid: session.sessionId },
+    { sub: user.id, sid: session.sessionId },
     env,
     { expiresIn: `${ACCESS_TTL_SECONDS.toString()}s`, fingerprint: { ip, ua } },
   );

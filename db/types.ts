@@ -22,9 +22,19 @@
 // ============================================================
 
 export type Locale = "en" | "ru";
-export type UserRole = "student" | "instructor" | "admin";
+/** Roles: M2M через user_roles table (migration 0003). Один user
+ *  может иметь любую комбинацию (admin+instructor — admin-преподаватель). */
+export type Role = "student" | "instructor" | "admin";
 export type AuthMethodKind = "password" | "google" | "discord";
 export type JwtKeyStatus = "active" | "deprecated" | "revoked";
+
+/** modules lifecycle: methodist пушит в external repo с status, sync
+ *  pipeline апдейтит D1. `draft` невидим студентам, `archived` скрыт
+ *  из catalogue но existing enrollments работают. */
+export type ModuleStatus = "draft" | "published" | "archived";
+
+/** enrollment.status — runtime жизнь экземпляра programme'a у user'a. */
+export type EnrollmentStatus = "active" | "completed" | "cancelled" | "refunded";
 
 /** События в audit_log.event — открытое множество, расширяется по
  *  мере добавления auth-flow'ов; CHECK constraint в SQL отсутствует
@@ -39,23 +49,56 @@ export type AuditEvent =
   | "password_reset"
   | "login_failed"
   | "session_revoked"
-  | "method_unlink";
+  | "method_unlink"
+  | "user_created_by_admin"
+  | "user_deactivated"
+  | "user_reactivated"
+  | "user_anonymized"
+  | "role_granted"
+  | "role_revoked"
+  | "enrollment_granted"
+  | "enrollment_status_changed"
+  | "enrollment_module_added"
+  | "enrollment_module_removed";
 
 // ============================================================
 // Row types — soft mirror таблиц D1.
 // ============================================================
 
-/** users — identity + profile. Auth secrets хранятся в auth_methods. */
+/**
+ * users — identity + profile. Auth secrets хранятся в auth_methods.
+ *
+ * Roles — НЕ в users (column удалён в migration 0003), а в user_roles
+ * M2M. Для получения ролей используй `getUserWithRoles(env, userId)`.
+ *
+ * `deactivated_at` — soft-deactivation (migration 0003). NULL =
+ * активный пользователь. NOT NULL = login разрешён, но redirect на
+ * `/{locale}/inactive`, доступ к контенту revoked через
+ * `hasAccessToModule`.
+ */
 export interface UserRow {
   id: string;
   email: string;
   email_verified_at: number | null;
   name: string | null;
   locale: Locale;
-  role: UserRole;
   referral_code: string;
+  deactivated_at: number | null;
   created_at: number;
   updated_at: number;
+}
+
+/** users + roles set — возвращается `getUserWithRoles`. */
+export interface UserWithRoles extends UserRow {
+  roles: Set<Role>;
+}
+
+/** user_roles row — M2M user × role (migration 0003). */
+export interface UserRoleRow {
+  user_id: string;
+  role: Role;
+  granted_by: string | null;
+  granted_at: number;
 }
 
 /**
@@ -137,6 +180,72 @@ export interface JwtKeyRow {
   expires_at: number;
   rotated_at: number | null;          // когда active → deprecated
   revoked_at: number | null;          // когда → revoked
+}
+
+/**
+ * modules — каталог из external repo (migration 0004).
+ *
+ * PK = (slug, locale). Body живёт в R2 по `body_r2_key`. Видео тоже
+ * в R2. `requires_modules_json` — массив slug'ов модулей-зависимостей.
+ */
+export interface ModuleRow {
+  slug: string;
+  locale: Locale;
+  title: string;
+  track: string | null;
+  status: ModuleStatus;
+  has_video: number;        // 0 | 1
+  has_homework: number;     // 0 | 1
+  has_text: number;         // 0 | 1
+  default_duration_days: number;
+  requires_modules_json: string;   // JSON-array of slugs
+  body_r2_key: string;
+  video_r2_key: string | null;
+  source_commit: string | null;
+  created_at: number;
+  published_at: number | null;
+  archived_at: number | null;
+  synced_at: number;
+}
+
+/**
+ * enrollments — instance user × programme_slug (migration 0004).
+ *
+ * `programme_slug` ссылается на Content Collection `programmes/[slug]`.
+ * `price_paid_amount` + `features_json` — snapshot на момент покупки.
+ * `lead_instructor_id` — single lead (Option 1 из decisions 2026-05-17),
+ * NULL = unassigned.
+ */
+export interface EnrollmentRow {
+  id: string;
+  user_id: string;
+  programme_slug: string;
+  status: EnrollmentStatus;
+  price_paid_amount: number;     // cents
+  price_paid_currency: string;
+  features_json: string;          // JSON object
+  lead_instructor_id: string | null;
+  enrolled_at: number;
+  completed_at: number | null;
+  cancelled_at: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * enrollment_modules — mutable список модулей в enrollment'е
+ * (migration 0004). Instructor может add/remove, при INSERT'е
+ * auto-resolve дополняет транзитивные `requires_modules`.
+ *
+ * `module_slug` ссылается на `modules.slug` (без FK — модули могут
+ * быть archived/удалены).
+ */
+export interface EnrollmentModuleRow {
+  enrollment_id: string;
+  module_slug: string;
+  order_idx: number;
+  added_by: string;
+  added_at: number;
 }
 
 // ============================================================

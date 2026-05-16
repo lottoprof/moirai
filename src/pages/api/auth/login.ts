@@ -103,8 +103,10 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const { sessionId, cookieHeader } = await createRefreshSession(env, user.id, request);
   await touchAuthMethod(env, method.id);
 
+  // JWT не несёт role с migration 0003 (multi-role): user_id достаточно,
+  // роли читаются из user_roles при каждом guard. См. decisions 2026-05-17.
   const accessToken = await signJWT(
-    { sub: user.id, role: user.role, sid: sessionId },
+    { sub: user.id, sid: sessionId },
     env,
     { expiresIn: `${ACCESS_TTL_SECONDS.toString()}s`, fingerprint: { ip, ua } },
   );
@@ -121,7 +123,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
         email: user.email,
         name: user.name,
         locale: user.locale,
-        role: user.role,
         email_verified: user.email_verified_at !== null,
       },
     }),

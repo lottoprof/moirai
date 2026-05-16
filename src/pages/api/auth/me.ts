@@ -18,7 +18,6 @@ export const prerender = false;
 
 interface JwtPayload extends Record<string, unknown> {
   sub?: string;
-  role?: string;
 }
 
 export const GET: APIRoute = async ({ request, locals }) => {
@@ -55,6 +54,12 @@ export const GET: APIRoute = async ({ request, locals }) => {
 
   const methods = await getUserAuthMethods(env, user.id);
 
+  // roles из user_roles (migration 0003 multi-role).
+  const rolesRows = await env.DB.prepare(
+    `SELECT role FROM user_roles WHERE user_id = ?`,
+  ).bind(user.id).all<{ role: string }>();
+  const roles = rolesRows.results.map((r) => r.role);
+
   return new Response(
     JSON.stringify({
       ok: true,
@@ -63,7 +68,8 @@ export const GET: APIRoute = async ({ request, locals }) => {
         email: user.email,
         name: user.name,
         locale: user.locale,
-        role: user.role,
+        roles,
+        deactivated: user.deactivated_at !== null,
         email_verified: user.email_verified_at !== null,
         referral_code: user.referral_code,
       },
