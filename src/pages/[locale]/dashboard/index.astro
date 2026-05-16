@@ -23,8 +23,7 @@ import StatCard from "../../../components/dashboard/StatCard.astro";
 import ContinueCard from "../../../components/dashboard/ContinueCard.astro";
 import ModuleCard from "../../../components/dashboard/ModuleCard.astro";
 import HomeworkCard from "../../../components/dashboard/HomeworkCard.astro";
-import { verifyRefreshSession } from "../../../lib/server/session";
-import { findUserById } from "../../../lib/server/user-ops";
+import { requireRole } from "../../../lib/server/guards";
 
 export const prerender = false;
 
@@ -33,15 +32,9 @@ if (locale !== "en" && locale !== "ru") {
   return Astro.redirect("/en/dashboard");
 }
 
-const env = Astro.locals.runtime.env;
-const session = await verifyRefreshSession(env, Astro.request);
-if (!session) {
-  return Astro.redirect(`/${locale}/login?return_to=/${locale}/dashboard`);
-}
-const user = await findUserById(env, session.userId);
-if (!user) {
-  return Astro.redirect(`/${locale}/login`);
-}
+const userOrRes = await requireRole(Astro, "student");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
 
 // Greeting: first-name (или email-prefix если name пустой). Длинные
 // nick'и (lottoprof) разобьёт CSS `word-break: break-word` в Hero.
@@ -138,6 +131,7 @@ const continueEyebrow = `${locale === "ru" ? "МОДУЛЬ" : "MODULE"} ${stub.c
   locale={locale}
   seo={{ title: t.seo.title, description: t.seo.description }}
   currentNavKey="dashboard"
+  userRoles={user.roles}
 >
   <DashboardHero eyebrow={t.eyebrow} name={firstName} tierLine={tierLine} />
 

@@ -40,6 +40,8 @@ import {
 } from "../../../../../lib/server/user-ops";
 import { createRefreshSession } from "../../../../../lib/server/session";
 import { logAuth } from "../../../../../lib/server/audit";
+import { getUserWithRoles } from "../../../../../lib/server/guards";
+import { computeRedirectTarget } from "../../../../../lib/server/auth-redirect";
 
 export const prerender = false;
 
@@ -82,7 +84,6 @@ export const GET: APIRoute = async ({ request, url, locals }) => {
 
   const locale = stateData.locale;
   const returnTo = stateData.return_to;
-  const finalRedirect = returnTo ?? `/${locale}/dashboard`;
 
   // Step 2: exchange code → tokens
   let tokens;
@@ -196,6 +197,12 @@ export const GET: APIRoute = async ({ request, url, locals }) => {
     session_id: sessionId,
   });
 
-  // Step 7: redirect с Set-Cookie
-  return redirect(finalRedirect, cookieHeader);
+  // Step 7: compute role-based target + redirect с Set-Cookie
+  // computeRedirectTarget учитывает roles, deactivated_at, sanitize return_to.
+  // См. decisions 2026-05-17 §18.
+  const userWithRoles = await getUserWithRoles(env, userId);
+  const target = userWithRoles
+    ? computeRedirectTarget(userWithRoles, returnTo ?? null)
+    : `/${locale}/dashboard/`;
+  return redirect(target, cookieHeader);
 };

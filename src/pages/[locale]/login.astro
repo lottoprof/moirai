@@ -179,18 +179,20 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, turnstileToken }),
+        body: JSON.stringify({ email, password, turnstileToken, return_to: returnTo || undefined }),
         credentials: "same-origin",
       });
 
       if (res.ok) {
-        const data = (await res.json()) as { access_token?: string; user?: { locale?: string } };
+        const data = (await res.json()) as { access_token?: string; redirect_to?: string; user?: { locale?: string } };
         if (data.access_token) {
           // Store access token in sessionStorage; refresh lives in HttpOnly cookie.
           sessionStorage.setItem("moirai_access_token", data.access_token);
         }
+        // Server вычисляет redirect_to через computeRedirectTarget
+        // (с учётом user.roles + sanitize return_to). См. decisions 2026-05-17.
         const userLocale = data.user?.locale ?? "en";
-        window.location.href = returnTo && returnTo.startsWith("/") ? returnTo : `/${userLocale}/dashboard`;
+        window.location.href = data.redirect_to ?? `/${userLocale}/dashboard/`;
         return;
       }
 

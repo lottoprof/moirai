@@ -14,12 +14,17 @@
  * URL.
  */
 
+import type { Role } from "../../../db/types";
+
 interface Props {
   locale: "en" | "ru";
   currentKey: "dashboard" | "modules" | "homework" | "account";
+  /** Дополнительные роли user'a — для zone-switcher. Если undefined,
+   *  zone-switcher не рендерится (страница не передала roles). */
+  roles?: Set<Role>;
 }
 
-const { locale, currentKey } = Astro.props;
+const { locale, currentKey, roles } = Astro.props;
 
 const labels = locale === "ru"
   ? {
@@ -29,6 +34,8 @@ const labels = locale === "ru"
       homework: "Задания",
       account: "Аккаунт →",
       site: "На сайт",
+      switchInstructor: "→ Преподавателю",
+      switchAdmin: "→ Админу",
     }
   : {
       aria: "Dashboard navigation",
@@ -37,6 +44,8 @@ const labels = locale === "ru"
       homework: "Homework",
       account: "Account →",
       site: "View site",
+      switchInstructor: "→ Instructor",
+      switchAdmin: "→ Admin",
     };
 
 const items = [
@@ -45,6 +54,16 @@ const items = [
   { key: "homework",  label: labels.homework,  href: `/${locale}/dashboard` },
   { key: "account",   label: labels.account,   href: `/${locale}/account` },
 ] as const;
+
+// Zone-switcher: показываем links на другие зоны если у user'а
+// есть соответствующие роли. См. decisions 2026-05-17 §11.
+const otherZones: { href: string; label: string }[] = [];
+if (roles?.has("instructor")) {
+  otherZones.push({ href: `/${locale}/instructor/`, label: labels.switchInstructor });
+}
+if (roles?.has("admin")) {
+  otherZones.push({ href: `/admin/`, label: labels.switchAdmin });
+}
 ---
 
 <nav class="dashboard-nav" aria-label={labels.aria}>
@@ -60,6 +79,11 @@ const items = [
           class:list={["dashboard-nav__link", { "dashboard-nav__link--active": item.key === currentKey }]}
           aria-current={item.key === currentKey ? "page" : undefined}
         >{item.label}</a>
+      </li>
+    ))}
+    {otherZones.map((z) => (
+      <li class="dashboard-nav__item">
+        <a href={z.href} class="dashboard-nav__link dashboard-nav__link--switch">{z.label}</a>
       </li>
     ))}
   </ul>
@@ -138,6 +162,19 @@ const items = [
     color: var(--text);
   }
   .dashboard-nav__link--active {
+    color: var(--text-accent);
+  }
+
+  /* Zone-switcher links — приглушены, с отступом для визуального
+     отделения от primary nav-items */
+  .dashboard-nav__link--switch {
+    color: var(--text-faint);
+    font-size: var(--type-micro-sm);
+    padding-left: var(--space-sm);
+    border-left: 1px solid var(--border);
+    margin-left: var(--space-xs);
+  }
+  .dashboard-nav__link--switch:hover {
     color: var(--text-accent);
   }
 

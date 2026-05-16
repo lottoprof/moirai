@@ -32,6 +32,8 @@ import { extractRequestInfo } from "../../../lib/server/hash";
 import { createRefreshSession } from "../../../lib/server/session";
 import { signJWT } from "../../../lib/server/jwt";
 import { logAuth } from "../../../lib/server/audit";
+import { getUserWithRoles } from "../../../lib/server/guards";
+import { computeRedirectTarget } from "../../../lib/server/auth-redirect";
 
 export const prerender = false;
 
@@ -39,6 +41,7 @@ const LoginSchema = z.object({
   email: z.string().email().max(254),
   password: z.string().min(1).max(256),
   turnstileToken: z.string().min(1).max(2048),
+  return_to: z.string().max(2048).optional(),
 });
 
 const ACCESS_TTL_SECONDS = 15 * 60;     // 15 min — синхронно с DEFAULT_ACCESS_TTL в jwt.ts
@@ -62,7 +65,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
   const parsed = LoginSchema.safeParse(raw);
   if (!parsed.success) return jsonError("invalid_input", 400);
-  const { email, password, turnstileToken } = parsed.data;
+  const { email, password, turnstileToken, return_to: returnTo } = parsed.data;
 
   // Turnstile
   const turnstileOk = await verifyTurnstile(turnstileToken, ip, env);
@@ -113,11 +116,20 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
   await logAuth(env, "login", user.id, "password", request);
 
+  // Roles + computeRedirectTarget — server решает куда отправить
+  // (учитывая user.roles + sanitize return_to). Client просто читает
+  // redirect_to из ответа. См. decisions 2026-05-17 §18.
+  const userWithRoles = await getUserWithRoles(env, user.id);
+  const redirectTo = userWithRoles
+    ? computeRedirectTarget(userWithRoles, returnTo ?? null)
+    : `/${user.locale}/dashboard/`;
+
   return new Response(
     JSON.stringify({
       ok: true,
       access_token: accessToken,
       expires_in: ACCESS_TTL_SECONDS,
+      redirect_to: redirectTo,
       user: {
         id: user.id,
         email: user.email,

@@ -11,10 +11,13 @@
  *   - Sign out — POST logout
  */
 
+// Pending dynamic-layout по primary role (Stage 21f) — пока на
+// DashboardLayout, AdminLayout/InstructorLayout появятся в 21e/21f
+// и тогда account.astro получит динамический выбор. См. plan 21f.
 import Layout from "../../layouts/dashboard/Layout.astro";
 import Btn from "../../components/public/Btn.astro";
-import { verifyRefreshSession } from "../../lib/server/session";
-import { findUserById, getUserAuthMethods } from "../../lib/server/user-ops";
+import { requireAuth } from "../../lib/server/guards";
+import { getUserAuthMethods } from "../../lib/server/user-ops";
 
 export const prerender = false;
 
@@ -23,15 +26,12 @@ if (locale !== "en" && locale !== "ru") {
   return Astro.redirect("/en/account");
 }
 
+// allowDeactivated: deactivated user может управлять профилем (request reactivation)
+const userOrRes = await requireAuth(Astro, { allowDeactivated: true });
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
 const env = Astro.locals.runtime.env;
-const session = await verifyRefreshSession(env, Astro.request);
-if (!session) {
-  return Astro.redirect(`/${locale}/login?return_to=/${locale}/account`);
-}
-const user = await findUserById(env, session.userId);
-if (!user) {
-  return Astro.redirect(`/${locale}/login`);
-}
+
 const methods = await getUserAuthMethods(env, user.id);
 const hasPassword = methods.some((m) => m.kind === "password");
 const canUnlink = methods.length > 1;
@@ -118,6 +118,7 @@ function methodLabel(kind: string): string {
   locale={locale}
   seo={{ title: t.seo.title, description: t.seo.description }}
   currentNavKey="account"
+  userRoles={user.roles}
 >
   <section class="section center" aria-labelledby="account-title">
     <header class="section__head">

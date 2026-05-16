@@ -1,0 +1,137 @@
+---
+/*
+ * /{locale}/inactive — заглушка для deactivated user'ов.
+ *
+ * Auth-required: только залогиненный пользователь может видеть.
+ * Cross-zone (любая роль). Layout — DashboardLayout (минимально
+ * нейтральный из существующих), без zone-specific nav.
+ *
+ * Поведение:
+ *   - guards.requireAuth({allowDeactivated: true}) пропускает deactivated
+ *   - Не залогинен → redirect на /{locale}/login
+ *   - Залогинен и НЕ deactivated → redirect на role-home (зачем тебе сюда?)
+ *   - Залогинен и deactivated → render баннер + sign-out + account
+ *
+ * См. decisions 2026-05-17 §deactivation.
+ */
+
+import DashboardLayout from "../../layouts/dashboard/Layout.astro";
+import Btn from "../../components/public/Btn.astro";
+import { requireAuth } from "../../lib/server/guards";
+import { roleHomeUrl } from "../../lib/server/auth-redirect";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/inactive");
+}
+
+const userOrRes = await requireAuth(Astro, { allowDeactivated: true });
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+
+// Если user активен — ему тут делать нечего, шлём в role-home
+if (user.deactivated_at === null) {
+  return Astro.redirect(roleHomeUrl(user));
+}
+
+const t = locale === "ru"
+  ? {
+      eyebrow: "Аккаунт",
+      title: "Ваш аккаунт неактивен.",
+      lede: "Доступ к программам и материалам приостановлен. Для возобновления — свяжитесь с поддержкой или администратором.",
+      account: "Управлять аккаунтом",
+      signOut: "Выйти",
+      seo: { title: "Аккаунт неактивен — Moirai", description: "Ваш аккаунт неактивен." },
+    }
+  : {
+      eyebrow: "Account",
+      title: "Your account is inactive.",
+      lede: "Access to programmes and materials is suspended. Contact support or your administrator to reactivate.",
+      account: "Manage account",
+      signOut: "Sign out",
+      seo: { title: "Account inactive — Moirai", description: "Your account is inactive." },
+    };
+---
+
+<DashboardLayout
+  locale={locale}
+  seo={{ title: t.seo.title, description: t.seo.description }}
+  currentNavKey="account"
+>
+  <section class="inactive">
+    <p class="inactive__eyebrow">{t.eyebrow}</p>
+    <h1 class="inactive__title">{t.title}</h1>
+    <p class="inactive__lede">{t.lede}</p>
+
+    <div class="inactive__actions">
+      <Btn href={`/${locale}/account`} variant="primary" size="lg">{t.account}</Btn>
+      <Btn type="button" variant="ghost" size="lg" class="js-signout">{t.signOut}</Btn>
+    </div>
+  </section>
+</DashboardLayout>
+
+<style>
+  .inactive {
+    max-width: 540px;
+    margin: 0 auto;
+    padding: var(--space-3xl) var(--container-pad);
+    text-align: center;
+  }
+
+  .inactive__eyebrow {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-accent);
+    margin-bottom: var(--space-md);
+  }
+
+  .inactive__title {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 5vw, 44px);
+    font-weight: 400;
+    line-height: var(--leading-snug);
+    color: var(--text);
+    margin-bottom: var(--space-md);
+  }
+
+  .inactive__lede {
+    font-family: var(--font-body);
+    color: var(--text-muted);
+    line-height: var(--leading-relaxed);
+    margin-bottom: var(--space-2xl);
+  }
+
+  .inactive__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    align-items: stretch;
+  }
+
+  @media (min-width: 480px) {
+    .inactive__actions {
+      flex-direction: row;
+      justify-content: center;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll(".js-signout").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+      });
+      sessionStorage.removeItem("moirai_access_token");
+      const m = /^\/(en|ru)\//.exec(window.location.pathname);
+      window.location.href = `/${m ? m[1] : "en"}/`;
+    });
+  });
+</script>

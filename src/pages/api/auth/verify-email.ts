@@ -26,6 +26,8 @@ import { consumeVerifyToken } from "../../../lib/server/verify-tokens";
 import { findUserById, markEmailVerified } from "../../../lib/server/user-ops";
 import { createRefreshSession } from "../../../lib/server/session";
 import { logAuth } from "../../../lib/server/audit";
+import { getUserWithRoles } from "../../../lib/server/guards";
+import { computeRedirectTarget } from "../../../lib/server/auth-redirect";
 
 export const prerender = false;
 
@@ -71,5 +73,13 @@ export const GET: APIRoute = async ({ url, request, locals }) => {
     session_id: sessionId,
   });
 
-  return redirect(`/${user.locale}/dashboard?verified=1`, cookieHeader);
+  // Role-based redirect (admin → /admin/, instructor → /instructor/,
+  // иначе /dashboard/). Добавляем ?verified=1 query для toast.
+  // См. decisions 2026-05-17 §18.
+  const userWithRoles = await getUserWithRoles(env, user.id);
+  const baseTarget = userWithRoles
+    ? computeRedirectTarget(userWithRoles, null)
+    : `/${user.locale}/dashboard/`;
+  const sep = baseTarget.includes("?") ? "&" : "?";
+  return redirect(`${baseTarget}${sep}verified=1`, cookieHeader);
 };
