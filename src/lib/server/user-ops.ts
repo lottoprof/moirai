@@ -89,12 +89,15 @@ export async function createUser(
   const emailVerifiedAt = input.emailVerified === true ? now : null;
   const email = input.email.toLowerCase();
 
-  await env.DB.prepare(
-    `INSERT INTO users
-       (id, email, email_verified_at, name, locale, role, referral_code, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'student', ?, ?, ?)`,
-  )
-    .bind(
+  // INSERT users + INSERT user_roles одной batch'ью (migration 0003:
+  // users.role удалён, roles живут в user_roles M2M). Default role —
+  // 'student'. Иные роли назначаются admin'ом через /api/admin/users/[id]/roles.
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO users
+         (id, email, email_verified_at, name, locale, referral_code, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
       id,
       email,
       emailVerifiedAt,
@@ -103,8 +106,12 @@ export async function createUser(
       referralCode,
       now,
       now,
-    )
-    .run();
+    ),
+    env.DB.prepare(
+      `INSERT INTO user_roles (user_id, role, granted_by, granted_at)
+       VALUES (?, 'student', NULL, ?)`,
+    ).bind(id, now),
+  ]);
 
   const created = await findUserById(env, id);
   if (!created) {
