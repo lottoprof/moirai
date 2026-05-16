@@ -1,0 +1,60 @@
+---
+/*
+ * Корневой layout для protected zone — личного кабинета студента.
+ * Отличия от public/Layout.astro:
+ *   - DashboardNav вместо public Nav (без Sign in/Sign up, без LangSwitcher
+ *     в маркетинговом стиле — внутри кабинета locale выбран при логине)
+ *   - noindex зашит в layout (защищённая зона всегда noindex)
+ *   - без Footer (self-contained зона)
+ *
+ * Импортирует тот же набор стилей что и public layout — единый source
+ * of truth для дизайн-токенов и базовых reset'ов.
+ */
+
+import "../../styles/tokens.css";
+import "../../styles/fonts.css";
+import "../../styles/base.css";
+import "../../styles/utilities.css";
+import SeoHead from "../../components/public/SeoHead.astro";
+import DashboardNav from "../../components/dashboard/DashboardNav.astro";
+
+interface Seo {
+  title: string;
+  description: string;
+}
+
+interface Props {
+  locale: "en" | "ru";
+  seo: Seo;
+  currentNavKey: "dashboard" | "modules" | "homework" | "account";
+}
+
+const { locale, seo, currentNavKey } = Astro.props;
+const pathname = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0D0B09" />
+    <meta name="color-scheme" content="dark" />
+
+    <SeoHead
+      locale={locale}
+      pathname={pathname}
+      seo={{ title: seo.title, description: seo.description, noindex: true }}
+    />
+  </head>
+
+  <body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+
+    <DashboardNav locale={locale} currentKey={currentNavKey} />
+
+    <main id="main" class="dashboard-main">
+      <slot />
+    </main>
+  </body>
+</html>

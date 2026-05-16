@@ -1,0 +1,104 @@
+---
+/*
+ * StatCard — одна карточка из stats row на dashboard overview.
+ * Принимает label / value (с опциональным акцентным фрагментом
+ * перед слешем — "3" в "3 / 12") / sub-text / опциональный progress.
+ *
+ * Если `progress` задан (0..1) — рисуется тонкий amber-бар под
+ * sub-текстом + `aria-label` для screen reader.
+ */
+
+interface Props {
+  label: string;
+  /* Либо просто число/строка, либо tuple [accent, rest] для "3 / 12" */
+  value: string | number | [string | number, string];
+  sub: string;
+  progress?: number;
+  progressLabel?: string;
+  /* Уменьшить шрифт value (для текстовых значений вроде "Beginner") */
+  valueSmall?: boolean;
+}
+
+const { label, value, sub, progress, progressLabel, valueSmall = false } = Astro.props;
+const accent = Array.isArray(value) ? value[0] : null;
+const rest = Array.isArray(value) ? value[1] : value;
+const pct = progress != null ? Math.max(0, Math.min(1, progress)) * 100 : null;
+---
+
+<article class="stat-card">
+  <p class="stat-card__label">{label}</p>
+  <p class:list={["stat-card__value", { "stat-card__value--small": valueSmall }]}>
+    {accent != null && <span class="stat-card__accent">{accent}</span>}
+    {accent != null ? <> / {rest}</> : rest}
+  </p>
+  <p class="stat-card__sub">{sub}</p>
+  {pct != null && (
+    <div
+      class="stat-card__bar"
+      role="progressbar"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={Math.round(pct)}
+      aria-label={progressLabel ?? label}
+    >
+      <div class="stat-card__bar-fill" style={`width: ${pct}%`}></div>
+    </div>
+  )}
+</article>
+
+<style>
+  .stat-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: var(--space-md) var(--space-lg);
+  }
+
+  .stat-card__label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: var(--space-xs);
+  }
+
+  .stat-card__value {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--text);
+    margin: 0;
+  }
+  .stat-card__value--small {
+    font-size: 22px;
+    padding-top: 4px;
+  }
+
+  .stat-card__accent {
+    color: var(--text-accent);
+  }
+
+  .stat-card__sub {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    margin-top: var(--space-2xs);
+  }
+
+  .stat-card__bar {
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    margin-top: var(--space-xs);
+    overflow: hidden;
+  }
+  .stat-card__bar-fill {
+    height: 100%;
+    background: var(--text-accent);
+    border-radius: 1px;
+    transition: width var(--duration-normal) var(--ease-out);
+  }
+</style>

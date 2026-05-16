@@ -1,0 +1,278 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .db {
+    font-family: 'Georgia', var(--font-serif), serif;
+    background: #0a0907;
+    color: #F7F3EC;
+    min-height: 600px;
+    padding: 0;
+  }
+
+  .nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 32px;
+    border-bottom: 0.5px solid rgba(247,243,236,0.1);
+  }
+  .nav-logo { font-size: 15px; letter-spacing: 0.12em; color: #F7F3EC; font-family: var(--font-sans); }
+  .nav-right { display: flex; gap: 24px; align-items: center; font-family: var(--font-sans); font-size: 12px; letter-spacing: 0.08em; color: rgba(247,243,236,0.45); }
+  .nav-right a { color: rgba(247,243,236,0.45); text-decoration: none; }
+  .nav-right .active { color: #D4820A; }
+
+  .hero {
+    padding: 48px 32px 32px;
+    border-bottom: 0.5px solid rgba(247,243,236,0.08);
+  }
+  .hero-label { font-family: var(--font-sans); font-size: 11px; letter-spacing: 0.14em; color: #D4820A; margin-bottom: 12px; }
+  .hero-name { font-size: 52px; font-weight: 400; line-height: 1.05; color: #F7F3EC; }
+  .hero-tier { font-family: var(--font-sans); font-size: 13px; color: rgba(247,243,236,0.4); margin-top: 10px; letter-spacing: 0.06em; }
+
+  .content { padding: 32px; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  .stat {
+    background: rgba(247,243,236,0.04);
+    border: 0.5px solid rgba(247,243,236,0.1);
+    border-radius: 4px;
+    padding: 18px 20px;
+  }
+  .stat-label { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.12em; color: rgba(247,243,236,0.35); margin-bottom: 8px; }
+  .stat-value { font-size: 28px; font-weight: 400; color: #F7F3EC; line-height: 1; }
+  .stat-sub { font-family: var(--font-sans); font-size: 11px; color: rgba(247,243,236,0.35); margin-top: 4px; }
+  .stat-accent { color: #D4820A; }
+
+  .section-label {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: rgba(247,243,236,0.3);
+    margin-bottom: 14px;
+  }
+
+  .continue-card {
+    background: rgba(212,130,10,0.08);
+    border: 0.5px solid rgba(212,130,10,0.3);
+    border-radius: 4px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    cursor: pointer;
+  }
+  .continue-card:hover { background: rgba(212,130,10,0.12); }
+  .continue-left {}
+  .continue-num { font-family: var(--font-sans); font-size: 10px; letter-spacing: 0.1em; color: #D4820A; margin-bottom: 6px; }
+  .continue-title { font-size: 20px; color: #F7F3EC; }
+  .continue-meta { font-family: var(--font-sans); font-size: 11px; color: rgba(247,243,236,0.35); margin-top: 4px; }
+  .continue-arrow { font-size: 22px; color: #D4820A; font-family: var(--font-sans); }
+
+  .modules-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+  .module-card {
+    background: rgba(247,243,236,0.03);
+    border: 0.5px solid rgba(247,243,236,0.08);
+    border-radius: 4px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    cursor: pointer;
+  }
+  .module-card.done { opacity: 0.5; }
+  .module-card.active {
+    border-color: rgba(247,243,236,0.2);
+    background: rgba(247,243,236,0.05);
+  }
+  .module-card.locked { opacity: 0.3; }
+  .module-num {
+    font-family: var(--font-sans);
+    font-size: 11px;
+    color: rgba(247,243,236,0.3);
+    min-width: 24px;
+    padding-top: 2px;
+  }
+  .module-body {}
+  .module-track {
+    font-family: var(--font-sans);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: rgba(212,130,10,0.6);
+    margin-bottom: 4px;
+  }
+  .module-title { font-size: 15px; color: #F7F3EC; line-height: 1.2; }
+  .module-status {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    margin-top: 5px;
+  }
+  .status-done { color: rgba(247,243,236,0.3); }
+  .status-active { color: #D4820A; }
+  .status-locked { color: rgba(247,243,236,0.2); }
+
+  .hw-section {}
+  .hw-card {
+    border: 0.5px solid rgba(247,243,236,0.08);
+    border-radius: 4px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    background: rgba(247,243,236,0.02);
+  }
+  .hw-left {}
+  .hw-mod { font-family: var(--font-sans); font-size: 10px; color: rgba(247,243,236,0.3); margin-bottom: 4px; letter-spacing: 0.08em; }
+  .hw-title { font-size: 15px; color: #F7F3EC; }
+  .hw-badge {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 3px 10px;
+    border-radius: 2px;
+  }
+  .hw-pending { background: rgba(212,130,10,0.12); color: #D4820A; border: 0.5px solid rgba(212,130,10,0.3); }
+  .hw-review { background: rgba(247,243,236,0.06); color: rgba(247,243,236,0.4); border: 0.5px solid rgba(247,243,236,0.15); }
+
+  .progress-bar-wrap {
+    height: 2px;
+    background: rgba(247,243,236,0.08);
+    border-radius: 1px;
+    margin-top: 6px;
+  }
+  .progress-bar-fill {
+    height: 2px;
+    background: #D4820A;
+    border-radius: 1px;
+    width: 25%;
+  }
+</style>
+
+<div class="db">
+  <nav class="nav">
+    <span class="nav-logo">MOIRAI.</span>
+    <div class="nav-right">
+      <a href="#" class="active">DASHBOARD</a>
+      <a href="#">MODULES</a>
+      <a href="#">HOMEWORK</a>
+      <a href="#">ACCOUNT →</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <div class="hero-label">DASHBOARD</div>
+    <div class="hero-name">Hi lotto<br>prof.</div>
+    <div class="hero-tier">Beginner Programme · enrolled May 15, 2026</div>
+  </div>
+
+  <div class="content">
+    <div class="stats-row">
+      <div class="stat">
+        <div class="stat-label">PROGRESS</div>
+        <div class="stat-value"><span class="stat-accent">3</span> / 12</div>
+        <div class="stat-sub">modules complete</div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill"></div></div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">YOUR TIER</div>
+        <div class="stat-value" style="font-size:20px; padding-top:6px;">Beginner</div>
+        <div class="stat-sub">en · active</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">HOMEWORK</div>
+        <div class="stat-value"><span class="stat-accent">1</span></div>
+        <div class="stat-sub">awaiting feedback</div>
+      </div>
+    </div>
+
+    <div class="section-label">CONTINUE LEARNING</div>
+    <div class="continue-card">
+      <div class="continue-left">
+        <div class="continue-num">MODULE 04 · DIRECTING</div>
+        <div class="continue-title">Visual Language</div>
+        <div class="continue-meta">Text + video · homework required</div>
+      </div>
+      <div class="continue-arrow">→</div>
+    </div>
+
+    <div class="section-label">ALL MODULES</div>
+    <div class="modules-grid">
+      <div class="module-card done">
+        <div class="module-num">01</div>
+        <div class="module-body">
+          <div class="module-track">DIRECTING</div>
+          <div class="module-title">The Director's Eye</div>
+          <div class="module-status status-done">✓ complete</div>
+        </div>
+      </div>
+      <div class="module-card done">
+        <div class="module-num">02</div>
+        <div class="module-body">
+          <div class="module-track">SCRIPTWRITING</div>
+          <div class="module-title">Story Structure</div>
+          <div class="module-status status-done">✓ complete</div>
+        </div>
+      </div>
+      <div class="module-card done">
+        <div class="module-num">03</div>
+        <div class="module-body">
+          <div class="module-track">EDITING</div>
+          <div class="module-title">The Cut</div>
+          <div class="module-status status-done">✓ complete</div>
+        </div>
+      </div>
+      <div class="module-card active">
+        <div class="module-num">04</div>
+        <div class="module-body">
+          <div class="module-track">DIRECTING</div>
+          <div class="module-title">Visual Language</div>
+          <div class="module-status status-active">→ in progress</div>
+        </div>
+      </div>
+      <div class="module-card locked">
+        <div class="module-num">05</div>
+        <div class="module-body">
+          <div class="module-track">PRODUCING</div>
+          <div class="module-title">Pre-Production</div>
+          <div class="module-status status-locked">locked</div>
+        </div>
+      </div>
+      <div class="module-card locked">
+        <div class="module-num">06</div>
+        <div class="module-body">
+          <div class="module-track">SCRIPTWRITING</div>
+          <div class="module-title">Character & Conflict</div>
+          <div class="module-status status-locked">locked</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">HOMEWORK</div>
+    <div class="hw-card">
+      <div class="hw-left">
+        <div class="hw-mod">MODULE 02 · SCRIPTWRITING</div>
+        <div class="hw-title">Story Structure</div>
+      </div>
+      <div class="hw-badge hw-review">UNDER REVIEW</div>
+    </div>
+    <div class="hw-card">
+      <div class="hw-left">
+        <div class="hw-mod">MODULE 04 · DIRECTING</div>
+        <div class="hw-title">Visual Language</div>
+      </div>
+      <div class="hw-badge hw-pending">SUBMIT →</div>
+    </div>
+  </div>
+</div>

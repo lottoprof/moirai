@@ -1,0 +1,91 @@
+---
+/*
+ * HomeworkCard — строка задания на dashboard overview.
+ * Кликабельна целиком (вся карточка — <a>). Справа — badge со статусом:
+ *   - pending: amber "SUBMIT →" (нужно сдать)
+ *   - review:  приглушённый "UNDER REVIEW" (уже сдано, ждём фидбэк)
+ */
+
+interface Props {
+  moduleLabel: string;
+  title: string;
+  badgeLabel: string;
+  badgeVariant: "pending" | "review";
+  href: string;
+}
+
+const { moduleLabel, title, badgeLabel, badgeVariant, href } = Astro.props;
+---
+
+<a class="homework-card" href={href}>
+  <div class="homework-card__body">
+    <p class="homework-card__module">{moduleLabel}</p>
+    <p class="homework-card__title">{title}</p>
+  </div>
+  <span class:list={["homework-card__badge", `homework-card__badge--${badgeVariant}`]}>{badgeLabel}</span>
+</a>
+
+<style>
+  .homework-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    background: color-mix(in srgb, var(--paper) 2%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: var(--space-md) var(--space-lg);
+    text-decoration: none;
+    color: inherit;
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+  .homework-card:hover {
+    background: color-mix(in srgb, var(--paper) 5%, transparent);
+    border-color: var(--border-strong);
+  }
+
+  .homework-card__body {
+    min-width: 0;
+  }
+
+  .homework-card__module {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    color: var(--text-faint);
+    margin-bottom: var(--space-2xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+
+  .homework-card__title {
+    font-family: var(--font-display);
+    font-size: 17px;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .homework-card__badge {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    padding: 4px 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+
+  .homework-card__badge--pending {
+    background: var(--amber-faint);
+    color: var(--text-accent);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  }
+
+  .homework-card__badge--review {
+    background: color-mix(in srgb, var(--paper) 6%, transparent);
+    color: var(--text-faint);
+    border: 1px solid var(--border-strong);
+  }
+</style>

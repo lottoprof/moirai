@@ -1,0 +1,87 @@
+---
+/*
+ * Большая amber-карточка "Continue learning" — главный CTA на overview.
+ * Кликабельна целиком (вся карточка — <a>), стрелка справа декоративная.
+ *
+ * `meta` — третья строка ("Text + video · homework required") —
+ * опциональная.
+ */
+
+interface Props {
+  eyebrowText: string;
+  title: string;
+  meta?: string;
+  href: string;
+  ariaLabel?: string;
+}
+
+const { eyebrowText, title, meta, href, ariaLabel } = Astro.props;
+---
+
+<a class="continue-card" href={href} aria-label={ariaLabel}>
+  <div class="continue-card__body">
+    <p class="continue-card__eyebrow">{eyebrowText}</p>
+    <p class="continue-card__title">{title}</p>
+    {meta && <p class="continue-card__meta">{meta}</p>}
+  </div>
+  <span class="continue-card__arrow" aria-hidden="true">→</span>
+</a>
+
+<style>
+  .continue-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    background: var(--amber-faint);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+    border-radius: 4px;
+    padding: var(--space-lg) var(--space-xl);
+    text-decoration: none;
+    color: inherit;
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+  .continue-card:hover {
+    background: color-mix(in srgb, var(--amber) 18%, transparent);
+    border-color: color-mix(in srgb, var(--amber) 50%, transparent);
+  }
+
+  .continue-card__body {
+    min-width: 0;
+  }
+
+  .continue-card__eyebrow {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-accent);
+    margin-bottom: var(--space-2xs);
+  }
+
+  .continue-card__title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .continue-card__meta {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    margin-top: var(--space-2xs);
+  }
+
+  .continue-card__arrow {
+    font-family: var(--font-body);
+    font-size: 22px;
+    color: var(--text-accent);
+    flex-shrink: 0;
+  }
+</style>

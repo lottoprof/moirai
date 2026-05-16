@@ -1,22 +1,28 @@
 ---
 /*
- * /{locale}/dashboard — личный кабинет студента (заглушка).
+ * /{locale}/dashboard — overview личного кабинета студента.
  *
- * SSR + auth-guard через refresh cookie. Если сессии нет — redirect
- * на /login?return_to=/dashboard. Если есть — рендерит приветствие,
- * placeholder для будущих секций (модули / расписание / задания /
- * сообщество) и кнопку Sign out.
+ * SSR + auth-guard через refresh cookie. Не залогинен → redirect на
+ * /login?return_to=/{locale}/dashboard.
  *
- * Архитектурно (Architecture v0.8.2 §3):
- *   /{locale}/dashboard/**  — protected zone для студента
- *   /{locale}/account       — auth settings (методы входа, профиль)
+ * Архитектурно (decisions 2026-05-16: dashboard routing) — это
+ * отдельный Astro роут с SSR, не SPA-shell. Per-route auth-guard,
+ * per-route data-loading, islands только где нужна интерактивность
+ * (на этой странице — нигде, чистый HTML).
  *
- * Заглушка живёт здесь до Sprint 1+ когда подключим коллекции
- * modules / runs / sessions / enrollments / homework / feedback.
+ * STUB-ЭТАП: данные про progress / tier / modules / homework
+ * захардкожены ниже с маркером `// STUB:`. Реальные D1-таблицы
+ * (enrollments / modules / module_progress / homework_submissions)
+ * появятся в Sprint 1 — тогда заменим stub на запросы через
+ * `Astro.locals.runtime.env.DB`.
  */
 
-import Layout from "../../../layouts/public/Layout.astro";
-import Btn from "../../../components/public/Btn.astro";
+import DashboardLayout from "../../../layouts/dashboard/Layout.astro";
+import DashboardHero from "../../../components/dashboard/DashboardHero.astro";
+import StatCard from "../../../components/dashboard/StatCard.astro";
+import ContinueCard from "../../../components/dashboard/ContinueCard.astro";
+import ModuleCard from "../../../components/dashboard/ModuleCard.astro";
+import HomeworkCard from "../../../components/dashboard/HomeworkCard.astro";
 import { verifyRefreshSession } from "../../../lib/server/session";
 import { findUserById } from "../../../lib/server/user-ops";
 
@@ -37,89 +43,235 @@ if (!user) {
   return Astro.redirect(`/${locale}/login`);
 }
 
+// Greeting: first-name (или email-prefix если name пустой). Длинные
+// nick'и (lottoprof) разобьёт CSS `word-break: break-word` в Hero.
+const firstName = user.name?.trim().split(/\s+/)[0]
+  ?? user.email.split("@")[0];
+
 const verifiedBadge = Astro.url.searchParams.get("verified") === "1";
+
+// ====================================================================
+// STUB: replace with D1 queries in Sprint 1
+// ====================================================================
+const stub = {
+  progress: { completed: 3, total: 12 },
+  tier: {
+    label: locale === "ru" ? "Программа Beginner" : "Beginner Programme",
+    enrolledAtIso: "2026-05-15",
+  },
+  homeworkAwaiting: 1,
+  continueModule: {
+    num: "04",
+    track: "DIRECTING",
+    title: "Visual Language",
+    meta: locale === "ru" ? "Текст + видео · требуется задание" : "Text + video · homework required",
+  },
+  modules: [
+    { num: "01", track: "DIRECTING",     title: locale === "ru" ? "Взгляд режиссёра"     : "The Director's Eye",  status: "done"   as const },
+    { num: "02", track: "SCRIPTWRITING", title: locale === "ru" ? "Структура истории"    : "Story Structure",     status: "done"   as const },
+    { num: "03", track: "EDITING",       title: locale === "ru" ? "Монтажный кадр"       : "The Cut",             status: "done"   as const },
+    { num: "04", track: "DIRECTING",     title: locale === "ru" ? "Визуальный язык"      : "Visual Language",     status: "active" as const },
+    { num: "05", track: "PRODUCING",     title: locale === "ru" ? "Препродакшен"         : "Pre-Production",      status: "locked" as const },
+    { num: "06", track: "SCRIPTWRITING", title: locale === "ru" ? "Персонаж и конфликт"  : "Character & Conflict", status: "locked" as const },
+  ],
+  homework: [
+    { num: "02", track: "SCRIPTWRITING", title: locale === "ru" ? "Структура истории" : "Story Structure", variant: "review"  as const },
+    { num: "04", track: "DIRECTING",     title: locale === "ru" ? "Визуальный язык"   : "Visual Language", variant: "pending" as const },
+  ],
+};
+// ====================================================================
 
 const t = locale === "ru"
   ? {
-      eyebrow: "Личный кабинет",
-      titleHi: (n: string | null) => n ? `Привет, ${n}.` : "Личный кабинет",
-      lede: "Здесь появятся ваши модули, расписание, задания и материалы курса.",
-      verifiedNote: "✅ Email подтверждён. Добро пожаловать!",
-      sectionsTitle: "Скоро здесь:",
-      sections: [
-        "📚 Модули программы — лекции, упражнения, материалы",
-        "📅 Расписание — ближайшие live-сессии",
-        "✏️ Задания — отправка работ и фидбэк",
-        "🎬 Финальный фильм — статус и review",
-        "👥 Сообщество — связь с когортой",
-      ],
-      settingsLink: "Настройки аккаунта",
-      signOut: "Выйти",
+      eyebrow: "Кабинет",
+      enrolled: "поступление",
+      progress: "Прогресс",
+      progressSub: (n: number) => `модул${n === 1 ? "ь" : "ей"} завершено`,
+      tier: "Ваш тариф",
+      tierSub: "ru · активен",
+      homework: "Задания",
+      homeworkSub: "на проверке",
+      continueLearning: "Продолжить",
+      allModules: "Все модули",
+      homeworkSection: "Задания",
+      statusDone: "✓ завершено",
+      statusActive: "→ в процессе",
+      statusLocked: "недоступно",
+      badgeReview: "На проверке",
+      badgePending: "Сдать →",
+      verifiedNote: "Email подтверждён. Добро пожаловать!",
       seo: { title: "Личный кабинет — Moirai", description: "Личный кабинет студента Moirai." },
     }
   : {
       eyebrow: "Dashboard",
-      titleHi: (n: string | null) => n ? `Hi, ${n}.` : "Dashboard",
-      lede: "Your modules, schedule, assignments, and course materials will appear here.",
-      verifiedNote: "✅ Email verified. Welcome!",
-      sectionsTitle: "Coming here:",
-      sections: [
-        "📚 Programme modules — lectures, exercises, materials",
-        "📅 Schedule — upcoming live sessions",
-        "✏️ Assignments — submit work and get feedback",
-        "🎬 Final film — status and review",
-        "👥 Community — your cohort",
-      ],
-      settingsLink: "Account settings",
-      signOut: "Sign out",
+      enrolled: "enrolled",
+      progress: "Progress",
+      progressSub: (n: number) => `module${n === 1 ? "" : "s"} complete`,
+      tier: "Your tier",
+      tierSub: "en · active",
+      homework: "Homework",
+      homeworkSub: "awaiting feedback",
+      continueLearning: "Continue learning",
+      allModules: "All modules",
+      homeworkSection: "Homework",
+      statusDone: "✓ complete",
+      statusActive: "→ in progress",
+      statusLocked: "locked",
+      badgeReview: "Under review",
+      badgePending: "Submit →",
+      verifiedNote: "Email verified. Welcome!",
       seo: { title: "Dashboard — Moirai", description: "Your Moirai student dashboard." },
     };
+
+const enrolledFormatted = new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+}).format(new Date(stub.tier.enrolledAtIso));
+
+const tierLine = `${stub.tier.label} · ${t.enrolled} ${enrolledFormatted}`;
+
+const continueEyebrow = `${locale === "ru" ? "МОДУЛЬ" : "MODULE"} ${stub.continueModule.num} · ${stub.continueModule.track}`;
 ---
 
-<Layout
+<DashboardLayout
   locale={locale}
-  seo={{ title: t.seo.title, description: t.seo.description, noindex: true }}
+  seo={{ title: t.seo.title, description: t.seo.description }}
+  currentNavKey="dashboard"
 >
-  <section class="section center" aria-labelledby="dashboard-title">
-    <header class="section__head">
-      <p class="eyebrow">{t.eyebrow}</p>
-      <h1 id="dashboard-title" class="h1">{t.titleHi(user.name)}</h1>
-      <p class="text-muted">{t.lede}</p>
-    </header>
+  <DashboardHero eyebrow={t.eyebrow} name={firstName} tierLine={tierLine} />
 
+  <div class="dashboard-content">
     {verifiedBadge && (
-      <div class="form" role="status">
-        <p class="form__hint" style="text-align:center;">{t.verifiedNote}</p>
-      </div>
+      <p class="dashboard-content__notice" role="status">{t.verifiedNote}</p>
     )}
 
-    <div class="form">
-      <div class="form__field">
-        <span class="form__label">{t.sectionsTitle}</span>
-        <ul class="form__hint" style="list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:var(--space-sm); line-height:1.6;">
-          {t.sections.map((s) => <li>{s}</li>)}
-        </ul>
+    <section class="dashboard-content__stats" aria-label={t.eyebrow}>
+      <StatCard
+        label={t.progress}
+        value={[stub.progress.completed, String(stub.progress.total)]}
+        sub={t.progressSub(stub.progress.completed)}
+        progress={stub.progress.completed / stub.progress.total}
+        progressLabel={`${t.progress}: ${stub.progress.completed} / ${stub.progress.total}`}
+      />
+      <StatCard
+        label={t.tier}
+        value={stub.tier.label.split(" ")[0]}
+        sub={t.tierSub}
+        valueSmall
+      />
+      <StatCard
+        label={t.homework}
+        value={[stub.homeworkAwaiting, ""]}
+        sub={t.homeworkSub}
+      />
+    </section>
+
+    <section aria-labelledby="continue-label">
+      <p id="continue-label" class="dashboard-content__section-label">{t.continueLearning}</p>
+      <ContinueCard
+        eyebrowText={continueEyebrow}
+        title={stub.continueModule.title}
+        meta={stub.continueModule.meta}
+        href={`/${locale}/dashboard`}
+        ariaLabel={`${t.continueLearning}: ${stub.continueModule.title}`}
+      />
+    </section>
+
+    <section aria-labelledby="modules-label">
+      <p id="modules-label" class="dashboard-content__section-label">{t.allModules}</p>
+      <div class="dashboard-content__modules">
+        {stub.modules.map((m) => (
+          <ModuleCard
+            num={m.num}
+            track={m.track}
+            title={m.title}
+            status={m.status}
+            statusLabel={
+              m.status === "done" ? t.statusDone
+              : m.status === "active" ? t.statusActive
+              : t.statusLocked
+            }
+            href={m.status !== "locked" ? `/${locale}/dashboard` : undefined}
+          />
+        ))}
       </div>
+    </section>
 
-      <Btn href={`/${locale}/account`} variant="ghost" size="lg">{t.settingsLink}</Btn>
-      <Btn type="button" variant="ghost" size="lg" class="js-signout">{t.signOut}</Btn>
-    </div>
-  </section>
-</Layout>
+    <section aria-labelledby="homework-label">
+      <p id="homework-label" class="dashboard-content__section-label">{t.homeworkSection}</p>
+      <div class="dashboard-content__homework">
+        {stub.homework.map((h) => (
+          <HomeworkCard
+            moduleLabel={`${locale === "ru" ? "Модуль" : "Module"} ${h.num} · ${h.track}`}
+            title={h.title}
+            badgeLabel={h.variant === "review" ? t.badgeReview : t.badgePending}
+            badgeVariant={h.variant}
+            href={`/${locale}/dashboard`}
+          />
+        ))}
+      </div>
+    </section>
+  </div>
+</DashboardLayout>
 
-<script>
-  document.querySelectorAll(".js-signout").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-      });
-      sessionStorage.removeItem("moirai_access_token");
-      const path = window.location.pathname;
-      const m = /^\/(en|ru)\//.exec(path);
-      const locale = m ? m[1] : "en";
-      window.location.href = `/${locale}/`;
-    });
-  });
-</script>
+<style>
+  .dashboard-content {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  .dashboard-content__notice {
+    background: var(--amber-faint);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+    color: var(--text-accent);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: 4px;
+    font-size: var(--type-body-sm);
+    text-align: center;
+  }
+
+  .dashboard-content__stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-sm);
+  }
+
+  .dashboard-content__section-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: var(--space-md);
+  }
+
+  .dashboard-content__modules {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-xs);
+  }
+
+  .dashboard-content__homework {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  @media (max-width: 640px) {
+    .dashboard-content {
+      gap: var(--space-xl);
+    }
+    .dashboard-content__stats {
+      grid-template-columns: 1fr;
+    }
+    .dashboard-content__modules {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

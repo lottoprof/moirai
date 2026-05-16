@@ -1,0 +1,137 @@
+---
+/*
+ * ModuleCard — карточка модуля в grid.
+ *
+ * Состояния:
+ *   - done   — completed модуль; цвет приглушённый, ссылка работает
+ *   - active — текущий; полный контраст + amber accent на статусе
+ *   - locked — недоступен; <div aria-disabled="true">, не ссылка
+ *
+ * Locked рисуется НЕ через opacity: 0.3 (ломает text contrast ниже AA),
+ * а через приглушённые токены + lock-иконка (Unicode lock symbol).
+ */
+
+interface Props {
+  num: string;
+  track: string;
+  title: string;
+  status: "done" | "active" | "locked";
+  statusLabel: string;
+  href?: string;
+}
+
+const { num, track, title, status, statusLabel, href } = Astro.props;
+const isLink = status !== "locked" && href;
+const Tag = isLink ? "a" : "div";
+---
+
+<Tag
+  class:list={["module-card", `module-card--${status}`]}
+  href={isLink ? href : undefined}
+  aria-disabled={status === "locked" ? "true" : undefined}
+>
+  <span class="module-card__num">{num}</span>
+  <div class="module-card__body">
+    <p class="module-card__track">{track}</p>
+    <p class="module-card__title">{title}</p>
+    <p class:list={["module-card__status", `module-card__status--${status}`]}>
+      {status === "locked" && <span class="module-card__lock" aria-hidden="true">🔒</span>}
+      {statusLabel}
+    </p>
+  </div>
+</Tag>
+
+<style>
+  .module-card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: var(--space-md) var(--space-md);
+    text-decoration: none;
+    color: inherit;
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+
+  /* Active (current) — самый контрастный */
+  .module-card--active {
+    background: color-mix(in srgb, var(--paper) 5%, transparent);
+    border-color: var(--border-strong);
+  }
+  .module-card--active:hover {
+    background: color-mix(in srgb, var(--paper) 8%, transparent);
+  }
+
+  /* Done — completed модули; ссылочные но приглушённые */
+  .module-card--done:hover {
+    border-color: var(--border-strong);
+  }
+
+  /* Locked — не ссылка, курсор и hover отключены */
+  .module-card--locked {
+    cursor: not-allowed;
+  }
+  .module-card--locked .module-card__title,
+  .module-card--locked .module-card__num,
+  .module-card--locked .module-card__track {
+    color: var(--text-faint);
+  }
+
+  .module-card__num {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    min-width: 24px;
+    padding-top: 2px;
+  }
+
+  .module-card__body {
+    min-width: 0;
+  }
+
+  .module-card__track {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    color: color-mix(in srgb, var(--amber) 70%, transparent);
+    margin-bottom: var(--space-2xs);
+  }
+
+  .module-card--done .module-card__track {
+    color: var(--text-faint);
+  }
+
+  .module-card__title {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 400;
+    line-height: 1.25;
+    color: var(--text);
+    margin: 0;
+  }
+  .module-card--done .module-card__title {
+    color: var(--text-muted);
+  }
+
+  .module-card__status {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    margin-top: var(--space-2xs);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+  }
+
+  .module-card__status--done   { color: var(--text-faint); }
+  .module-card__status--active { color: var(--text-accent); }
+  .module-card__status--locked { color: var(--text-faint); }
+
+  .module-card__lock {
+    font-size: 11px;
+  }
+</style>

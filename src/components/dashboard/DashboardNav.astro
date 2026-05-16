@@ -1,0 +1,131 @@
+---
+/*
+ * Top nav для dashboard зоны. Логотип слева + 4 пункта справа
+ * (Dashboard / Modules / Homework / Account). Активный пункт —
+ * через `currentKey` prop, подсвечивается amber-цветом и помечается
+ * `aria-current="page"`.
+ *
+ * Sign out живёт на /account странице (мы туда ведём из Account
+ * пункта), отдельной кнопки в nav нет — паттерн как у большинства
+ * web-приложений.
+ *
+ * Stub-этап: Modules → /dashboard, Homework → /dashboard (страниц
+ * ещё нет, ведём на overview). После Sprint 1 заменятся на реальные
+ * URL.
+ */
+
+interface Props {
+  locale: "en" | "ru";
+  currentKey: "dashboard" | "modules" | "homework" | "account";
+}
+
+const { locale, currentKey } = Astro.props;
+
+const labels = locale === "ru"
+  ? {
+      aria: "Навигация по личному кабинету",
+      dashboard: "Кабинет",
+      modules: "Модули",
+      homework: "Задания",
+      account: "Аккаунт →",
+    }
+  : {
+      aria: "Dashboard navigation",
+      dashboard: "Dashboard",
+      modules: "Modules",
+      homework: "Homework",
+      account: "Account →",
+    };
+
+const items = [
+  { key: "dashboard", label: labels.dashboard, href: `/${locale}/dashboard` },
+  { key: "modules",   label: labels.modules,   href: `/${locale}/dashboard` },
+  { key: "homework",  label: labels.homework,  href: `/${locale}/dashboard` },
+  { key: "account",   label: labels.account,   href: `/${locale}/account` },
+] as const;
+---
+
+<nav class="dashboard-nav" aria-label={labels.aria}>
+  <a href={`/${locale}/dashboard`} class="dashboard-nav__logo">Moirai.</a>
+  <ul class="dashboard-nav__list" role="list">
+    {items.map((item) => (
+      <li class="dashboard-nav__item">
+        <a
+          href={item.href}
+          class:list={["dashboard-nav__link", { "dashboard-nav__link--active": item.key === currentKey }]}
+          aria-current={item.key === currentKey ? "page" : undefined}
+        >{item.label}</a>
+      </li>
+    ))}
+  </ul>
+</nav>
+
+<style>
+  .dashboard-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-lg) var(--container-pad);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .dashboard-nav__logo {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 300;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text);
+    text-decoration: none;
+    opacity: 0.95;
+  }
+
+  .dashboard-nav__list {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .dashboard-nav__list::-webkit-scrollbar { display: none; }
+
+  .dashboard-nav__item {
+    flex-shrink: 0;
+  }
+
+  .dashboard-nav__link {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 4px 2px;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .dashboard-nav__link:hover {
+    color: var(--text);
+  }
+  .dashboard-nav__link--active {
+    color: var(--text-accent);
+  }
+
+  @media (max-width: 640px) {
+    .dashboard-nav {
+      padding: var(--space-md) var(--space-md);
+      gap: var(--space-md);
+    }
+    .dashboard-nav__list {
+      gap: var(--space-md);
+    }
+    .dashboard-nav__link {
+      letter-spacing: var(--tracking-wide);
+    }
+  }
+</style>
