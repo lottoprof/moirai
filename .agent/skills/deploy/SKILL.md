@@ -307,3 +307,17 @@ Wrangler 4 **не имеет** first-class `rollback` команды для Page
    реально пустой список. Проверять scopes пробами: account-level
    endpoints (`/accounts/{id}/pages/projects` и т.п.) возвращают
    401/403 явно если scope не выдан.
+10. **`commit_message` UTF-8 false-positive** (wrangler 4.90.0,
+    2026-05-16). CF Pages API отклоняет `commit_message`
+    длиннее ~250 байт с misleading-ошибкой `8000111: Invalid
+    commit message, it must be a valid UTF-8 string` — даже если
+    байты валидны и truncate'нуты wrangler'ом до 383 байт
+    (его `MAX_COMMIT_MESSAGE_BYTES = 384`). Воспроизводимо для
+    UTF-8 с Cyrillic / `→` / `—`. Workaround зашит в `package.json`:
+    `pnpm deploy` передаёт `--commit-message "$(git log -1 --pretty=%s)"` —
+    только subject-line (по git-convention ≤70 chars). Body коммита
+    в CF Dashboard не уезжает, но full message остаётся в git.
+    Если деплоишь руками — **всегда** передавай `--commit-message`
+    с коротким ASCII/UTF-8 текстом. См. также discoverable баг
+    в wrangler — `MAX_COMMIT_MESSAGE_BYTES` не совпадает с
+    реальным server-лимитом.
