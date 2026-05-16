@@ -1,0 +1,162 @@
+---
+/*
+ * Top nav для Admin panel. Без локали в путях, но локаль в UI-строках.
+ * + zone-switcher если у admin'а есть instructor/student роли.
+ */
+
+import type { Role } from "../../../db/types";
+
+interface Props {
+  locale: "en" | "ru";
+  currentKey: "overview" | "users" | "enrollments" | "modules" | "instructors" | "queues" | "account";
+  roles?: Set<Role>;
+}
+
+const { locale, currentKey, roles } = Astro.props;
+
+const labels = locale === "ru"
+  ? {
+      aria: "Навигация админа",
+      overview: "Обзор",
+      users: "Пользователи",
+      enrollments: "Записи",
+      modules: "Модули",
+      instructors: "Преподаватели",
+      queues: "Очереди",
+      account: "Аккаунт →",
+      site: "На сайт",
+      switchInstructor: "→ Преподавателю",
+      switchDashboard: "→ Кабинет",
+    }
+  : {
+      aria: "Admin navigation",
+      overview: "Overview",
+      users: "Users",
+      enrollments: "Enrollments",
+      modules: "Modules",
+      instructors: "Instructors",
+      queues: "Queues",
+      account: "Account →",
+      site: "View site",
+      switchInstructor: "→ Instructor",
+      switchDashboard: "→ Dashboard",
+    };
+
+const items = [
+  { key: "overview",    label: labels.overview,    href: `/admin/` },
+  { key: "users",       label: labels.users,       href: `/admin/users` },
+  { key: "enrollments", label: labels.enrollments, href: `/admin/` },
+  { key: "modules",     label: labels.modules,     href: `/admin/` },
+  { key: "instructors", label: labels.instructors, href: `/admin/` },
+  { key: "queues",      label: labels.queues,      href: `/admin/` },
+  { key: "account",     label: labels.account,     href: `/${locale}/account` },
+] as const;
+
+const otherZones: { href: string; label: string }[] = [];
+if (roles?.has("instructor")) {
+  otherZones.push({ href: `/${locale}/instructor/`, label: labels.switchInstructor });
+}
+if (roles?.has("student")) {
+  otherZones.push({ href: `/${locale}/dashboard/`, label: labels.switchDashboard });
+}
+---
+
+<nav class="admin-nav" aria-label={labels.aria}>
+  <div class="admin-nav__brand">
+    <a href={`/admin/`} class="admin-nav__logo">Moirai.</a>
+    <a href={`/${locale}/`} class="admin-nav__site">{labels.site} <span aria-hidden="true">→</span></a>
+  </div>
+  <ul class="admin-nav__list" role="list">
+    {items.map((item) => (
+      <li class="admin-nav__item">
+        <a
+          href={item.href}
+          class:list={["admin-nav__link", { "admin-nav__link--active": item.key === currentKey }]}
+          aria-current={item.key === currentKey ? "page" : undefined}
+        >{item.label}</a>
+      </li>
+    ))}
+    {otherZones.map((z) => (
+      <li class="admin-nav__item">
+        <a href={z.href} class="admin-nav__link admin-nav__link--switch">{z.label}</a>
+      </li>
+    ))}
+  </ul>
+</nav>
+
+<style>
+  .admin-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) var(--container-pad);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .admin-nav__brand {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-md);
+  }
+
+  .admin-nav__logo {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 300;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text);
+    text-decoration: none;
+    opacity: 0.95;
+  }
+
+  .admin-nav__site {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    color: var(--text-faint);
+    text-decoration: none;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .admin-nav__list {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .admin-nav__list::-webkit-scrollbar { display: none; }
+
+  .admin-nav__item { flex-shrink: 0; }
+
+  .admin-nav__link {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 4px 2px;
+  }
+  .admin-nav__link:hover { color: var(--text); }
+  .admin-nav__link--active { color: var(--text-accent); }
+
+  .admin-nav__link--switch {
+    color: var(--text-faint);
+    padding-left: var(--space-sm);
+    border-left: 1px solid var(--border);
+    margin-left: var(--space-2xs);
+  }
+  .admin-nav__link--switch:hover { color: var(--text-accent); }
+
+  @media (max-width: 640px) {
+    .admin-nav { padding: var(--space-md); gap: var(--space-md); }
+    .admin-nav__list { gap: var(--space-sm); }
+  }
+</style>

@@ -1,0 +1,695 @@
+---
+/*
+ * /admin/users — управление пользователями.
+ *
+ * SSR таблица + drawer (inline markup, открывается через ?selected=id).
+ * Mutations через /api/admin/users/[id]/* endpoints (Stage 21g).
+ *
+ * Filters через URL:
+ *   ?role=all|student|instructor|admin (default all)
+ *   ?q=<search> (по email/name)
+ */
+
+import Layout from "../../layouts/admin/Layout.astro";
+import InstructorHero from "../../components/instructor/InstructorHero.astro";
+import RoleBadge from "../../components/admin/RoleBadge.astro";
+import { requireRole } from "../../lib/server/guards";
+import type { Role } from "../../../db/types";
+
+export const prerender = false;
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const adminUser = userOrRes;
+const env = Astro.locals.runtime.env;
+const locale = adminUser.locale;
+
+const roleFilter = (Astro.url.searchParams.get("role") ?? "all") as
+  | "all" | "student" | "instructor" | "admin";
+const searchQuery = (Astro.url.searchParams.get("q") ?? "").trim();
+const selectedId = Astro.url.searchParams.get("selected");
+
+// Список пользователей с агрегированными ролями + active enrollment
+interface UserListRow {
+  id: string;
+  email: string;
+  name: string | null;
+  locale: string;
+  email_verified_at: number | null;
+  deactivated_at: number | null;
+  created_at: number;
+  roles_csv: string | null;
+  active_enrollment_count: number;
+  primary_enrollment_programme: string | null;
+}
+
+const where: string[] = [];
+const binds: unknown[] = [];
+
+if (roleFilter !== "all") {
+  where.push(`EXISTS(SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role = ?)`);
+  binds.push(roleFilter);
+}
+if (searchQuery) {
+  where.push(`(LOWER(u.email) LIKE ? OR LOWER(COALESCE(u.name, '')) LIKE ?)`);
+  binds.push(`%${searchQuery.toLowerCase()}%`, `%${searchQuery.toLowerCase()}%`);
+}
+
+const usersQuery = `
+  SELECT
+    u.id, u.email, u.name, u.locale, u.email_verified_at,
+    u.deactivated_at, u.created_at,
+    (SELECT GROUP_CONCAT(role) FROM user_roles WHERE user_id = u.id) AS roles_csv,
+    (SELECT COUNT(*) FROM enrollments WHERE user_id = u.id AND status = 'active') AS active_enrollment_count,
+    (SELECT programme_slug FROM enrollments
+       WHERE user_id = u.id AND status = 'active'
+       ORDER BY enrolled_at DESC LIMIT 1) AS primary_enrollment_programme
+  FROM users u
+  ${where.length > 0 ? "WHERE " + where.join(" AND ") : ""}
+  ORDER BY u.created_at DESC
+`;
+
+const usersRows = await env.DB.prepare(usersQuery).bind(...binds).all<UserListRow>();
+const users = usersRows.results.map((r) => ({
+  ...r,
+  roles: (r.roles_csv?.split(",") ?? []) as Role[],
+}));
+
+// Counts по role для sub-nav badges
+interface RoleCounts {
+  total: number; student_cnt: number; instructor_cnt: number; admin_cnt: number;
+}
+const counts = await env.DB.prepare(`
+  SELECT
+    (SELECT COUNT(*) FROM users) AS total,
+    (SELECT COUNT(*) FROM user_roles WHERE role = 'student') AS student_cnt,
+    (SELECT COUNT(*) FROM user_roles WHERE role = 'instructor') AS instructor_cnt,
+    (SELECT COUNT(*) FROM user_roles WHERE role = 'admin') AS admin_cnt
+`).first<RoleCounts>();
+
+// Selected user — для drawer'а
+const selectedUser = selectedId ? users.find((u) => u.id === selectedId) ?? null : null;
+
+const t = locale === "ru"
+  ? {
+      eyebrow: "Пользователи",
+      title: "Управление аккаунтами.",
+      subtitle: "Назначай роли, отправляй reset пароля, деактивируй",
+      tabAll: "Все", tabStudent: "Студенты", tabInstructor: "Преподаватели", tabAdmin: "Админы",
+      colUser: "USER", colRole: "ROLES", colEnrollment: "ENROLLMENT", colLocale: "LOCALE",
+      colStatus: "STATUS", colRegistered: "REGISTERED", colActions: "ACTIONS",
+      searchPlaceholder: "Поиск по имени или email…",
+      addUser: "+ Добавить пользователя",
+      statusActive: "ACTIVE", statusInactive: "INACTIVE", statusPending: "PENDING",
+      noEnrollment: "—", profile: "profile",
+      drawerTitle: "Профиль пользователя",
+      close: "ЗАКРЫТЬ ✕",
+      fieldName: "Display name", fieldEmail: "Email", fieldLocale: "Locale", fieldRoles: "Roles",
+      btnSave: "Сохранить", btnResetPwd: "Отправить reset пароля",
+      btnDeactivate: "Деактивировать", btnReactivate: "Реактивировать",
+      btnAnonymize: "Анонимизировать",
+      registered: "регистрация",
+      seo: { title: "Пользователи — Moirai Admin", description: "Управление аккаунтами." },
+    }
+  : {
+      eyebrow: "Users",
+      title: "Manage accounts.",
+      subtitle: "Assign roles, send password resets, deactivate",
+      tabAll: "All", tabStudent: "Students", tabInstructor: "Instructors", tabAdmin: "Admins",
+      colUser: "USER", colRole: "ROLES", colEnrollment: "ENROLLMENT", colLocale: "LOCALE",
+      colStatus: "STATUS", colRegistered: "REGISTERED", colActions: "ACTIONS",
+      searchPlaceholder: "Search by name or email…",
+      addUser: "+ Add user",
+      statusActive: "ACTIVE", statusInactive: "INACTIVE", statusPending: "PENDING",
+      noEnrollment: "—", profile: "profile",
+      drawerTitle: "User profile",
+      close: "CLOSE ✕",
+      fieldName: "Display name", fieldEmail: "Email", fieldLocale: "Locale", fieldRoles: "Roles",
+      btnSave: "Save", btnResetPwd: "Send password reset",
+      btnDeactivate: "Deactivate", btnReactivate: "Reactivate",
+      btnAnonymize: "Anonymize",
+      registered: "registered",
+      seo: { title: "Users — Moirai Admin", description: "Manage accounts." },
+    };
+
+const dateFmt = new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  month: "short", day: "numeric", year: "numeric",
+});
+
+const initials = (u: { name: string | null; email: string }) => {
+  const name = u.name?.trim() || u.email.split("@")[0];
+  return name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+};
+
+const statusOf = (u: UserListRow): "active" | "inactive" | "pending" =>
+  u.deactivated_at ? "inactive"
+    : (u.email_verified_at ? "active" : "pending");
+---
+
+<Layout
+  locale={locale}
+  seo={{ title: t.seo.title, description: t.seo.description }}
+  currentNavKey="users"
+  userRoles={adminUser.roles}
+>
+  <InstructorHero eyebrow={t.eyebrow} title={t.title} subtitle={t.subtitle} />
+
+  <div class="admin-users">
+    <!-- Sub-nav tabs -->
+    <nav class="admin-users__tabs" aria-label="filter by role">
+      <a href="?role=all" class:list={["admin-users__tab", { "admin-users__tab--on": roleFilter === "all" }]}>
+        {t.tabAll} <span class="admin-users__tab-count">{counts?.total ?? 0}</span>
+      </a>
+      <a href="?role=student" class:list={["admin-users__tab", { "admin-users__tab--on": roleFilter === "student" }]}>
+        {t.tabStudent} <span class="admin-users__tab-count">{counts?.student_cnt ?? 0}</span>
+      </a>
+      <a href="?role=instructor" class:list={["admin-users__tab", { "admin-users__tab--on": roleFilter === "instructor" }]}>
+        {t.tabInstructor} <span class="admin-users__tab-count">{counts?.instructor_cnt ?? 0}</span>
+      </a>
+      <a href="?role=admin" class:list={["admin-users__tab", { "admin-users__tab--on": roleFilter === "admin" }]}>
+        {t.tabAdmin} <span class="admin-users__tab-count">{counts?.admin_cnt ?? 0}</span>
+      </a>
+    </nav>
+
+    <!-- Filter bar -->
+    <form class="admin-users__filter" method="get">
+      <input type="hidden" name="role" value={roleFilter} />
+      <input
+        type="search"
+        name="q"
+        class="admin-users__search"
+        placeholder={t.searchPlaceholder}
+        value={searchQuery}
+        autocomplete="off"
+      />
+      <span class="admin-users__spacer"></span>
+      <button type="button" class="admin-users__add" data-action="add-user">{t.addUser}</button>
+    </form>
+
+    <!-- Users table -->
+    <div class="admin-users__table-wrap">
+      <table class="admin-users__table">
+        <thead>
+          <tr>
+            <th>{t.colUser}</th>
+            <th>{t.colRole}</th>
+            <th>{t.colEnrollment}</th>
+            <th>{t.colLocale}</th>
+            <th>{t.colStatus}</th>
+            <th>{t.colRegistered}</th>
+            <th>{t.colActions}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.length === 0 && (
+            <tr><td colspan="7" class="admin-users__empty">No users match the filter.</td></tr>
+          )}
+          {users.map((u) => {
+            const status = statusOf(u);
+            const name = u.name?.trim() || u.email.split("@")[0];
+            return (
+              <tr class:list={[{ "admin-users__row--inactive": status === "inactive", "admin-users__row--pending": status === "pending" }]}>
+                <td>
+                  <div class="admin-users__user-cell">
+                    <span class="admin-users__avatar" aria-hidden="true">{initials(u)}</span>
+                    <div>
+                      <div class="admin-users__user-name">{name}</div>
+                      <div class="admin-users__user-email">{u.email}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  {u.roles.map((r) => <RoleBadge role={r as "student" | "instructor" | "admin"} />)}
+                </td>
+                <td class="admin-users__col-muted">
+                  {u.primary_enrollment_programme
+                    ? `${u.primary_enrollment_programme}${u.active_enrollment_count > 1 ? ` +${String(u.active_enrollment_count - 1)}` : ""}`
+                    : t.noEnrollment}
+                </td>
+                <td class="admin-users__col-muted">{u.locale.toUpperCase()}</td>
+                <td>
+                  <span class:list={["admin-users__status", `admin-users__status--${status}`]}>
+                    {status === "active" ? t.statusActive : status === "inactive" ? t.statusInactive : t.statusPending}
+                  </span>
+                </td>
+                <td class="admin-users__col-muted">{dateFmt.format(new Date(u.created_at * 1000))}</td>
+                <td>
+                  <a href={`?role=${roleFilter}&q=${encodeURIComponent(searchQuery)}&selected=${u.id}`}
+                     class="admin-users__action">{t.profile} →</a>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Drawer (когда selected) -->
+    {selectedUser && (
+      <div class="admin-users__drawer" data-user-id={selectedUser.id}>
+        <div class="admin-users__drawer-header">
+          <div>
+            <h2 class="admin-users__drawer-name">{selectedUser.name?.trim() || selectedUser.email.split("@")[0]}</h2>
+            <p class="admin-users__drawer-email">
+              {selectedUser.email} · {t.registered} {dateFmt.format(new Date(selectedUser.created_at * 1000))}
+            </p>
+          </div>
+          <a href={`?role=${roleFilter}&q=${encodeURIComponent(searchQuery)}`} class="admin-users__drawer-close">{t.close}</a>
+        </div>
+
+        <form class="admin-users__form" id="user-edit-form" data-user-id={selectedUser.id}>
+          <div class="admin-users__form-grid">
+            <label class="admin-users__field">
+              <span class="admin-users__field-lbl">{t.fieldName}</span>
+              <input type="text" name="name" value={selectedUser.name ?? ""} class="admin-users__field-input" />
+            </label>
+            <label class="admin-users__field">
+              <span class="admin-users__field-lbl">{t.fieldEmail}</span>
+              <input type="email" name="email" value={selectedUser.email} class="admin-users__field-input" required />
+            </label>
+            <label class="admin-users__field">
+              <span class="admin-users__field-lbl">{t.fieldLocale}</span>
+              <select name="locale" class="admin-users__field-input">
+                <option value="en" selected={selectedUser.locale === "en"}>en</option>
+                <option value="ru" selected={selectedUser.locale === "ru"}>ru</option>
+              </select>
+            </label>
+          </div>
+
+          <fieldset class="admin-users__field">
+            <legend class="admin-users__field-lbl">{t.fieldRoles}</legend>
+            <div class="admin-users__roles-checkboxes">
+              <label><input type="checkbox" name="roles" value="student"    checked={selectedUser.roles.includes("student")} /> student</label>
+              <label><input type="checkbox" name="roles" value="instructor" checked={selectedUser.roles.includes("instructor")} /> instructor</label>
+              <label><input type="checkbox" name="roles" value="admin"      checked={selectedUser.roles.includes("admin")} /> admin</label>
+            </div>
+          </fieldset>
+
+          <div class="admin-users__actions">
+            <button type="submit" class="admin-users__btn admin-users__btn--primary">{t.btnSave}</button>
+            <button type="button" class="admin-users__btn" data-action="reset-password">{t.btnResetPwd}</button>
+            {selectedUser.deactivated_at === null && (
+              <button type="button" class="admin-users__btn admin-users__btn--warn" data-action="deactivate">{t.btnDeactivate}</button>
+            )}
+            {selectedUser.deactivated_at !== null && (
+              <button type="button" class="admin-users__btn admin-users__btn--primary" data-action="reactivate">{t.btnReactivate}</button>
+            )}
+            <button type="button" class="admin-users__btn admin-users__btn--danger" data-action="anonymize">{t.btnAnonymize}</button>
+          </div>
+          <p class="admin-users__form-status" role="status"></p>
+        </form>
+      </div>
+    )}
+  </div>
+</Layout>
+
+<script>
+  // Все mutations через /api/admin/users/[id]/* endpoints.
+  // На success — reload страницы (state persists в URL).
+  const form = document.getElementById("user-edit-form") as HTMLFormElement | null;
+
+  async function api(path: string, method: string, body?: unknown): Promise<Response> {
+    return fetch(path, {
+      method,
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  function showStatus(msg: string, isError = false) {
+    const el = form?.querySelector(".admin-users__form-status") as HTMLElement | null;
+    if (el) {
+      el.textContent = msg;
+      el.style.color = isError ? "#e06060" : "var(--text-accent)";
+    }
+  }
+
+  if (form) {
+    const userId = form.dataset.userId ?? "";
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const name = (fd.get("name") as string) || null;
+      const email = (fd.get("email") as string) || "";
+      const localeVal = (fd.get("locale") as string) || "en";
+      const roles = fd.getAll("roles") as string[];
+
+      // PATCH profile fields
+      const r1 = await api(`/api/admin/users/${userId}`, "PATCH", { name, email, locale: localeVal });
+      if (!r1.ok) {
+        showStatus("Save failed (profile): " + r1.status, true);
+        return;
+      }
+      // PATCH roles
+      const r2 = await api(`/api/admin/users/${userId}/roles`, "PATCH", { roles });
+      if (!r2.ok) {
+        const b = await r2.json().catch(() => ({})) as { error?: string };
+        showStatus("Save failed (roles): " + (b.error ?? r2.status), true);
+        return;
+      }
+      showStatus("Saved.");
+      // reload after small delay
+      setTimeout(() => window.location.reload(), 400);
+    });
+
+    form.querySelectorAll<HTMLButtonElement>("button[data-action]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const action = btn.dataset.action;
+        let path = "";
+        let needConfirm = "";
+        if (action === "reset-password") { path = `/api/admin/users/${userId}/reset-password`; }
+        if (action === "deactivate")     { path = `/api/admin/users/${userId}/deactivate`; needConfirm = "Deactivate this user?"; }
+        if (action === "reactivate")     { path = `/api/admin/users/${userId}/reactivate`; }
+        if (action === "anonymize")      {
+          const email = (form.querySelector('input[name="email"]') as HTMLInputElement)?.value ?? "";
+          const typed = prompt(`Irreversible. Type the user's email to confirm:\n${email}`);
+          if (typed !== email) {
+            showStatus("Anonymize cancelled.", true);
+            return;
+          }
+          path = `/api/admin/users/${userId}/anonymize`;
+        }
+        if (!path) return;
+        if (needConfirm && !confirm(needConfirm)) return;
+
+        const r = await api(path, "POST");
+        if (!r.ok) {
+          const b = await r.json().catch(() => ({})) as { error?: string };
+          showStatus(`${action ?? ""} failed: ${b.error ?? r.status}`, true);
+          return;
+        }
+        showStatus(`${action ?? ""} ok.`);
+        setTimeout(() => window.location.reload(), 400);
+      });
+    });
+  }
+
+  // "+ Add user" — пока пока минимальный prompt-flow (modal будет в Sprint 1+)
+  document.querySelector<HTMLButtonElement>('[data-action="add-user"]')?.addEventListener("click", async () => {
+    const email = prompt("Email of new user:");
+    if (!email) return;
+    const name = prompt("Name (optional):") ?? "";
+    const localeVal = prompt("Locale (en|ru):", "en") ?? "en";
+    const r = await fetch("/api/admin/users", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, name: name || undefined, locale: localeVal, roles: ["student"] }),
+    });
+    if (!r.ok) {
+      const b = await r.json().catch(() => ({})) as { error?: string };
+      alert(`Failed: ${b.error ?? r.status}`);
+      return;
+    }
+    alert("User created. Password-setup email sent (if Resend configured).");
+    window.location.reload();
+  });
+</script>
+
+<style>
+  .admin-users {
+    padding: var(--space-md) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  /* Sub-nav tabs */
+  .admin-users__tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-md);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .admin-users__tabs::-webkit-scrollbar { display: none; }
+  .admin-users__tab {
+    font-family: var(--font-body);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: var(--space-sm) var(--space-md);
+    color: var(--text-faint);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .admin-users__tab:hover { color: var(--text-muted); }
+  .admin-users__tab--on {
+    color: var(--text);
+    border-bottom-color: var(--text-accent);
+  }
+  .admin-users__tab-count {
+    color: var(--text-faint);
+    margin-left: 4px;
+    font-size: 9px;
+  }
+
+  /* Filter bar */
+  .admin-users__filter {
+    display: flex;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-md);
+    align-items: center;
+  }
+  .admin-users__search {
+    background: color-mix(in srgb, var(--paper) 4%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 7px 12px;
+    font-size: 12px;
+    color: var(--text);
+    width: 240px;
+    outline: none;
+    font-family: var(--font-body);
+  }
+  .admin-users__search:focus { border-color: var(--text-accent); }
+  .admin-users__spacer { flex: 1; }
+  .admin-users__add {
+    font-family: var(--font-body);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border: 1px solid color-mix(in srgb, var(--amber) 50%, transparent);
+    color: var(--text-accent);
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  /* Table */
+  .admin-users__table-wrap {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: var(--space-xl);
+  }
+  .admin-users__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .admin-users__table thead tr { border-bottom: 1px solid var(--border); }
+  .admin-users__table th {
+    font-family: var(--font-body);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--text-faint);
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    font-weight: 400;
+  }
+  .admin-users__table td {
+    padding: var(--space-sm) var(--space-md);
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .admin-users__table tr:last-child td { border-bottom: none; }
+  .admin-users__table tr:hover td {
+    background: color-mix(in srgb, var(--paper) 2%, transparent);
+  }
+  .admin-users__row--inactive { opacity: 0.5; }
+  .admin-users__row--pending td {
+    background: color-mix(in srgb, var(--amber) 4%, transparent);
+  }
+
+  .admin-users__user-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+  .admin-users__avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--paper) 7%, transparent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+  .admin-users__user-name { font-size: 12px; }
+  .admin-users__user-email {
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 1px;
+  }
+  .admin-users__col-muted { color: var(--text-muted); }
+
+  .admin-users__status {
+    display: inline-block;
+    font-size: 9px;
+    letter-spacing: 0.07em;
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+  .admin-users__status--active   { background: rgba(30,80,40,0.2); color: #7fcf8a; border: 1px solid rgba(127,207,138,0.2); }
+  .admin-users__status--inactive { background: color-mix(in srgb, var(--paper) 4%, transparent); color: var(--text-faint); border: 1px solid var(--border); }
+  .admin-users__status--pending  { background: var(--amber-faint); color: var(--text-accent); border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent); }
+
+  .admin-users__action {
+    font-size: 10px;
+    color: var(--text-faint);
+    text-decoration: none;
+  }
+  .admin-users__action:hover { color: var(--text-accent); }
+
+  .admin-users__empty {
+    text-align: center;
+    color: var(--text-faint);
+    font-family: var(--font-body);
+    padding: var(--space-xl);
+  }
+
+  /* Drawer */
+  .admin-users__drawer {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: var(--space-lg) var(--space-xl);
+    background: color-mix(in srgb, var(--paper) 2%, transparent);
+  }
+  .admin-users__drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-lg);
+  }
+  .admin-users__drawer-name {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--text);
+    margin: 0;
+  }
+  .admin-users__drawer-email {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 3px;
+  }
+  .admin-users__drawer-close {
+    font-size: 10px;
+    color: var(--text-faint);
+    text-decoration: none;
+    letter-spacing: 0.08em;
+  }
+  .admin-users__drawer-close:hover { color: var(--text-accent); }
+
+  /* Form */
+  .admin-users__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+  .admin-users__form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-md);
+  }
+  .admin-users__field { display: block; }
+  .admin-users__field-lbl {
+    display: block;
+    font-family: var(--font-body);
+    font-size: 9px;
+    letter-spacing: 0.11em;
+    color: var(--text-faint);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  .admin-users__field-input {
+    width: 100%;
+    background: color-mix(in srgb, var(--paper) 5%, transparent);
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--text);
+    font-family: var(--font-body);
+    outline: none;
+  }
+  .admin-users__field-input:focus { border-color: var(--text-accent); }
+
+  .admin-users__roles-checkboxes {
+    display: flex;
+    gap: var(--space-md);
+    font-family: var(--font-body);
+    font-size: 12px;
+    color: var(--text);
+  }
+  .admin-users__roles-checkboxes label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  .admin-users__actions {
+    display: flex;
+    gap: var(--space-xs);
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .admin-users__btn {
+    font-family: var(--font-body);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+  }
+  .admin-users__btn--primary {
+    border-color: color-mix(in srgb, var(--amber) 50%, transparent);
+    color: var(--text-accent);
+  }
+  .admin-users__btn--warn {
+    border-color: color-mix(in srgb, var(--paper) 15%, transparent);
+    color: var(--text-faint);
+  }
+  .admin-users__btn--danger {
+    border-color: rgba(200, 80, 80, 0.3);
+    color: rgba(200, 80, 80, 0.7);
+    margin-left: auto;
+  }
+  .admin-users__form-status {
+    font-family: var(--font-body);
+    font-size: 11px;
+    margin-top: var(--space-xs);
+  }
+
+  @media (max-width: 768px) {
+    .admin-users__form-grid { grid-template-columns: 1fr; }
+    .admin-users__table { font-size: 11px; }
+  }
+</style>

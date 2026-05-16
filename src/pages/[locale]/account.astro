@@ -11,12 +11,11 @@
  *   - Sign out — POST logout
  */
 
-// Pending dynamic-layout по primary role (Stage 21f) — пока на
-// DashboardLayout, AdminLayout/InstructorLayout появятся в 21e/21f
-// и тогда account.astro получит динамический выбор. См. plan 21f.
-import Layout from "../../layouts/dashboard/Layout.astro";
+import DashboardLayout from "../../layouts/dashboard/Layout.astro";
+import InstructorLayout from "../../layouts/instructor/Layout.astro";
+import AdminLayout from "../../layouts/admin/Layout.astro";
 import Btn from "../../components/public/Btn.astro";
-import { requireAuth } from "../../lib/server/guards";
+import { requireAuth, primaryRole } from "../../lib/server/guards";
 import { getUserAuthMethods } from "../../lib/server/user-ops";
 
 export const prerender = false;
@@ -31,6 +30,14 @@ const userOrRes = await requireAuth(Astro, { allowDeactivated: true });
 if (userOrRes instanceof Response) return userOrRes;
 const user = userOrRes;
 const env = Astro.locals.runtime.env;
+
+// Dynamic layout по primary role (decisions 2026-05-17 §7)
+const primary = primaryRole(user.roles);
+const Layout = primary === "admin"
+  ? AdminLayout
+  : primary === "instructor"
+    ? InstructorLayout
+    : DashboardLayout;
 
 const methods = await getUserAuthMethods(env, user.id);
 const hasPassword = methods.some((m) => m.kind === "password");

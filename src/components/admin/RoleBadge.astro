@@ -1,0 +1,43 @@
+---
+/*
+ * Role badge для admin users list. Show role + variant.
+ */
+
+interface Props {
+  role: "student" | "instructor" | "admin";
+}
+
+const { role } = Astro.props;
+---
+
+<span class:list={["role-badge", `role-badge--${role}`]}>
+  {role}
+</span>
+
+<style>
+  .role-badge {
+    display: inline-block;
+    font-family: var(--font-body);
+    font-size: 9px;
+    letter-spacing: 0.07em;
+    padding: 2px 8px;
+    border-radius: 2px;
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+  .role-badge--student {
+    background: color-mix(in srgb, var(--paper) 5%, transparent);
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+  }
+  .role-badge--instructor {
+    background: rgba(184, 159, 224, 0.12);
+    color: rgb(184, 159, 224);
+    border: 1px solid rgba(184, 159, 224, 0.25);
+  }
+  .role-badge--admin {
+    background: var(--amber-faint);
+    color: var(--text-accent);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  }
+</style>

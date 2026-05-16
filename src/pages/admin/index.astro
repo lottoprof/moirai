@@ -1,0 +1,282 @@
+---
+/*
+ * /admin — overview-страница admin'ской панели.
+ *
+ * Без locale в URL. Locale UI берётся из user.locale.
+ * Guard: requireRole(ctx, 'admin').
+ *
+ * Содержимое (mockup parity):
+ *   - 4 stat cards (active enrollments, pending homework, revenue, avg progress)
+ *   - Students mini-table (recent активные)
+ *   - Modules mini-list (последние published из D1)
+ *
+ * Реальные данные:
+ *   - active enrollments count (COUNT из enrollments)
+ *   - students table — JOIN enrollments + users
+ *   - modules list — LIMIT из modules
+ *
+ * STUB:
+ *   - pending homework count (homework table = Sprint 2)
+ *   - revenue (payments table = Sprint 2)
+ *   - avg progress (module_progress = Sprint 2)
+ */
+
+import Layout from "../../layouts/admin/Layout.astro";
+import InstructorHero from "../../components/instructor/InstructorHero.astro";
+import StatCard from "../../components/dashboard/StatCard.astro";
+import StudentRow from "../../components/instructor/StudentRow.astro";
+import { requireRole } from "../../lib/server/guards";
+
+export const prerender = false;
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+const locale = user.locale;
+
+// Реальные данные из D1
+interface Counts { active_enrollments: number; total_users: number; }
+const counts = await env.DB.prepare(
+  `SELECT
+     (SELECT COUNT(*) FROM enrollments WHERE status='active') AS active_enrollments,
+     (SELECT COUNT(*) FROM users WHERE deactivated_at IS NULL) AS total_users`,
+).first<Counts>();
+
+interface StudentRowData {
+  id: string;
+  name: string | null;
+  email: string;
+  programme_slug: string;
+}
+const studentsRaw = await env.DB.prepare(
+  `SELECT u.id, u.name, u.email, e.programme_slug
+   FROM users u
+   JOIN enrollments e ON e.user_id = u.id
+   WHERE e.status = 'active' AND u.deactivated_at IS NULL
+   ORDER BY e.enrolled_at DESC
+   LIMIT 5`,
+).all<StudentRowData>();
+
+interface ModuleRowMini { slug: string; title: string; track: string | null; }
+const modulesRaw = await env.DB.prepare(
+  `SELECT slug, title, track FROM modules
+   WHERE locale = ? AND status = 'published'
+   ORDER BY synced_at DESC
+   LIMIT 5`,
+).bind(locale).all<ModuleRowMini>();
+
+// STUB (Sprint 2)
+const stub = {
+  pendingHomework: 12,
+  revenue: locale === "ru" ? "$4 820" : "$4,820",
+  avgProgress: 38,
+};
+
+const students = studentsRaw.results.map((s, i) => {
+  const name = s.name?.trim() || s.email.split("@")[0];
+  const initials = name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  return {
+    name,
+    initials,
+    currentModuleNum: String((i % 9) + 1).padStart(2, "0"),
+    progress: [0.25, 0.6, 0.08, 0.45, 0.9][i % 5],
+    href: `/admin/users`,
+  };
+});
+
+const modules = modulesRaw.results.length > 0
+  ? modulesRaw.results
+  : [
+      // STUB: модулей ещё нет в D1 (sync pipeline = Sprint 2)
+      { slug: "directors-eye",     title: locale === "ru" ? "Взгляд режиссёра" : "The Director's Eye", track: "DIRECTING" },
+      { slug: "story-structure",   title: locale === "ru" ? "Структура истории" : "Story Structure",   track: "SCRIPTWRITING" },
+      { slug: "the-cut",           title: locale === "ru" ? "Монтажный кадр"   : "The Cut",            track: "EDITING" },
+      { slug: "visual-language",   title: locale === "ru" ? "Визуальный язык"  : "Visual Language",    track: "DIRECTING" },
+      { slug: "pre-production",    title: locale === "ru" ? "Препродакшен"     : "Pre-Production",     track: "PRODUCING" },
+    ];
+
+const t = locale === "ru"
+  ? {
+      eyebrow: "Админ",
+      title: "Обзор.",
+      subtitleFn: (n: number) => `${String(n)} активных студентов`,
+      statEnrollments: "Активные записи",
+      statEnrollmentsSub: "+3 за неделю",
+      statHomework: "Задания на проверке",
+      statHomeworkSub: "у 2 инструкторов",
+      statRevenue: "Выручка (мес.)",
+      statRevenueSub: "via Lemon Squeezy",
+      statProgress: "Средний прогресс",
+      statProgressSub: "beginner-когорта",
+      studentsLabel: "Студенты",
+      modulesLabel: "Контент",
+      seo: { title: "Админ — Moirai", description: "Админ-обзор." },
+    }
+  : {
+      eyebrow: "Admin",
+      title: "Overview.",
+      subtitleFn: (n: number) => `${String(n)} active students`,
+      statEnrollments: "Active enrollments",
+      statEnrollmentsSub: "+3 this week",
+      statHomework: "Pending homework",
+      statHomeworkSub: "across 2 instructors",
+      statRevenue: "Revenue (mo)",
+      statRevenueSub: "via Lemon Squeezy",
+      statProgress: "Avg progress",
+      statProgressSub: "beginner cohort",
+      studentsLabel: "Students",
+      modulesLabel: "Content",
+      seo: { title: "Admin — Moirai", description: "Admin overview." },
+    };
+
+const activeCount = counts?.active_enrollments ?? 0;
+---
+
+<Layout
+  locale={locale}
+  seo={{ title: t.seo.title, description: t.seo.description }}
+  currentNavKey="overview"
+  userRoles={user.roles}
+>
+  <InstructorHero
+    eyebrow={t.eyebrow}
+    title={t.title}
+    subtitle={t.subtitleFn(activeCount)}
+  />
+
+  <div class="admin-content">
+    <section class="admin-content__stats" aria-label={t.eyebrow}>
+      <StatCard
+        label={t.statEnrollments}
+        value={[activeCount, ""]}
+        sub={t.statEnrollmentsSub}
+      />
+      <StatCard
+        label={t.statHomework}
+        value={String(stub.pendingHomework)}
+        sub={t.statHomeworkSub}
+      />
+      <StatCard
+        label={t.statRevenue}
+        value={stub.revenue}
+        sub={t.statRevenueSub}
+        valueSmall
+      />
+      <StatCard
+        label={t.statProgress}
+        value={`${String(stub.avgProgress)}%`}
+        sub={t.statProgressSub}
+        valueSmall
+      />
+    </section>
+
+    <section class="admin-content__two-col">
+      <div>
+        <p class="admin-content__section-label">{t.studentsLabel}</p>
+        <div class="admin-content__students">
+          {students.length === 0 && (
+            <p class="admin-content__empty">No students yet.</p>
+          )}
+          {students.map((s) => (
+            <StudentRow
+              name={s.name}
+              initials={s.initials}
+              currentModuleNum={s.currentModuleNum}
+              progress={s.progress}
+              href={s.href}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p class="admin-content__section-label">{t.modulesLabel}</p>
+        <div class="admin-content__modules">
+          {modules.map((m, i) => (
+            <div class="module-row">
+              <span class="module-row__num">{String(i + 1).padStart(2, "0")}</span>
+              <span class="module-row__name">{m.title}</span>
+              <span class="module-row__track">{m.track ?? "—"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  </div>
+</Layout>
+
+<style>
+  .admin-content {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  .admin-content__stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-sm);
+  }
+
+  .admin-content__section-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: var(--space-md);
+  }
+
+  .admin-content__two-col {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: var(--space-lg);
+  }
+
+  .admin-content__students,
+  .admin-content__modules {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .admin-content__empty {
+    padding: var(--space-md);
+    font-family: var(--font-body);
+    color: var(--text-faint);
+    font-size: var(--type-micro-md);
+    text-align: center;
+  }
+
+  .module-row {
+    display: grid;
+    grid-template-columns: 30px 1fr auto;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .module-row:last-child { border-bottom: none; }
+  .module-row__num { color: var(--text-faint); font-family: var(--font-body); font-size: 10px; }
+  .module-row__name { color: var(--text); font-family: var(--font-body); }
+  .module-row__track {
+    color: color-mix(in srgb, var(--amber) 55%, transparent);
+    font-family: var(--font-body);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+  }
+
+  @media (max-width: 768px) {
+    .admin-content__stats { grid-template-columns: repeat(2, 1fr); }
+    .admin-content__two-col { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 480px) {
+    .admin-content__stats { grid-template-columns: 1fr; }
+  }
+</style>
