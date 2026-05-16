@@ -28,6 +28,7 @@ const labels = locale === "ru"
       modules: "Модули",
       homework: "Задания",
       account: "Аккаунт →",
+      site: "На сайт",
     }
   : {
       aria: "Dashboard navigation",
@@ -35,6 +36,7 @@ const labels = locale === "ru"
       modules: "Modules",
       homework: "Homework",
       account: "Account →",
+      site: "View site",
     };
 
 const items = [
@@ -46,7 +48,10 @@ const items = [
 ---
 
 <nav class="dashboard-nav" aria-label={labels.aria}>
-  <a href={`/${locale}/dashboard`} class="dashboard-nav__logo">Moirai.</a>
+  <div class="dashboard-nav__brand">
+    <a href={`/${locale}/dashboard`} class="dashboard-nav__logo">Moirai.</a>
+    <a href={`/${locale}/`} class="dashboard-nav__site">{labels.site} <span aria-hidden="true">→</span></a>
+  </div>
   <ul class="dashboard-nav__list" role="list">
     {items.map((item) => (
       <li class="dashboard-nav__item">
@@ -70,6 +75,12 @@ const items = [
     background: var(--bg);
   }
 
+  .dashboard-nav__brand {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-md);
+  }
+
   .dashboard-nav__logo {
     font-family: var(--font-display);
     font-size: 22px;
@@ -79,6 +90,20 @@ const items = [
     color: var(--text);
     text-decoration: none;
     opacity: 0.95;
+  }
+
+  .dashboard-nav__site {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .dashboard-nav__site:hover {
+    color: var(--text-muted);
   }
 
   .dashboard-nav__list {

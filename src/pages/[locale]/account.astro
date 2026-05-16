@@ -11,7 +11,7 @@
  *   - Sign out — POST logout
  */
 
-import Layout from "../../layouts/public/Layout.astro";
+import Layout from "../../layouts/dashboard/Layout.astro";
 import Btn from "../../components/public/Btn.astro";
 import { verifyRefreshSession } from "../../lib/server/session";
 import { findUserById, getUserAuthMethods } from "../../lib/server/user-ops";
@@ -116,7 +116,8 @@ function methodLabel(kind: string): string {
 
 <Layout
   locale={locale}
-  seo={{ title: t.seo.title, description: t.seo.description, noindex: true }}
+  seo={{ title: t.seo.title, description: t.seo.description }}
+  currentNavKey="account"
 >
   <section class="section center" aria-labelledby="account-title">
     <header class="section__head">

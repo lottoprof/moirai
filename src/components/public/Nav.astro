@@ -29,13 +29,13 @@ const labels = locale === "ru"
       aria: "Главная",
       signIn: "Войти",
       signUp: "Регистрация",
-      account: "Кабинет →",
+      dashboard: "Кабинет →",
     }
   : {
       aria: "Primary",
       signIn: "Sign in",
       signUp: "Sign up",
-      account: "Account →",
+      dashboard: "Dashboard →",
     };
 
 // Active state на текущей странице — подсвечивается тот item где
@@ -66,9 +66,10 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
       >{labels.signUp}</a>
     </div>
 
-    {/* Authed state — hidden by default, JS показывает если /api/auth/me OK */}
-    <a href={`/${locale}/account`} class="nav__cta js-auth-authed" hidden>
-      {labels.account}
+    {/* Authed state — hidden by default, JS показывает если /api/auth/me OK.
+        Из публичного сайта залогиненный пользователь возвращается в ЛК. */}
+    <a href={`/${locale}/dashboard`} class="nav__cta js-auth-authed" hidden>
+      {labels.dashboard}
     </a>
   </div>
 </nav>
