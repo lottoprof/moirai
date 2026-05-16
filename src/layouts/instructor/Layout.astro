@@ -1,0 +1,76 @@
+---
+/*
+ * Корневой layout для Instructor zone.
+ * Аналог dashboard/Layout, но с InstructorNav (Queue / My Students /
+ * Schedule / Account →) + role-strip "INSTRUCTOR" сверху.
+ * noindex зашит.
+ *
+ * См. decisions 2026-05-17 §role-zones.
+ */
+
+import "../../styles/tokens.css";
+import "../../styles/fonts.css";
+import "../../styles/base.css";
+import "../../styles/utilities.css";
+import SeoHead from "../../components/public/SeoHead.astro";
+import InstructorNav from "../../components/instructor/InstructorNav.astro";
+import type { Role } from "../../../db/types";
+
+interface Seo {
+  title: string;
+  description: string;
+}
+
+interface Props {
+  locale: "en" | "ru";
+  seo: Seo;
+  currentNavKey: "queue" | "students" | "schedule" | "account";
+  userRoles?: Set<Role>;
+}
+
+const { locale, seo, currentNavKey, userRoles } = Astro.props;
+const pathname = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0D0B09" />
+    <meta name="color-scheme" content="dark" />
+
+    <SeoHead
+      locale={locale}
+      pathname={pathname}
+      seo={{ title: seo.title, description: seo.description, noindex: true }}
+    />
+  </head>
+
+  <body>
+    <a href="#main" class="skip-link">Skip to main content</a>
+
+    <div class="role-strip" aria-hidden="true">
+      {locale === "ru" ? "ПРЕПОДАВАТЕЛЬ" : "INSTRUCTOR"}
+    </div>
+
+    <InstructorNav locale={locale} currentKey={currentNavKey} roles={userRoles} />
+
+    <main id="main" class="instructor-main">
+      <slot />
+    </main>
+  </body>
+</html>
+
+<style>
+  .role-strip {
+    padding: 6px var(--container-pad);
+    background: color-mix(in srgb, var(--amber) 7%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--amber) 15%, transparent);
+    font-family: var(--font-body);
+    font-size: 10px;
+    letter-spacing: 0.13em;
+    color: color-mix(in srgb, var(--amber) 80%, transparent);
+    text-transform: uppercase;
+  }
+</style>

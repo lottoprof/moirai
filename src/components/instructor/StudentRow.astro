@@ -1,0 +1,89 @@
+---
+/*
+ * Строка в таблице "MY STUDENTS" у инструктора.
+ * Показывает: avatar (initials) + name + current module + mini progress bar.
+ */
+
+interface Props {
+  name: string;
+  initials: string;
+  currentModuleNum: string;    // "04"
+  progress: number;            // 0..1
+  href: string;
+}
+
+const { name, initials, currentModuleNum, progress, href } = Astro.props;
+const pct = Math.max(0, Math.min(1, progress)) * 100;
+---
+
+<a class="student-row" href={href}>
+  <span class="student-row__avatar" aria-hidden="true">{initials}</span>
+  <span class="student-row__name">{name}</span>
+  <span class="student-row__module">{currentModuleNum}</span>
+  <span class="student-row__progress">
+    <span class="student-row__progress-fill" style={`width: ${pct}%`}></span>
+  </span>
+</a>
+
+<style>
+  .student-row {
+    display: grid;
+    grid-template-columns: 30px 1fr 30px 70px;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    color: inherit;
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .student-row:hover {
+    background: color-mix(in srgb, var(--paper) 3%, transparent);
+  }
+  .student-row:last-child {
+    border-bottom: none;
+  }
+
+  .student-row__avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--paper) 7%, transparent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-body);
+    font-size: 10px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .student-row__name {
+    font-family: var(--font-body);
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  .student-row__module {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    text-align: center;
+  }
+
+  .student-row__progress {
+    display: inline-block;
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .student-row__progress-fill {
+    display: block;
+    height: 100%;
+    background: var(--text-accent);
+    border-radius: 1px;
+  }
+</style>

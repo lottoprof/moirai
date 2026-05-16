@@ -1,0 +1,163 @@
+---
+/*
+ * Top nav для Instructor zone. Логотип + Queue / My Students /
+ * Schedule / Account → + zone-switcher.
+ */
+
+import type { Role } from "../../../db/types";
+
+interface Props {
+  locale: "en" | "ru";
+  currentKey: "queue" | "students" | "schedule" | "account";
+  roles?: Set<Role>;
+}
+
+const { locale, currentKey, roles } = Astro.props;
+
+const labels = locale === "ru"
+  ? {
+      aria: "Навигация инструктора",
+      queue: "Очередь",
+      students: "Мои студенты",
+      schedule: "Расписание",
+      account: "Аккаунт →",
+      site: "На сайт",
+      switchDashboard: "→ Кабинет",
+      switchAdmin: "→ Админу",
+    }
+  : {
+      aria: "Instructor navigation",
+      queue: "Queue",
+      students: "My students",
+      schedule: "Schedule",
+      account: "Account →",
+      site: "View site",
+      switchDashboard: "→ Dashboard",
+      switchAdmin: "→ Admin",
+    };
+
+const items = [
+  { key: "queue",    label: labels.queue,    href: `/${locale}/instructor` },
+  { key: "students", label: labels.students, href: `/${locale}/instructor` },
+  { key: "schedule", label: labels.schedule, href: `/${locale}/instructor` },
+  { key: "account",  label: labels.account,  href: `/${locale}/account` },
+] as const;
+
+const otherZones: { href: string; label: string }[] = [];
+if (roles?.has("student")) {
+  otherZones.push({ href: `/${locale}/dashboard/`, label: labels.switchDashboard });
+}
+if (roles?.has("admin")) {
+  otherZones.push({ href: `/admin/`, label: labels.switchAdmin });
+}
+---
+
+<nav class="instructor-nav" aria-label={labels.aria}>
+  <div class="instructor-nav__brand">
+    <a href={`/${locale}/instructor`} class="instructor-nav__logo">Moirai.</a>
+    <a href={`/${locale}/`} class="instructor-nav__site">{labels.site} <span aria-hidden="true">→</span></a>
+  </div>
+  <ul class="instructor-nav__list" role="list">
+    {items.map((item) => (
+      <li class="instructor-nav__item">
+        <a
+          href={item.href}
+          class:list={["instructor-nav__link", { "instructor-nav__link--active": item.key === currentKey }]}
+          aria-current={item.key === currentKey ? "page" : undefined}
+        >{item.label}</a>
+      </li>
+    ))}
+    {otherZones.map((z) => (
+      <li class="instructor-nav__item">
+        <a href={z.href} class="instructor-nav__link instructor-nav__link--switch">{z.label}</a>
+      </li>
+    ))}
+  </ul>
+</nav>
+
+<style>
+  .instructor-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-lg) var(--container-pad);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .instructor-nav__brand {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-md);
+  }
+
+  .instructor-nav__logo {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 300;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text);
+    text-decoration: none;
+    opacity: 0.95;
+  }
+
+  .instructor-nav__site {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .instructor-nav__site:hover { color: var(--text-muted); }
+
+  .instructor-nav__list {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .instructor-nav__list::-webkit-scrollbar { display: none; }
+
+  .instructor-nav__item { flex-shrink: 0; }
+
+  .instructor-nav__link {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 4px 2px;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .instructor-nav__link:hover { color: var(--text); }
+  .instructor-nav__link--active { color: var(--text-accent); }
+
+  .instructor-nav__link--switch {
+    color: var(--text-faint);
+    font-size: var(--type-micro-sm);
+    padding-left: var(--space-sm);
+    border-left: 1px solid var(--border);
+    margin-left: var(--space-xs);
+  }
+  .instructor-nav__link--switch:hover { color: var(--text-accent); }
+
+  @media (max-width: 640px) {
+    .instructor-nav {
+      padding: var(--space-md) var(--space-md);
+      gap: var(--space-md);
+    }
+    .instructor-nav__list { gap: var(--space-md); }
+    .instructor-nav__link { letter-spacing: var(--tracking-wide); }
+  }
+</style>

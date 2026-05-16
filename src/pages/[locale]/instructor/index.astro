@@ -1,0 +1,276 @@
+---
+/*
+ * /{locale}/instructor — overview-страница инструктора.
+ *
+ * Layout: InstructorLayout. Guard: requireRole(ctx, 'instructor').
+ *
+ * Содержимое (mockup parity):
+ *   - Hero "Review queue. N submissions awaiting feedback"
+ *   - 3 stat cards (awaiting / reviewed this week / my students)
+ *   - Pending feedback queue (homework cards)
+ *   - My students mini-table
+ *   - Next session card
+ *
+ * Stage 21: данные о homework / sessions / reviewed-this-week — STUB
+ * (таблицы появятся Sprint 2). Реальные данные о enrollments
+ * (where lead_instructor_id = current user) — из D1.
+ */
+
+import Layout from "../../../layouts/instructor/Layout.astro";
+import InstructorHero from "../../../components/instructor/InstructorHero.astro";
+import StatCard from "../../../components/dashboard/StatCard.astro";
+import HwQueueCard from "../../../components/instructor/HwQueueCard.astro";
+import StudentRow from "../../../components/instructor/StudentRow.astro";
+import { requireRole } from "../../../lib/server/guards";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/instructor");
+}
+
+const userOrRes = await requireRole(Astro, "instructor");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+// Реальные данные: enrollments где user — lead_instructor
+interface MyEnrollment {
+  id: string;
+  user_id: string;
+  programme_slug: string;
+  student_name: string | null;
+  student_email: string;
+}
+const myEnrollments = await env.DB.prepare(
+  `SELECT e.id, e.user_id, e.programme_slug, u.name as student_name, u.email as student_email
+   FROM enrollments e
+   JOIN users u ON u.id = e.user_id
+   WHERE e.lead_instructor_id = ? AND e.status = 'active'
+   ORDER BY e.enrolled_at DESC`,
+).bind(user.id).all<MyEnrollment>();
+
+// ============================================================
+// STUB: эти данные будут из D1 в Sprint 2 (homework, sessions tables)
+// ============================================================
+const stub = {
+  awaitingReview: 5,
+  reviewedThisWeek: 8,
+  avgReviewMin: 18,
+  oldestDays: 3,
+  pending: [
+    { studentName: "s. lee",     module: "MODULE 02 · SCRIPTWRITING", title: locale === "ru" ? "Структура истории" : "Story Structure",  daysWaiting: 3, href: "#" },
+    { studentName: "lotto prof", module: "MODULE 02 · SCRIPTWRITING", title: locale === "ru" ? "Структура истории" : "Story Structure",  daysWaiting: 2, href: "#" },
+    { studentName: "m. reyes",   module: "MODULE 01 · DIRECTING",     title: locale === "ru" ? "Взгляд режиссёра" : "The Director's Eye", daysWaiting: 1, href: "#" },
+    { studentName: "anna k.",    module: "MODULE 07 · EDITING",       title: locale === "ru" ? "Ритм и темп"       : "Rhythm & Pacing",   daysWaiting: 0, href: "#" },
+  ],
+  nextSession: {
+    when: locale === "ru" ? "Пн · 18 мая · 18:00 UTC" : "Mon · May 18 · 18:00 UTC",
+    title: locale === "ru" ? "1:1 с anna k." : "1:1 with anna k.",
+    detail: locale === "ru" ? "Intermediate · Модуль 9" : "Intermediate · Module 9",
+  },
+};
+
+// Если у инструктора 0 enrollment'ов — показываем сами реальные
+// данные; STUB-students нужны для визуальной полноты mockup'а.
+const students = myEnrollments.results.length > 0
+  ? myEnrollments.results.map((e, i) => {
+      const name = e.student_name?.trim() || e.student_email.split("@")[0];
+      const firstName = name.split(/\s+/)[0];
+      const initials = firstName.slice(0, 2).toUpperCase();
+      return {
+        name,
+        initials,
+        currentModuleNum: String((i % 9) + 1).padStart(2, "0"),
+        progress: [0.25, 0.6, 0.08, 0.45][i % 4],
+        href: `/${locale}/instructor`,
+      };
+    })
+  : [
+      { name: "lotto prof", initials: "LP", currentModuleNum: "04", progress: 0.25, href: "#" },
+      { name: "anna k.",    initials: "AK", currentModuleNum: "09", progress: 0.6,  href: "#" },
+      { name: "m. reyes",   initials: "MR", currentModuleNum: "01", progress: 0.08, href: "#" },
+      { name: "s. lee",     initials: "SL", currentModuleNum: "03", progress: 0.45, href: "#" },
+    ];
+
+const t = locale === "ru"
+  ? {
+      eyebrow: "Преподаватель",
+      title: "Очередь проверки.",
+      subtitle: `${String(stub.awaitingReview)} работ ждут фидбэка`,
+      statAwaiting: "На проверке",
+      statAwaitingSub: (n: number) => `самой старой: ${String(n)} д.`,
+      statReviewed: "Проверено за неделю",
+      statReviewedSub: (n: number) => `в среднем ${String(n)} мин`,
+      statStudents: "Мои студенты",
+      statStudentsSub: "beginner · intermediate",
+      pendingLabel: "Pending feedback",
+      studentsLabel: "Мои студенты",
+      sessionLabel: "Следующая сессия",
+      review: "Проверить →",
+      waiting: locale === "ru" ? "д. в ожидании" : "d waiting",
+      seo: { title: "Преподаватель — Moirai", description: "Очередь проверки и студенты." },
+    }
+  : {
+      eyebrow: "Instructor",
+      title: "Review queue.",
+      subtitle: `${String(stub.awaitingReview)} submissions awaiting feedback`,
+      statAwaiting: "Awaiting review",
+      statAwaitingSub: (n: number) => `oldest: ${String(n)} days ago`,
+      statReviewed: "Reviewed this week",
+      statReviewedSub: (n: number) => `avg ${String(n)} min each`,
+      statStudents: "My students",
+      statStudentsSub: "beginner · intermediate",
+      pendingLabel: "Pending feedback",
+      studentsLabel: "My students",
+      sessionLabel: "Next session",
+      review: "Review →",
+      waiting: "d waiting",
+      seo: { title: "Instructor — Moirai", description: "Review queue and my students." },
+    };
+---
+
+<Layout
+  locale={locale}
+  seo={{ title: t.seo.title, description: t.seo.description }}
+  currentNavKey="queue"
+  userRoles={user.roles}
+>
+  <InstructorHero eyebrow={t.eyebrow} title={t.title} subtitle={t.subtitle} />
+
+  <div class="instructor-content">
+    <section class="instructor-content__stats" aria-label={t.eyebrow}>
+      <StatCard
+        label={t.statAwaiting}
+        value={[stub.awaitingReview, ""]}
+        sub={t.statAwaitingSub(stub.oldestDays)}
+      />
+      <StatCard
+        label={t.statReviewed}
+        value={String(stub.reviewedThisWeek)}
+        sub={t.statReviewedSub(stub.avgReviewMin)}
+      />
+      <StatCard
+        label={t.statStudents}
+        value={String(students.length)}
+        sub={t.statStudentsSub}
+      />
+    </section>
+
+    <section class="instructor-content__two-col">
+      <div>
+        <p class="instructor-content__section-label">{t.pendingLabel}</p>
+        {stub.pending.map((h) => (
+          <HwQueueCard
+            studentName={h.studentName}
+            moduleLabel={h.module}
+            title={h.title}
+            daysWaiting={h.daysWaiting}
+            href={h.href}
+            reviewLabel={t.review}
+            waitingLabel={t.waiting}
+          />
+        ))}
+      </div>
+
+      <div>
+        <p class="instructor-content__section-label">{t.studentsLabel}</p>
+        <div class="instructor-content__students">
+          {students.map((s) => (
+            <StudentRow
+              name={s.name}
+              initials={s.initials}
+              currentModuleNum={s.currentModuleNum}
+              progress={s.progress}
+              href={s.href}
+            />
+          ))}
+        </div>
+
+        <p class="instructor-content__section-label instructor-content__section-label--top">{t.sessionLabel}</p>
+        <div class="next-session">
+          <p class="next-session__when">{stub.nextSession.when}</p>
+          <p class="next-session__title">{stub.nextSession.title}</p>
+          <p class="next-session__detail">{stub.nextSession.detail}</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</Layout>
+
+<style>
+  .instructor-content {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  .instructor-content__stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-sm);
+  }
+
+  .instructor-content__section-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: var(--space-md);
+  }
+  .instructor-content__section-label--top {
+    margin-top: var(--space-xl);
+  }
+
+  .instructor-content__two-col {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: var(--space-lg);
+  }
+
+  .instructor-content__students {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .next-session {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: var(--space-md) var(--space-lg);
+  }
+  .next-session__when {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    color: var(--text-faint);
+    margin-bottom: var(--space-2xs);
+    letter-spacing: 0.05em;
+  }
+  .next-session__title {
+    font-family: var(--font-display);
+    color: var(--text);
+    font-size: 15px;
+    margin: 0;
+  }
+  .next-session__detail {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-accent);
+    margin-top: var(--space-2xs);
+  }
+
+  @media (max-width: 768px) {
+    .instructor-content__stats {
+      grid-template-columns: 1fr;
+    }
+    .instructor-content__two-col {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

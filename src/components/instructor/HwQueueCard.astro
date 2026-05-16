@@ -1,0 +1,98 @@
+---
+/*
+ * Carter homework для review-queue инструктора. Показывает:
+ *   - student name + module label
+ *   - title работы
+ *   - сколько ждёт (days)
+ *   - REVIEW → action (ссылка на детальную страницу)
+ *
+ * `daysWaiting` > 2 → amber accent (urgency); ≤ 2 — приглушённый.
+ */
+
+interface Props {
+  studentName: string;
+  moduleLabel: string;            // "MODULE 02 · SCRIPTWRITING"
+  title: string;
+  daysWaiting: number;
+  href: string;
+  reviewLabel: string;            // i18n: "REVIEW →" / "ПРОВЕРИТЬ →"
+  waitingLabel: string;           // i18n: "d waiting" / "д в ожидании"
+}
+
+const { studentName, moduleLabel, title, daysWaiting, href, reviewLabel, waitingLabel } = Astro.props;
+const urgent = daysWaiting > 2;
+---
+
+<a class:list={["hw-queue-card", { "hw-queue-card--urgent": urgent }]} href={href}>
+  <div class="hw-queue-card__body">
+    <p class="hw-queue-card__meta">{studentName} · {moduleLabel}</p>
+    <p class="hw-queue-card__title">{title}</p>
+    <p class:list={["hw-queue-card__days", { "hw-queue-card__days--urgent": urgent }]}>
+      {daysWaiting} {waitingLabel}
+    </p>
+  </div>
+  <span class="hw-queue-card__cta">{reviewLabel}</span>
+</a>
+
+<style>
+  .hw-queue-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    background: color-mix(in srgb, var(--paper) 2%, transparent);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: var(--space-md) var(--space-lg);
+    text-decoration: none;
+    color: inherit;
+    margin-bottom: var(--space-xs);
+    transition:
+      background var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+  .hw-queue-card:hover {
+    background: color-mix(in srgb, var(--paper) 5%, transparent);
+    border-color: var(--border-strong);
+  }
+
+  .hw-queue-card__body { min-width: 0; }
+
+  .hw-queue-card__meta {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    color: var(--text-faint);
+    letter-spacing: 0.07em;
+    margin-bottom: var(--space-2xs);
+  }
+
+  .hw-queue-card__title {
+    font-family: var(--font-display);
+    font-size: 15px;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .hw-queue-card__days {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    margin-top: 2px;
+  }
+  .hw-queue-card__days--urgent {
+    color: var(--text-accent);
+  }
+
+  .hw-queue-card__cta {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent);
+    border-radius: 2px;
+    color: var(--text-accent);
+    flex-shrink: 0;
+  }
+</style>
