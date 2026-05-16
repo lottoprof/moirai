@@ -54,7 +54,7 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
     {/* Unauth state — пара Sign in / Sign up, как LangSwitcher. */}
     <div class="nav__auth js-auth-unauth" role="group" aria-label={labels.aria}>
       <a
-        href={`/${locale}/login?return_to=${pathname}`}
+        href={`/${locale}/login`}
         class:list={["nav__auth-item", { "is-active": onLogin }]}
         aria-current={onLogin ? "page" : undefined}
       >{labels.signIn}</a>
