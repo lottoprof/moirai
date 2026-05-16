@@ -64,7 +64,7 @@ export async function requireRole(
 
   if (!session) {
     const returnTo = ctx.url.pathname + ctx.url.search;
-    return ctx.redirect(
+    return redirectResponse(
       `/${locale}/login?return_to=${encodeURIComponent(returnTo)}`,
     );
   }
@@ -72,12 +72,12 @@ export async function requireRole(
   const user = await getUserWithRoles(env, session.userId);
   if (!user) {
     // Stale session — user удалён. Logout и redirect.
-    return ctx.redirect(`/${locale}/login`);
+    return redirectResponse(`/${locale}/login`);
   }
 
   if (user.deactivated_at !== null) {
     // user может login'иться, но access redirects на inactive
-    return ctx.redirect(`/${user.locale}/inactive`);
+    return redirectResponse(`/${user.locale}/inactive`);
   }
 
   if (!user.roles.has(role)) {
@@ -87,6 +87,20 @@ export async function requireRole(
   }
 
   return user;
+}
+
+/**
+ * Helper: вернуть 302 Response с Location header'ом.
+ * Используем напрямую вместо `Astro.redirect()` потому что
+ * возвращаемая `ctx.redirect()` Response из вспомогательного модуля
+ * иногда теряет статус 302 при `return userOrRes` из frontmatter —
+ * приходит 404 с Location header'ом. Прямой Response гарантирует 302.
+ */
+function redirectResponse(location: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { Location: location },
+  });
 }
 
 /**
@@ -110,18 +124,18 @@ export async function requireAuth(
 
   if (!session) {
     const returnTo = ctx.url.pathname + ctx.url.search;
-    return ctx.redirect(
+    return redirectResponse(
       `/${locale}/login?return_to=${encodeURIComponent(returnTo)}`,
     );
   }
 
   const user = await getUserWithRoles(env, session.userId);
   if (!user) {
-    return ctx.redirect(`/${locale}/login`);
+    return redirectResponse(`/${locale}/login`);
   }
 
   if (user.deactivated_at !== null && !opts.allowDeactivated) {
-    return ctx.redirect(`/${user.locale}/inactive`);
+    return redirectResponse(`/${user.locale}/inactive`);
   }
 
   return user;
