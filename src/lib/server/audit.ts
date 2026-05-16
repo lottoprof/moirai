@@ -25,7 +25,19 @@ export type AuditEvent =
   | "password_reset"
   | "login_failed"
   | "session_revoked"
-  | "method_unlink";
+  | "method_unlink"
+  // admin-инициированные события (Stage 21+)
+  | "user_created_by_admin"
+  | "user_updated_by_admin"
+  | "user_deactivated"
+  | "user_reactivated"
+  | "user_anonymized"
+  | "role_granted"
+  | "role_revoked"
+  | "enrollment_granted"
+  | "enrollment_status_changed"
+  | "enrollment_module_added"
+  | "enrollment_module_removed";
 
 export type AuditMethod = "password" | "google" | "discord" | null;
 

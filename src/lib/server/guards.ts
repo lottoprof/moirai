@@ -11,7 +11,7 @@
  */
 
 import type { APIContext } from "astro";
-import type { Role, UserRow, UserWithRoles } from "../../../db/types";
+import type { Role, UserWithRoles } from "../../../db/types";
 import { verifyRefreshSession } from "./session";
 import { findUserById } from "./user-ops";
 
@@ -137,4 +137,34 @@ export function primaryRole(roles: Set<Role>): Role {
   if (roles.has("admin")) return "admin";
   if (roles.has("instructor")) return "instructor";
   return "student";
+}
+
+/**
+ * Guard для API endpoints: JSON errors вместо redirects.
+ *   401 unauthenticated — не залогинен
+ *   403 forbidden — нет нужной роли или deactivated
+ * Возвращает UserWithRoles при успехе.
+ */
+export async function requireRoleApi(
+  ctx: APIContext,
+  role: Role,
+): Promise<UserWithRoles | Response> {
+  const env = ctx.locals.runtime.env;
+  const session = await verifyRefreshSession(env, ctx.request);
+
+  const jsonErr = (code: string, status: number) =>
+    new Response(JSON.stringify({ error: code }), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+
+  if (!session) return jsonErr("unauthenticated", 401);
+
+  const user = await getUserWithRoles(env, session.userId);
+  if (!user) return jsonErr("unauthenticated", 401);
+
+  if (user.deactivated_at !== null) return jsonErr("account_deactivated", 403);
+  if (!user.roles.has(role)) return jsonErr("forbidden", 403);
+
+  return user;
 }
