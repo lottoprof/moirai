@@ -1,0 +1,39 @@
+$ pnpm exec wrangler pages deploy ./dist --project-name moirai --branch main
+
+ ⛅️ wrangler 4.90.0
+───────────────────
+✨ Compiled Worker successfully
+✨ Uploading Worker bundle
+✨ Uploading _routes.json
+🌎 Deploying...
+
+✘ [ERROR] A request to the Cloudflare API (/accounts/<redacted>/pages/projects/moirai/deployments) failed.
+
+  Invalid commit message, it must be a valid UTF-8 string. [code: 8000111]
+
+
+🪵  Logs were written to "~/.config/.wrangler/logs/wrangler-*.log"
+
+
+Relevant log lines:
+
+  "text": "A request to the Cloudflare API (.../pages/projects/moirai/deployments) failed."
+  "notes": [{ "text": "Invalid commit message, it must be a valid UTF-8 string. [code: 8000111]" }]
+  "code": 8000111
+  "kind": "error"
+  "errorType": "APIError"
+
+Sanity checks that DID succeed for the same project/account:
+
+  $ wrangler pages deploy ./dist --project-name moirai --branch main \
+        --commit-message "тест: проверка UTF-8 в commit_message"
+  ✨ Deployment complete!  https://<hash>.moirai-c6e.pages.dev
+
+  $ wrangler pages deploy ./dist --project-name moirai --branch main \
+        --commit-message "nav: remove return_to from Sign in link so login defaults to dashboard"
+  ✨ Deployment complete!  https://<hash>.moirai-c6e.pages.dev
+
+So Cyrillic + multi-byte UTF-8 is *not* the problem per se — short
+multi-byte messages pass. The repro-able failure mode is: a valid
+UTF-8 string close to (but within) wrangler's 384-byte cap when it
+contains multi-byte characters.
