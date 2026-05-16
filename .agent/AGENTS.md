@@ -44,7 +44,7 @@ agents_dir:  .agent/agents/
 
 ```json
 {
-  "target_agent": "astro-public|astro-dashboard|astro-admin|content|pages-ssr|schema|docs|reviewer|e2e",
+  "target_agent": "astro-public|astro-student|astro-instructor|astro-admin|content|pages-ssr|schema|docs|reviewer|e2e",
   "issue": "кратко что нужно сделать",
   "file": "целевой файл/директория",
   "details": "точные требования, ограничения, критерии готовности"
@@ -56,15 +56,18 @@ agents_dir:  .agent/agents/
 - `astro-public` — публичный SEO-слой: `src/pages/[locale]/*.astro`
   (без `dashboard/`, без `admin/`), `src/components/public/`,
   `src/layouts/public/`, vanilla JS, CSS-only анимации, статика
-- `astro-dashboard` — личный кабинет (student/instructor):
+- `astro-student` — Student ЛК (role: `'student'`):
   `src/pages/[locale]/dashboard/**`, `src/components/dashboard/**`,
   островная гидрация (`client:idle` / `client:visible`), Vidstack
-- `astro-admin` — админ-панель: `src/pages/admin/**` (без локали),
-  `src/components/admin/**`, role=admin guard, CRUD поверх API,
-  `noindex`
-- `content` — Content Collections: `src/content/**` (programmes с
-  тирами, bundles, instructors, segments, pages, journal, works,
-  voice-guide), `drafts/**` (agent journal pipeline)
+- `astro-instructor` — Instructor zone (role: `'instructor'`):
+  `src/pages/[locale]/instructor/**`, `src/components/instructor/**`,
+  compose UI, review queue, timestamp-feedback
+- `astro-admin` — Admin panel (role: `'admin'`): `src/pages/admin/**`
+  (без локали), `src/components/admin/**`, CRUD поверх API, `noindex`
+- `content` — Content Collections: `src/content/**` (programmes
+  с `default_modules`/price/features, instructors faculty bios,
+  pages, journal, works, voice-guide). **Модули НЕ здесь** —
+  они в D1+R2 из external repo (см. decisions 2026-05-17)
 - `pages-ssr` — серверные эндпоинты и SSR: `src/pages/api/**`,
   `src/lib/server/**`, `src/middleware.ts`, `astro.config.mjs`,
   `wrangler.toml`, `src/content/config.ts` (zod-схемы коллекций),

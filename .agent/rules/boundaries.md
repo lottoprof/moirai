@@ -29,9 +29,9 @@ Owner: `agents/astro-public.md`.
 - Захардкоженные цены / счётные числа / meta-теги (см.
   `forbidden.md`).
 
-## Dashboard layer (ЛК — student/instructor)
+## Student layer (ЛК — role: 'student')
 
-Owner: `agents/astro-dashboard.md`.
+Owner: `agents/astro-student.md` (бывший `astro-dashboard.md`).
 
 Пути:
 - `src/pages/[locale]/dashboard/**`
@@ -42,16 +42,43 @@ Owner: `agents/astro-dashboard.md`.
 - Astro islands с `client:idle` / `client:visible` /
   `client:load` / `client:only`.
 - Vidstack media player (lecture / review режимы).
-- Чтение Content Collections для tier features (через
-  `getCollection`).
-- Импорт из `src/lib/shared/`.
+- Чтение Content Collections (programmes — для разворачивания
+  `programme_slug` в title/marketing/features).
+- Чтение D1 (enrollments, enrollment_modules, modules) через
+  `Astro.locals.runtime.env.DB`.
+- Импорт из `src/lib/shared/`, `src/lib/server/` (auth guards,
+  modules helpers).
 
 Запрещено:
 - Прямые обращения к биндингам со стороны клиента — только через
   `src/pages/api/**`.
-- Доступ без auth-guard'а (см. `src/middleware.ts`).
+- Доступ без `requireRole(ctx, 'student')` guard'а.
+- Импорт из `src/components/{instructor,admin}/`.
 
-## Admin layer
+## Instructor layer (role: 'instructor')
+
+Owner: `agents/astro-instructor.md`.
+
+Пути:
+- `src/pages/[locale]/instructor/**`
+- `src/components/instructor/**`
+- `src/layouts/instructor/**`
+
+Допускается:
+- Astro islands (compose UI, review queue с timestamp-feedback).
+- Чтение/мутации `enrollments` и `enrollment_modules` через
+  `/api/instructor/**` endpoints (только для enrollment'ов, где
+  user — lead_instructor).
+- Чтение `modules` каталога (`status='published'`).
+- Импорт из `src/lib/shared/`, `src/lib/server/`.
+
+Запрещено:
+- Доступ без `requireRole(ctx, 'instructor')` guard'а.
+- Мутации enrollment'ов, где user не lead_instructor (этим
+  занимается admin).
+- Импорт из `src/components/{public,dashboard,admin}/`.
+
+## Admin layer (role: 'admin')
 
 Owner: `agents/astro-admin.md`.
 
@@ -62,14 +89,26 @@ Owner: `agents/astro-admin.md`.
 
 Допускается:
 - Astro islands и интерактивные формы.
-- CRUD UI поверх API-эндпоинтов.
-- Импорт из `src/lib/shared/`.
+- CRUD UI поверх `/api/admin/**` endpoints.
+- Импорт из `src/lib/shared/`, `src/lib/server/`.
 
 Запрещено:
 - Локализация URL (admin — внутренний инструмент, без `[locale]/`).
-- Доступ без `users.role = 'admin'` (guard в `src/middleware.ts`).
+- Доступ без `requireRole(ctx, 'admin')` guard'а.
 - Прямые мутации D1 / R2 / KV из клиентских компонентов — только
   через `src/pages/api/**`.
+- Импорт из `src/components/{public,dashboard,instructor}/`.
+
+## Cross-zone files
+
+- `src/pages/[locale]/account.astro` — общая страница, layout
+  dynamic по primary role (`user_roles` highest priority).
+- `src/pages/[locale]/inactive.astro` — заглушка для deactivated
+  user'ов. Минимальный layout, без зональной nav.
+- `src/lib/server/guards.ts` — `requireRole`, `getUserWithRoles`,
+  `hasAccessToModule`.
+- `src/lib/server/auth-redirect.ts` — `computeRedirectTarget`,
+  `sanitizeReturnTo`.
 
 ## Server layer
 

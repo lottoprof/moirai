@@ -13,31 +13,39 @@ Architecture v0.8.x).
 src/
 ├── pages/
 │   ├── [locale]/
-│   │   ├── *.astro              # публичные SEO-страницы (programmes/bundles/...)
-│   │   └── dashboard/**         # ЛК (student/instructor)
-│   ├── admin/**                 # админка (БЕЗ локали, role=admin)
+│   │   ├── *.astro              # публичные SEO-страницы (programmes/instructors/...)
+│   │   ├── dashboard/**         # Student ЛК (role: 'student')
+│   │   ├── instructor/**        # Instructor zone (role: 'instructor')
+│   │   ├── account.astro        # cross-zone — любая роль, layout по primary role
+│   │   ├── inactive.astro       # заглушка для deactivated user'ов
+│   │   ├── login.astro, register.astro, password-reset.astro, verify-email-pending.astro
+│   │   └── ...
+│   ├── admin/**                 # Admin panel (без локали, role: 'admin')
 │   └── api/**                   # серверные эндпоинты (без локали)
 ├── content/
-│   ├── programmes/[id].{locale}.mdx
-│   ├── bundles/[id].{locale}.mdx
-│   ├── instructors/[id].{locale}.mdx
-│   ├── segments/[id].{locale}.mdx
-│   ├── pages/[id].{locale}.mdx          # about, faq, contact, legal
+│   ├── programmes/[id].{locale}.mdx   # шаблоны: default_modules + price + features
+│   ├── instructors/[id].{locale}.mdx  # публичные био (faculty pages)
+│   ├── pages/[id].{locale}.mdx        # about, faq, contact, legal
 │   ├── journal/[id].{locale}.mdx
 │   ├── works/[id].{locale}.mdx
 │   └── voice-guide.md
+│   # Модули НЕ в Content Collection — они в D1+R2, источник в внешнем
+│   # репозитории методистов (см. decisions 2026-05-17).
+│   # Bundles удалены как сущность; tier ушёл в programme.features.
 ├── components/
 │   ├── public/**                # vanilla, CSS-only
-│   ├── dashboard/**             # islands, Vidstack player
+│   ├── dashboard/**             # student islands, Vidstack player
+│   ├── instructor/**            # instructor islands (review queue, compose)
 │   └── admin/**                 # CRUD-интерфейс
 ├── layouts/
 │   ├── public/**
 │   ├── dashboard/**
+│   ├── instructor/**
 │   └── admin/**
 ├── lib/
-│   ├── server/**                # edge-only код (биндинги, crypto.subtle, MoR webhook, resolveAndAuthorize)
+│   ├── server/**                # edge-only код (биндинги, crypto.subtle, MoR webhook, guards, auth-redirect)
 │   └── shared/**                # изоморфные утилиты
-├── middleware.ts                # auth-guard'ы для /[locale]/dashboard и /admin
+├── middleware.ts                # locale detection; auth-guards в frontmatter страниц (через requireRole)
 ├── styles/**
 └── env.d.ts                     # типы биндингов + Astro.locals
 db/
@@ -53,24 +61,30 @@ public/                          # статика (favicon, fonts, og-images)
    `client:*`. Vanilla `<script>` и CSS-only анимации.
    SEO-критично. `prefixDefaultLocale: true` — префикс локали
    обязателен для всех языков.
-2. **ЛК `[locale]/dashboard/**`** — Astro islands с
+2. **Student ЛК `[locale]/dashboard/**`** — Astro islands с
    `client:idle` / `client:visible`. Vidstack живёт здесь.
-   Локаль обязательна.
-3. **Админка `/admin/**`** — без локали. `users.role = 'admin'`,
-   guard через `src/middleware.ts`. Внешний layout, CRUD-формы.
-4. **Серверный слой `src/pages/api/**` + `src/lib/server/**`** —
+   Локаль обязательна. Guard: `requireRole(ctx, 'student')`.
+3. **Instructor zone `[locale]/instructor/**`** — Astro islands.
+   Guard: `requireRole(ctx, 'instructor')`. Compose UI для модулей,
+   review queue homework.
+4. **Admin panel `/admin/**`** — без локали. Guard:
+   `requireRole(ctx, 'admin')`. CRUD-формы поверх API.
+5. **Cross-zone `[locale]/account`** — guard: любая аутентификация
+   + `user.deactivated_at IS NULL` (deactivated → redirect на
+   `/inactive`). Layout динамический по primary role.
+6. **Серверный слой `src/pages/api/**` + `src/lib/server/**`** —
    единственный путь к биндингам. Edge-compat обязателен (см.
    `edge-compat.md`).
-5. **Content Collections `src/content/**`** — данные (frontmatter +
+7. **Content Collections `src/content/**`** — данные (frontmatter +
    MDX). Страницы читают через `getCollection`, не дублируют
-   контент. Build-time валидация (`zod` schema, translation pairs,
-   уникальные id между programmes и bundles).
-6. **D1 + R2 + KV** — runtime-хранилища. См. ниже.
+   контент. Build-time валидация (`zod` schema, translation pairs).
+   **Модули НЕ здесь** — они в D1+R2 (см. decisions 2026-05-17).
+8. **D1 + R2 + KV** — runtime-хранилища. См. ниже.
 
 ## Локализация
 
-- Path-prefix: `/{locale}/...` для всех публичных и dashboard
-  путей. `astro.config.mjs` → `i18n.prefixDefaultLocale: true`.
+- Path-prefix: `/{locale}/...` для публичного, dashboard, instructor,
+  account, inactive. `astro.config.mjs` → `i18n.prefixDefaultLocale: true`.
 - `/admin/**` и `/api/**` — без локали.
 - `/` редиректит по `Accept-Language`.
 - Translation pairs: каждый контентный объект существует во всех

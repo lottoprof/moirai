@@ -10,6 +10,22 @@
 
 ## 2026-05
 
+- **2026-05-17** — Переосмысление модели: **модули — first-class
+  сущность** (источник в отдельном git-репо методистов, sync в
+  D1+R2), **programmes — Content Collection шаблоны** с
+  `default_modules` и снапшотом цены/features, **enrollments —
+  mutable instance** с собственным `enrollment_modules` (instructor
+  может add/remove постфактум, auto-resolve `requires_modules`).
+  **Tiers/Bundles как отдельные сущности отменяются** — варианты =
+  разные programmes. **`/[locale]/instructor/` — новая зона**
+  (отделена от `/dashboard/`). **`users.role` удалён** в пользу
+  M2M `user_roles` (admin может одновременно преподавать).
+  **`users.deactivated_at`** — soft-deactivation с redirect на
+  `/[locale]/inactive`. **Anonymize** для GDPR (irreversible).
+  Auth: `requireRole` + `computeRedirectTarget` + JWT без role.
+  Lead instructor per enrollment (single, NULL = unassigned).
+  Programme pages — SSR (`prerender=false`) с CF edge cache. См.
+  archive 2026-05-17.
 - **2026-05-16** — Dashboard routing: классический Astro MPA с
   отдельным SSR-роутом на каждую страницу (`/dashboard/modules/[id].astro`
   и т.п.), а не SPA-shell с client-side router'ом. Smooth navigation

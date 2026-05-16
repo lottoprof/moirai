@@ -135,6 +135,30 @@ moirai.film/                             → редирект по Accept-Langua
 Платформа поддерживает произвольное количество локалей, список — в
 `astro.config.mjs`.
 
+### Role-zones (auth required)
+
+После Stage 21 платформа делится на **четыре** зоны по ролям пользователя:
+
+```
+/[locale]/dashboard/**     — Student ЛК   (role: 'student')
+/[locale]/instructor/**    — Instructor   (role: 'instructor')
+/admin/**                  — Admin panel  (role: 'admin', без локали)
+/[locale]/account          — Cross-zone   (любая аутентификация)
+```
+
+- Каждая зона — собственный layout (`src/layouts/{dashboard,instructor,admin}/`)
+  и Nav-component.
+- Guards: `requireRole(ctx, role)` в frontmatter каждой страницы;
+  возвращает 404 (info-hiding) при несовпадении или redirect на
+  `/{locale}/login?return_to=...` если не залогинен.
+- **Multi-role**: user может иметь любую комбинацию ролей через
+  `user_roles` M2M (admin-преподаватель ≡ admin + instructor). Default
+  landing после login — priority `admin > instructor > student`.
+  Nav-zone-switcher показывает links на другие доступные зоны.
+- **Deactivated user** (`users.deactivated_at IS NOT NULL`) попадает
+  на `/[locale]/inactive` независимо от роли. `/account` доступен.
+- См. §6 (детальные карты) и `decisions_archive.md` 2026-05-17.
+
 ### Translation pairs requirement
 
 **Каждый контентный объект существует в наборе всех активных локалей.**
@@ -228,161 +252,201 @@ id (включая ссылки `bundles.includes_programmes` на programme id)
 
 ---
 
-## 5. Модель программ, тиров, bundles и запусков
+## 5. Модель: modules / programmes / enrollments
 
-### Атомарная единица — модуль
+> **Версия модели:** 2026-05-17 (см. `decisions_archive.md`). Предыдущая
+> модель с `tiers` / `bundles` / `runs` отменена в пользу простой
+> цепочки **module → programme → enrollment**. Sessions/homework/feedback
+> описаны отдельным под-разделом — спецификация Sprint 2+.
 
-Программа состоит из последовательности модулей с педагогическими
-атрибутами (id, programme_id, track, order_in_programme,
-default_duration_days, requires_homework, has_text, has_video).
-Длительность программы — производная.
+### Атомарная единица — модуль (first-class)
 
-### Тиры — прайс-структура программы
-
-Каждая программа имеет один или несколько **тиров**: варианты покупки с
-разными фичами и ценами. Тиры — атрибут programme в Content Collection:
+Модули существуют **независимо** от программ и могут переиспользоваться
+в любом наборе. Источник правды — **отдельный git-репозиторий**
+(`lottoprof/moirai-content` или аналог), где методисты коммитят:
 
 ```yaml
-# /src/content/programmes/beginner.{locale}.mdx (frontmatter)
-id: beginner
-title: 'Beginner'
-duration_weeks: 12  # производная, для отображения
-tiers:
-  - id: self-paced
-    name: 'Self-paced'
-    base_price_amount: 19900     # центы
-    base_price_currency: 'USD'
-    features:
-      live_sessions: false
-      pre_session_corrections: false
-      session_recordings: false
-      consultations_count: 0
-  - id: standard
-    name: 'Standard'
-    base_price_amount: 36900
-    base_price_currency: 'USD'
-    features:
-      live_sessions: true
-      pre_session_corrections: true
-      session_recordings: true
-      consultations_count: 1
-  - id: premium
-    name: 'Premium'
-    base_price_amount: 56900
-    base_price_currency: 'USD'
-    features:
-      live_sessions: true
-      pre_session_corrections: true
-      session_recordings: true
-      consultations_count: 3
-      priority_feedback: true
+# modules/visual-language.en.mdx (внешний repo)
+id: visual-language
+title: 'Visual Language'
+track: directing               # 'directing'|'editing'|'scriptwriting'|'producing'|'sound'
+has_video: true
+has_homework: true
+has_text: true
+default_duration_days: 7
+status: published               # 'draft'|'published'|'archived'
+requires_modules:               # модули, без которых X не идёт
+  - directors-eye
+  - story-structure
+---
+{body markdown — лекция, упражнения, prompt для homework}
 ```
 
-**features** — открытое множество, состав определяют методисты и админы.
-Ключи в `features` используются на странице программы для рендера
-сравнительной таблицы и в Worker'е для проверок доступа (`assertAccess`
-смотрит `tier.features.live_sessions`, etc.).
+**Sync pipeline** (Sprint 2+): GH Actions в external repo на push в main
+постит manifest в `POST /api/admin/modules/sync`. Endpoint:
+- UPSERT `modules` (PK `slug+locale`) с метаданными
+- PUT body в R2 (`modules/{slug}.{locale}.md`)
+- Видео — отдельный upload через wrangler r2 (методист, не CI)
 
-### Запуск (`run`) — материализация tier во времени
+**Lifecycle модуля:**
+```
+draft  →  published  →  archived
+                          ↑
+                          никогда → "deleted"
+```
+- **archived** скрывается из catalogue, но existing enrollments продолжают
+  его видеть с маркером "Legacy content".
+- Hard DELETE возможен только admin'ом через "Cleanup" когда usage = 0
+  (R2 body тоже удаляется).
+- Sync pipeline **рефьюзит** silent-delete если есть references из
+  `enrollment_modules` — downgrade'ит до `archived` + warning.
 
-`runs` содержит `tier_id` — snapshot ссылка на тир из Content Collection
-на момент создания. Если методист потом изменит фичи или цену тира —
-уже стартовавший run сохраняет свой snapshot.
+**Locale completeness:** каждый модуль обязан иметь **обе** локали
+(`{slug}.en.mdx` И `{slug}.ru.mdx`). External repo CI ломает merge при
+mismatch.
+
+**`requires_modules` — dependency graph:** модули, без которых данный
+не имеет смысла в одном enrollment. **Циклы запрещены** — external repo
+CI делает topological sort, ломает merge при цикле.
+
+### Programme — Content Collection шаблон
+
+Programme = ordered list of modules + price + features + marketing.
+Лежит в `src/content/programmes/{id}.{locale}.mdx`:
+
+```yaml
+# src/content/programmes/beginner.{en,ru}.mdx (в moirai-репо)
+id: beginner
+title: 'Beginner'
+default_modules:                 # ссылки на module slugs
+  - directors-eye
+  - story-structure
+  - the-cut
+  - visual-language
+  - pre-production
+  - character-conflict
+  # ...12 модулей
+price_amount: 39900              # центы, USD по умолчанию
+price_currency: USD
+features:                        # snapshot копируется в enrollment.features_json
+  live_sessions: true
+  pre_session_corrections: true
+  session_recordings: true
+  consultations_count: 1
+marketing:
+  tagline: 'Twelve modules to your first short film'
+  description: '...'
+  og_image: 'beginner-og.jpg'
+---
+{body — маркетинговый текст для /programmes/beginner страницы}
+```
+
+**Specials:**
+
+- `programmes/individual.{en,ru}.mdx` — `default_modules: []`. Маркетинг
+  "Соберём программу под вас". Студент покупает за depositamount или $0,
+  instructor потом composes модули постфактум.
+
+**Drop сущности (по сравнению со старой моделью):**
+
+- ❌ **Tiers** как отдельное измерение. Варианты ("Beginner Self-paced"
+  vs "Beginner Standard") = разные programmes.
+- ❌ **Bundles** как отдельная сущность. Пакет "Beginner + Intermediate
+  со скидкой" = published programme с подобранными модулями обоих и
+  bundle-ценой.
+- ❌ **Runs / cohorts.** Sprint 2+ при появлении scheduled-cohort UX.
+
+### Enrollment — mutable D1 instance
+
+`enrollment` = `user × programme_slug` + snapshot цены/фич + mutable
+список модулей. Запись в D1, не Content Collection.
 
 ```sql
-runs (
-  ...
-  programme_id    TEXT NOT NULL,
-  tier_id         TEXT NOT NULL,    -- snapshot ссылка
-  price_amount    INTEGER NOT NULL, -- snapshot из tier.base_price_amount
-                                     -- (или per-run override, например для early-bird)
-  ...
+enrollments (
+  id                   TEXT PRIMARY KEY,
+  user_id              TEXT REFERENCES users,
+  programme_slug       TEXT NOT NULL,                        -- ссылка на CC programme
+  status               TEXT CHECK IN ('active','completed','cancelled','refunded'),
+  price_paid_amount    INTEGER NOT NULL,                     -- snapshot на момент покупки
+  price_paid_currency  TEXT NOT NULL,
+  features_json        TEXT NOT NULL,                        -- snapshot programme.features
+  lead_instructor_id   TEXT REFERENCES users,                -- single lead, NULL = unassigned
+  enrolled_at, completed_at, cancelled_at, created_at, updated_at
+)
+
+enrollment_modules (
+  enrollment_id    TEXT REFERENCES enrollments ON DELETE CASCADE,
+  module_slug      TEXT NOT NULL,                            -- ссылка на modules
+  order_idx        INTEGER NOT NULL,
+  added_by         TEXT REFERENCES users,                    -- кто добавил (instructor/admin/'system' для initial)
+  added_at         INTEGER NOT NULL,
+  PRIMARY KEY (enrollment_id, module_slug)
 )
 ```
 
-`price_amount` в run по умолчанию = `tier.base_price_amount` на момент
-создания, но админ может переопределить при создании (early-bird, специальные
-условия для конкретного потока).
+**Три flow одной механикой:**
 
-### Bundles — пакеты из нескольких программ
+| Сценарий | enrollment | enrollment_modules |
+|---|---|---|
+| **Ready programme** (купил Beginner) | `slug='beginner', price=39900, features={...}` | копия `programme.default_modules` + auto-resolve `requires_modules`, `added_by='system'` |
+| **Individual** (купил individual) | `slug='individual', price=0` или deposit | initially 0 строк, instructor добавляет постфактум |
+| **Extension** (existing + добавили модуль) | без изменений | новая строка с `added_by=<instructor.id>`, audit_log entry |
 
-Bundle = отдельная сущность, продаётся как самостоятельный продукт. Описание
-в Content Collection:
+### Lead instructor — single per enrollment
 
-```yaml
-# /src/content/bundles/beginner-intermediate.{locale}.mdx
-id: beginner-intermediate
-title: 'Beginner + Intermediate Bundle'
-includes_programmes: ['beginner', 'intermediate']
-tiers:
-  - id: standard
-    name: 'Standard'
-    base_price_amount: 74900
-    base_price_currency: 'USD'
-    savings_vs_separate: 8900     # ($749 vs $369 + $469 = $89 economy)
-    features:                       # обычно объединяются с программами в bundle
-      priority_feedback: true
-      extra_consultations: 2
+`enrollments.lead_instructor_id NULLABLE`. Только lead + admin могут:
+- add/remove модули
+- менять price
+- mark complete
+
+Другие instructor'ы видят enrollment **read-only**, могут оставлять
+feedback на homework через `feedback.instructor_id`.
+
+**Cohort scheduling с 2+ instructors** — Sprint 2 через `runs.lead_instructor_id`
++ `run_instructors` M2M. Не конфликтует с enrollment-level lead.
+
+### Auto-resolve `requires_modules`
+
+При добавлении модуля X в enrollment server рекурсивно подтягивает
+все транзитивные deps через `resolveDependencies(slug)`. Алгоритм —
+DFS с `visited` set (защита от циклов на runtime). Post-order вставка
+гарантирует deps идут раньше зависящего по `order_idx`.
+
+При удалении модуля Y server проверяет `getDependents(enrollment_id, slug)`
+— если есть зависящие, возвращает 409 со списком. UI предлагает
+"Remove all together".
+
+### Refund / cancellation семантика
+
+`enrollment.status = 'refunded'` или `'cancelled'` → access revoked
+через централизованный `hasAccessToModule(env, userId, slug)`:
+
+```ts
+if (user.deactivated_at) return false;
+const ok = await db.prepare(`
+  SELECT 1 FROM enrollments e
+  JOIN enrollment_modules em ON em.enrollment_id = e.id
+  WHERE e.user_id=? AND em.module_slug=? AND e.status='active'
+  LIMIT 1
+`).bind(userId, slug).first();
+return !!ok;
 ```
 
-Bundle и programme — **один URL namespace**: `/{locale}/[id]`. Build-time
-валидация запрещает совпадение id между Content Collections programmes и
-bundles.
+Данные в `enrollment_modules` остаются (audit), но видимость для
+студента — нулевая. Re-activation: `UPDATE enrollments SET status='active'`
+→ доступ восстанавливается.
 
-### Покупка bundle — несколько enrollments на один платёж
+### Что фиксировано / что mutable
 
-Технически:
-
-1. Студент на странице bundle выбирает тир и нажимает "Купить"
-2. На чекауте выбирает конкретные runs из включённых programmes
-   (Beginner run X + Intermediate run Y)
-3. Создаётся **один** `payments` с `purchase_kind='bundle'`, `purchase_ref='beginner-intermediate'`
-4. Создаются **несколько** `enrollments` (по одному на каждую выбранную run)
-   с одинаковым `payment_id`
-
-Single-run покупка: 1 payment + 1 enrollment.
-Bundle покупка: 1 payment + N enrollments.
-
-### Сессии — гибкая связь со студентами и модулями
-
-Сессия = видеовстреча преподавателя со студентами. Любая комбинация
-один-несколько на любой стороне:
-
-- Преподаватель → один или несколько студентов через `session_participants`
-- Один или несколько модулей в одной сессии через `session_modules`
-
-Длительность задаётся преподавателем. Три педагогические фазы (Review,
-New block, Practice) — структура без жёсткого хронометража. Phase 2
-записывается в R2.
-
-### Работы (homework) — индивидуальные или групповые
-
-Работа сдаётся студентом по `run_module`. Может быть индивидуальной или
-групповой (общий `group_id` UUID, видео в R2 может быть общим).
-
-**Оценки и фидбэк всегда per-student.** Каждый участник получает свой
-feedback и свою оценку (`homework.score`).
-
-### Pre-session corrections (формат C — гибрид)
-
-Преподаватель оставляет timestamp-комментарии и/или общие комментарии на
-видео работы до сессии. Технически: `feedback` с `kind` и опциональным
-`timestamp_seconds`.
-
-### Что фиксировано в `run`, что подвижно
-
-| Атрибут                  | Где живёт                            | Меняется после старта? |
-|--------------------------|--------------------------------------|------------------------|
-| programme description    | Content Collection                   | через git+deploy       |
-| programme tiers (фичи, цены) | Content Collection               | через git+deploy (для будущих runs) |
-| run.tier_id snapshot     | D1 (`runs`)                          | нет                    |
-| run.price_amount         | D1 (`runs`)                          | нет (для уже купивших) |
-| modules в каталоге       | D1 (`modules`)                        | через админ-UI         |
-| тело модуля              | R2                                    | через админ-UI         |
-| run_modules расписание   | D1                                    | нет (snapshot)         |
-| sessions                 | D1                                    | время; состав модулей; состав участников |
-| resource caps            | D1 (`resources`)                     | да, любое время        |
-| promo_codes              | D1                                    | да                     |
+| Атрибут | Где живёт | Меняется после покупки? |
+|---|---|---|
+| Module metadata + body | external repo → D1 + R2 | методистами через external repo (sync) |
+| Programme description + default_modules | moirai Content Collection | через git+deploy (для будущих enrollments) |
+| `enrollment.price_paid_*` | D1 | нет (snapshot) |
+| `enrollment.features_json` | D1 | нет (snapshot) — re-purchase даёт новые features |
+| `enrollment_modules` список | D1 | да — instructor может add/remove |
+| `enrollment.lead_instructor_id` | D1 | да — admin reassigns |
+| `enrollment.status` | D1 | да — refund / cancel / complete |
 
 ---
 
@@ -433,38 +497,62 @@ feedback и свою оценку (`homework.score`).
 На страницах `/{locale}/[id]` для programme и bundle показываются **все
 тиры с ценами** — это публичный прайс-лист, видный без регистрации.
 
-### Личный кабинет (auth required)
+### Student ЛК (role: 'student')
 
 ```
-/{locale}/dashboard                        — overview, ближайшая сессия
-/{locale}/dashboard/modules                — список модулей run'а с датами
-/{locale}/dashboard/modules/[id]           — модуль: текст и/или видео + prompt
-/{locale}/dashboard/sessions               — мои сессии
-/{locale}/dashboard/sessions/[id]          — сессия: участники, модули, recording, notes
-/{locale}/dashboard/homework               — мои работы и фидбэк
-/{locale}/dashboard/homework/[id]          — работа с timestamp-фидбэком
-/{locale}/dashboard/account                — профиль, локаль
-/{locale}/dashboard/referrals              — мой реферальный код, список приглашённых, статус наград
+/{locale}/dashboard                     — overview (greeting, stats, continue learning, modules grid)
+/{locale}/dashboard/modules             — все модули моего enrollment'a с прогрессом
+/{locale}/dashboard/modules/[slug]      — модуль: текст + видео (Vidstack) + homework prompt
+/{locale}/dashboard/homework            — мои сданные работы + фидбэк
+/{locale}/dashboard/homework/[id]       — работа с timestamp-фидбэком
+/{locale}/dashboard/sessions            — мои live-сессии (Sprint 2)
+/{locale}/dashboard/referrals           — реферальная активность (Sprint 2+)
 ```
 
-### Админ-панель (role=admin)
+Layout: `src/layouts/dashboard/Layout.astro`. Nav: `DashboardNav` (Dashboard
+/ Modules / Homework / Account →) + zone-switcher если у user'а есть
+другие роли.
+
+### Instructor zone (role: 'instructor')
 
 ```
-/admin/login
-/admin                            — dashboard
-/admin/programmes                 — каталог (модули + атрибуты)
-/admin/programmes/[id]/modules    — модули: атрибуты, тело в R2
-/admin/runs                       — создание/редактирование запусков (выбор tier + price override)
-/admin/runs/[id]/schedule         — материализованное расписание
-/admin/runs/[id]/students         — список студентов запуска
-/admin/homework                   — очередь домашек (включая групповые)
-/admin/sessions                   — расписание: выбор участников и модулей
-/admin/users                      — поиск/блокировка
-/admin/promo-codes                — создание, активация, деактивация промо-кодов
-/admin/referrals                  — обзор реферальной активности, manual award/redeem
-/admin/resources                  — capacity ресурсов
-/admin/settings                   — KV-настройки
+/{locale}/instructor                    — review queue + my students + next session
+/{locale}/instructor/students           — все мои студенты (где я lead_instructor)
+/{locale}/instructor/students/[id]      — детали студента: enrollment, модули, прогресс
+/{locale}/instructor/students/[id]/compose  — composer модулей (для individual или extensions)
+/{locale}/instructor/homework           — review queue (homework awaiting feedback)
+/{locale}/instructor/homework/[id]      — review страница (видео + timestamp-feedback)
+/{locale}/instructor/sessions           — мои предстоящие сессии (Sprint 2)
 ```
+
+Layout: `src/layouts/instructor/Layout.astro`. Nav: `InstructorNav`
+(Queue / My students / Schedule / Account →) + zone-switcher.
+
+### Admin panel (role: 'admin', без локали)
+
+```
+/admin                            — overview (платформ-метрики)
+/admin/users                      — список пользователей + drawer для CRUD
+/admin/enrollments                — список enrollments + grant new
+/admin/modules                    — каталог модулей из D1 (read-only снапшот из external repo)
+/admin/instructors                — список instructor'ов с load metrics
+/admin/queues                     — pending homework / awaiting setup per-instructor
+/admin/settings                   — KV-настройки (Sprint 2+)
+```
+
+Layout: `src/layouts/admin/Layout.astro`. Nav: `AdminNav` (Overview / Users
+/ Enrollments / Modules / Account →) + zone-switcher если user также
+instructor.
+
+### Cross-zone (auth required, любая роль)
+
+```
+/{locale}/account                       — профиль, locale, sign-in methods (password / OAuth)
+/{locale}/inactive                      — заглушка для deactivated user'ов
+```
+
+`/account` использует layout динамически по primary role (admin → AdminLayout,
+instructor → InstructorLayout, иначе → DashboardLayout).
 
 ### Что не в карте намеренно
 

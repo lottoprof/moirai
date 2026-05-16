@@ -1,0 +1,357 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.wrap { font-family: var(--font-sans); background: #0a0907; color: #F7F3EC; }
+
+.role-strip { padding: 6px 28px; background: rgba(212,130,10,0.07); border-bottom: 0.5px solid rgba(212,130,10,0.15); font-size: 10px; letter-spacing: 0.13em; color: rgba(212,130,10,0.6); }
+
+.nav { display: flex; justify-content: space-between; align-items: center; padding: 16px 28px; border-bottom: 0.5px solid rgba(247,243,236,0.1); }
+.nav-logo { font-size: 14px; letter-spacing: 0.12em; }
+.nav-right { display: flex; gap: 20px; font-size: 11px; letter-spacing: 0.08em; color: rgba(247,243,236,0.35); }
+.nav-right .active { color: #D4820A; }
+
+.sub-nav { display: flex; gap: 0; border-bottom: 0.5px solid rgba(247,243,236,0.08); padding: 0 28px; }
+.sub-tab { font-size: 10px; letter-spacing: 0.1em; padding: 10px 18px; color: rgba(247,243,236,0.3); cursor: pointer; border-bottom: 1.5px solid transparent; margin-bottom: -0.5px; }
+.sub-tab.on { color: #F7F3EC; border-bottom-color: #D4820A; }
+
+.hero { padding: 32px 28px 20px; border-bottom: 0.5px solid rgba(247,243,236,0.07); }
+.hero-label { font-size: 10px; letter-spacing: 0.14em; color: #D4820A; margin-bottom: 6px; }
+.hero-title { font-family: var(--font-serif, Georgia, serif); font-size: 38px; font-weight: 400; line-height: 1.05; }
+.hero-sub { font-size: 12px; color: rgba(247,243,236,0.3); margin-top: 7px; }
+
+.content { padding: 24px 28px; }
+.sec-label { font-size: 10px; letter-spacing: 0.13em; color: rgba(247,243,236,0.28); margin-bottom: 12px; }
+
+/* filter bar */
+.filter-bar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+.filter-input { background: rgba(247,243,236,0.04); border: 0.5px solid rgba(247,243,236,0.12); border-radius: 3px; padding: 7px 12px; font-size: 12px; color: #F7F3EC; width: 220px; outline: none; font-family: var(--font-sans); }
+.filter-input::placeholder { color: rgba(247,243,236,0.2); }
+.filter-pill { font-size: 10px; letter-spacing: 0.08em; padding: 5px 12px; border: 0.5px solid rgba(247,243,236,0.12); border-radius: 2px; color: rgba(247,243,236,0.35); cursor: pointer; background: transparent; }
+.filter-pill.on { border-color: rgba(212,130,10,0.4); color: #D4820A; background: rgba(212,130,10,0.06); }
+.filter-spacer { flex: 1; }
+.invite-btn { font-size: 10px; letter-spacing: 0.08em; padding: 6px 16px; border: 0.5px solid rgba(212,130,10,0.5); color: #D4820A; border-radius: 2px; background: transparent; cursor: pointer; }
+
+/* table */
+.tbl-wrap { border: 0.5px solid rgba(247,243,236,0.09); border-radius: 3px; overflow: hidden; margin-bottom: 28px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tbl thead tr { border-bottom: 0.5px solid rgba(247,243,236,0.09); }
+.tbl th { font-size: 9px; letter-spacing: 0.1em; color: rgba(247,243,236,0.25); padding: 10px 14px; text-align: left; font-weight: 400; }
+.tbl td { padding: 11px 14px; color: rgba(247,243,236,0.8); border-bottom: 0.5px solid rgba(247,243,236,0.05); vertical-align: middle; }
+.tbl tr:last-child td { border-bottom: none; }
+.tbl tr:hover td { background: rgba(247,243,236,0.02); }
+
+/* badges */
+.badge { display: inline-block; font-size: 9px; letter-spacing: 0.07em; padding: 2px 8px; border-radius: 2px; white-space: nowrap; }
+.b-student  { background: rgba(247,243,236,0.05); color: rgba(247,243,236,0.4); border: 0.5px solid rgba(247,243,236,0.12); }
+.b-instructor { background: rgba(184,159,224,0.12); color: #b89fe0; border: 0.5px solid rgba(184,159,224,0.25); }
+.b-admin    { background: rgba(212,130,10,0.12); color: #D4820A; border: 0.5px solid rgba(212,130,10,0.3); }
+.b-active   { background: rgba(30,80,40,0.2); color: #7fcf8a; border: 0.5px solid rgba(127,207,138,0.2); }
+.b-inactive { background: rgba(247,243,236,0.04); color: rgba(247,243,236,0.25); border: 0.5px solid rgba(247,243,236,0.08); }
+.b-pending  { background: rgba(212,130,10,0.07); color: rgba(212,130,10,0.6); border: 0.5px solid rgba(212,130,10,0.2); }
+
+/* role selector inline */
+.role-sel { background: rgba(247,243,236,0.04); border: 0.5px solid rgba(247,243,236,0.12); border-radius: 2px; padding: 4px 8px; font-size: 11px; color: #F7F3EC; font-family: var(--font-sans); cursor: pointer; outline: none; }
+.role-sel:hover { border-color: rgba(212,130,10,0.35); }
+
+/* action links */
+.act { font-size: 10px; color: rgba(247,243,236,0.25); cursor: pointer; margin-left: 12px; text-decoration: none; }
+.act:hover { color: #D4820A; }
+.act.danger:hover { color: #e06060; }
+
+/* avatar */
+.av { width: 26px; height: 26px; border-radius: 50%; background: rgba(247,243,236,0.07); display: inline-flex; align-items: center; justify-content: center; font-size: 9px; color: rgba(247,243,236,0.4); margin-right: 8px; flex-shrink: 0; vertical-align: middle; }
+.sname { display: flex; align-items: center; }
+.sname-sub { font-size: 10px; color: rgba(247,243,236,0.25); margin-top: 1px; }
+
+/* detail drawer mockup */
+.drawer { border: 0.5px solid rgba(247,243,236,0.09); border-radius: 3px; padding: 20px 22px; background: rgba(247,243,236,0.02); }
+.drawer-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+.drawer-name { font-family: var(--font-serif, Georgia, serif); font-size: 22px; color: #F7F3EC; }
+.drawer-email { font-size: 11px; color: rgba(247,243,236,0.3); margin-top: 3px; }
+.drawer-close { font-size: 10px; color: rgba(247,243,236,0.2); cursor: pointer; letter-spacing: 0.08em; }
+.drawer-close:hover { color: #D4820A; }
+
+.field-row { display: flex; gap: 16px; margin-bottom: 14px; }
+.field { flex: 1; }
+.field-lbl { font-size: 9px; letter-spacing: 0.11em; color: rgba(247,243,236,0.28); margin-bottom: 5px; }
+.field-val { font-size: 12px; color: rgba(247,243,236,0.75); }
+
+.select-full { width: 100%; background: rgba(247,243,236,0.05); border: 0.5px solid rgba(247,243,236,0.15); border-radius: 3px; padding: 8px 10px; font-size: 12px; color: #F7F3EC; font-family: var(--font-sans); outline: none; }
+.select-full:hover { border-color: rgba(212,130,10,0.4); }
+
+.drawer-actions { display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 0.5px solid rgba(247,243,236,0.07); }
+.btn-save { font-size: 10px; letter-spacing: 0.08em; padding: 7px 20px; border: 0.5px solid rgba(212,130,10,0.5); color: #D4820A; border-radius: 2px; background: transparent; cursor: pointer; }
+.btn-deact { font-size: 10px; letter-spacing: 0.08em; padding: 7px 20px; border: 0.5px solid rgba(247,243,236,0.12); color: rgba(247,243,236,0.35); border-radius: 2px; background: transparent; cursor: pointer; }
+.btn-del { font-size: 10px; letter-spacing: 0.08em; padding: 7px 20px; border: 0.5px solid rgba(200,80,80,0.25); color: rgba(200,80,80,0.6); border-radius: 2px; background: transparent; cursor: pointer; margin-left: auto; }
+
+.divider { border: none; border-top: 0.5px solid rgba(247,243,236,0.07); margin: 0 0 20px; }
+</style>
+
+<div class="wrap">
+  <div class="role-strip">ADMIN PANEL · USER MANAGEMENT</div>
+
+  <nav class="nav">
+    <span class="nav-logo">MOIRAI.</span>
+    <div class="nav-right">
+      <span>OVERVIEW</span>
+      <span>STUDENTS</span>
+      <span class="active">USERS</span>
+      <span>CONTENT</span>
+      <span>PAYMENTS</span>
+      <span>ACCOUNT →</span>
+    </div>
+  </nav>
+
+  <div class="sub-nav">
+    <div class="sub-tab">ALL <span style="color:rgba(247,243,236,0.2);margin-left:4px">54</span></div>
+    <div class="sub-tab on">STUDENTS <span style="color:rgba(247,243,236,0.2);margin-left:4px">47</span></div>
+    <div class="sub-tab">INSTRUCTORS <span style="color:rgba(247,243,236,0.2);margin-left:4px">4</span></div>
+    <div class="sub-tab">ADMINS <span style="color:rgba(247,243,236,0.2);margin-left:4px">3</span></div>
+    <div class="sub-tab">PENDING <span style="color:rgba(212,130,10,0.5);margin-left:4px">2</span></div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-label">USERS</div>
+    <div class="hero-title">Manage<br>accounts.</div>
+    <div class="hero-sub">Assign roles · reset passwords · deactivate</div>
+  </div>
+
+  <div class="content">
+
+    <div class="filter-bar">
+      <input class="filter-input" type="text" placeholder="Search by name or email…" />
+      <button class="filter-pill on">ALL TIERS</button>
+      <button class="filter-pill">BEGINNER</button>
+      <button class="filter-pill">INTERMEDIATE</button>
+      <button class="filter-pill">BUNDLE</button>
+      <div class="filter-spacer"></div>
+      <button class="invite-btn">+ INVITE USER</button>
+    </div>
+
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th style="width:28%">USER</th>
+            <th style="width:13%">ROLE</th>
+            <th style="width:13%">TIER / ACCESS</th>
+            <th style="width:10%">LOCALE</th>
+            <th style="width:11%">STATUS</th>
+            <th style="width:13%">REGISTERED</th>
+            <th style="width:12%">ACTIONS</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <!-- row: student active -->
+          <tr>
+            <td>
+              <div class="sname">
+                <span class="av">LP</span>
+                <div>
+                  <div>lotto prof</div>
+                  <div class="sname-sub">lottoprof@gmail.com</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <select class="role-sel">
+                <option selected>student</option>
+                <option>instructor</option>
+                <option>admin</option>
+              </select>
+            </td>
+            <td><span class="badge b-student">Beginner</span></td>
+            <td style="color:rgba(247,243,236,0.4)">EN</td>
+            <td><span class="badge b-active">ACTIVE</span></td>
+            <td style="color:rgba(247,243,236,0.3)">May 15, 2026</td>
+            <td>
+              <a class="act">profile</a>
+              <a class="act danger">deact.</a>
+            </td>
+          </tr>
+
+          <!-- row: just registered, needs role -->
+          <tr style="background:rgba(212,130,10,0.04)">
+            <td>
+              <div class="sname">
+                <span class="av" style="background:rgba(212,130,10,0.1);color:#D4820A">NK</span>
+                <div>
+                  <div>natasha k.</div>
+                  <div class="sname-sub">natasha@kino.ru</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <select class="role-sel" style="border-color:rgba(212,130,10,0.4);color:#D4820A">
+                <option selected>student</option>
+                <option>instructor</option>
+                <option>admin</option>
+              </select>
+            </td>
+            <td><span class="badge b-pending">no enrollment</span></td>
+            <td style="color:rgba(247,243,236,0.4)">RU</td>
+            <td><span class="badge b-pending">PENDING</span></td>
+            <td style="color:rgba(247,243,236,0.3)">May 16, 2026</td>
+            <td>
+              <a class="act" style="color:#D4820A">assign →</a>
+            </td>
+          </tr>
+
+          <!-- row: instructor -->
+          <tr>
+            <td>
+              <div class="sname">
+                <span class="av" style="background:rgba(184,159,224,0.1);color:#b89fe0">MV</span>
+                <div>
+                  <div>marina v.</div>
+                  <div class="sname-sub">marina@moirai.pro</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <select class="role-sel" style="border-color:rgba(184,159,224,0.3);color:#b89fe0">
+                <option>student</option>
+                <option selected>instructor</option>
+                <option>admin</option>
+              </select>
+            </td>
+            <td><span class="badge b-instructor">staff</span></td>
+            <td style="color:rgba(247,243,236,0.4)">EN / RU</td>
+            <td><span class="badge b-active">ACTIVE</span></td>
+            <td style="color:rgba(247,243,236,0.3)">Jan 10, 2026</td>
+            <td>
+              <a class="act">profile</a>
+              <a class="act danger">deact.</a>
+            </td>
+          </tr>
+
+          <!-- row: admin -->
+          <tr>
+            <td>
+              <div class="sname">
+                <span class="av" style="background:rgba(212,130,10,0.1);color:#D4820A">AD</span>
+                <div>
+                  <div>alex d.</div>
+                  <div class="sname-sub">alex@moirai.pro</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <select class="role-sel" style="border-color:rgba(212,130,10,0.4);color:#D4820A">
+                <option>student</option>
+                <option>instructor</option>
+                <option selected>admin</option>
+              </select>
+            </td>
+            <td><span class="badge b-admin">full access</span></td>
+            <td style="color:rgba(247,243,236,0.4)">EN / RU</td>
+            <td><span class="badge b-active">ACTIVE</span></td>
+            <td style="color:rgba(247,243,236,0.3)">Dec 1, 2025</td>
+            <td>
+              <a class="act">profile</a>
+            </td>
+          </tr>
+
+          <!-- row: deactivated -->
+          <tr style="opacity:0.4">
+            <td>
+              <div class="sname">
+                <span class="av">JL</span>
+                <div>
+                  <div>j. liu</div>
+                  <div class="sname-sub">j.liu@mail.com</div>
+                </div>
+              </div>
+            </td>
+            <td><select class="role-sel"><option selected>student</option><option>instructor</option><option>admin</option></select></td>
+            <td><span class="badge b-student">Intermediate</span></td>
+            <td style="color:rgba(247,243,236,0.4)">EN</td>
+            <td><span class="badge b-inactive">INACTIVE</span></td>
+            <td style="color:rgba(247,243,236,0.3)">Mar 3, 2026</td>
+            <td>
+              <a class="act">restore</a>
+              <a class="act danger">delete</a>
+            </td>
+          </tr>
+
+        </tbody>
+      </table>
+    </div>
+
+    <!-- ── Profile drawer (expanded state) ── -->
+    <div class="sec-label">USER PROFILE · natasha k. <span style="color:rgba(212,130,10,0.5);margin-left:8px">↑ row above — click "assign →"</span></div>
+    <div class="drawer">
+      <div class="drawer-header">
+        <div>
+          <div class="drawer-name">natasha k.</div>
+          <div class="drawer-email">natasha@kino.ru · registered May 16, 2026</div>
+        </div>
+        <span class="drawer-close">CLOSE ✕</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field-row">
+        <div class="field">
+          <div class="field-lbl">DISPLAY NAME</div>
+          <input class="select-full" type="text" value="natasha k." style="margin-top:0" />
+        </div>
+        <div class="field">
+          <div class="field-lbl">EMAIL</div>
+          <input class="select-full" type="text" value="natasha@kino.ru" />
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <div class="field-lbl">ROLE</div>
+          <select class="select-full">
+            <option>student</option>
+            <option>instructor</option>
+            <option>admin</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-lbl">LOCALE</div>
+          <select class="select-full">
+            <option>en</option>
+            <option selected>ru</option>
+            <option>es</option>
+          </select>
+        </div>
+        <div class="field">
+          <div class="field-lbl">TIER (если student)</div>
+          <select class="select-full">
+            <option selected>— no enrollment —</option>
+            <option>Beginner</option>
+            <option>Intermediate</option>
+            <option>Bundle</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <div class="field-lbl">PASSWORD RESET</div>
+          <button class="btn-deact" style="font-size:10px;padding:7px 16px">SEND RESET EMAIL</button>
+        </div>
+        <div class="field">
+          <div class="field-lbl">ASSIGNED INSTRUCTOR (если student)</div>
+          <select class="select-full">
+            <option selected>— unassigned —</option>
+            <option>marina v.</option>
+            <option>igor s.</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="drawer-actions">
+        <button class="btn-save">SAVE CHANGES</button>
+        <button class="btn-deact">DEACTIVATE</button>
+        <button class="btn-del">DELETE ACCOUNT</button>
+      </div>
+    </div>
+
+  </div>
+</div>

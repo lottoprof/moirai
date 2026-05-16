@@ -762,3 +762,241 @@ SPA-роутер поверх ломает эту модель и приноси
 state. View Transitions = "SPA feel" без SPA-сложности. Решение
 открывает путь к простой архитектуре dashboard без JS-роутера, без
 client-side state-store, без manual history management.
+
+---
+
+## 2026-05-17: переосмысление модели programmes / modules / enrollments + multi-role + role-zones
+
+**Контекст.** При подготовке Stage 21 (instructor + admin mocks) обнаружили
+накопившиеся напряжения в текущей модели Architecture.md §5 и §6:
+
+- `modules` — атрибут programme в Content Collection, не reusable между
+  программами;
+- `tiers` (self-paced/standard/premium) — отдельное измерение,
+  усложняющее enrollment-схему;
+- `bundles` — отдельная сущность с собственным purchase flow;
+- `users.role` — single value, мешает админу одновременно преподавать;
+- `/admin/` зона без локали — admin'у нужно переключать язык контента
+  не имея locale в URL;
+- `/[locale]/dashboard/` — общая зона student + instructor, мокапы
+  показывают что эти роли требуют принципиально разных UI;
+- Mockup admin users page вводил термины ("TIER: Beginner") не совпадающие
+  с Architecture.md (programme/tier — разные оси).
+
+После аудита 12 пунктов и серии решений модель и зоны переписаны.
+
+**Решение.**
+
+### Модель контента и enrollments
+
+1. **Module — first-class сущность.** Источник правды — отдельный
+   git репо (`lottoprof/moirai-content` или аналог), методисты
+   коммитят `modules/{slug}.{en,ru}.mdx` туда. CI sync-pipeline
+   доставляет метаданные в D1 (`modules` table), тело в R2
+   (`modules/{slug}.{locale}.md`), видео отдельным upload'ом в R2
+   через wrangler/admin.
+
+   Lifecycle: `draft → published → archived`. **Delete не существует**
+   как методистская операция. Hard DELETE — только admin'ская
+   "Cleanup" когда usage = 0. Любые ссылки из existing enrollments
+   защищены downgrade'ом до `archived` в sync pipeline.
+
+2. **`requires_modules`** — список модулей, без которых данный не
+   имеет смысла. При добавлении модуля X в enrollment auto-resolve
+   рекурсивно подтягивает все транзитивные зависимости. Циклы
+   запрещены — external repo CI делает topological sort, ломает
+   merge при цикле.
+
+3. **Programme — Content Collection шаблон.** В `src/content/programmes/`
+   с frontmatter `{id, title, default_modules: [slugs], price,
+   features, marketing}`. Special programme `individual` — пустой
+   `default_modules`, маркетинг "соберём под вас".
+
+   **Tier и Bundle как отдельные сущности отменяются.** Варианты
+   ("Beginner standard" vs "Beginner premium") — это разные programmes.
+   Bundle ("Beginner+Intermediate скидкой") — отдельная published
+   programme с подобранными модулями + bundle-ценой.
+
+4. **Enrollment — mutable D1 instance.** `user × programme_slug` с
+   snapshot цены и фич на момент покупки. Modules — отдельная таблица
+   `enrollment_modules` с mutable списком (instructor может add/remove
+   постфактум). При покупке: `enrollment_modules` копируются из
+   `programme.default_modules` (с auto-resolve `requires_modules`).
+
+   Три flow одной механикой:
+   - **Ready programme**: купил Beginner → enrollment(slug='beginner') +
+     12 modules скопированы
+   - **Individual**: купил individual → enrollment(slug='individual') +
+     0 modules. Instructor потом composes
+   - **Extension**: instructor добавляет модуль к existing enrollment
+
+5. **Refund/cancellation семантика:** `enrollment.status='refunded'` или
+   `'cancelled'` → `hasAccessToModule()` возвращает false, данные в
+   `enrollment_modules` остаются для audit.
+
+### Role-zones
+
+6. **`/[locale]/instructor/` — НОВАЯ зона.** Отделяется от
+   `/[locale]/dashboard/`. Маппинг:
+   ```
+   /[locale]/dashboard/**     student only
+   /[locale]/instructor/**    instructor only
+   /admin/**                  admin only (без локали)
+   ```
+   Каждая зона — свой Layout, Nav, agents (`astro-student.md`,
+   `astro-instructor.md`, `astro-admin.md`).
+
+7. **`/[locale]/account` — cross-zone.** Один URL для всех ролей,
+   layout dynamic по primary role user'a. Admin'у — AdminLayout,
+   instructor'у — InstructorLayout, остальным — DashboardLayout.
+
+8. **Admin не имеет автоматического доступа на `/instructor/`** —
+   404 если он только admin. Чтобы был доступ — у user должна быть
+   роль `instructor` явно (multi-role, см. ниже).
+
+### Multi-role
+
+9. **`users.role` удаляется** (вместе с CHECK constraint). Заменяется
+   на M2M-таблицу `user_roles (user_id, role)`. Один user может иметь
+   роли в любой комбинации (admin + instructor — admin-преподаватель).
+
+10. **Last-active-admin invariant** — DB triggers:
+    - `prevent_role_orphan`: после DELETE из `user_roles` запрет если
+      у user'a осталось 0 ролей
+    - `prevent_last_admin_demotion`: запрет remove admin role если
+      это был последний **active** admin (deactivated user'ы не
+      считаются)
+
+11. **Nav-zone-switcher** — если у user'a несколько ролей, в каждом
+    nav (DashboardNav/InstructorNav/AdminNav) появляется блок ссылок
+    на другие доступные зоны. Default landing после login — приоритет
+    `admin > instructor > student`.
+
+### Deactivation
+
+12. **`users.deactivated_at INTEGER NULL`** — soft, reversible. Deactivated
+    user **может login'иться**, но `computeRedirectTarget` и guards
+    редиректят на `/[locale]/inactive` страницу-заглушку. `/account`
+    доступен (для re-activation request). Все enrollments скрыты через
+    `hasAccessToModule`.
+
+13. **Anonymize endpoint** — `POST /api/admin/users/[id]/anonymize`:
+    email → `deleted-{uuid}@example.invalid`, name → NULL,
+    `auth_methods` + `auth_sessions` → DELETE. Audit_log сохраняется.
+    Irreversible.
+
+### API (admin scope)
+
+14. **Endpoints:**
+    ```
+    GET    /api/admin/users                  list/filter/search
+    GET    /api/admin/users/[id]             detail
+    POST   /api/admin/users                  create (+ опционально enrollment)
+                                              auto-trigger password-reset email
+    PATCH  /api/admin/users/[id]             name, locale, email
+    PATCH  /api/admin/users/[id]/roles       { roles: [...] }
+    POST   /api/admin/users/[id]/reset-password    re-issue password-reset
+    POST   /api/admin/users/[id]/send-password-setup  for first-time login (no auth_methods yet)
+    POST   /api/admin/users/[id]/deactivate
+    POST   /api/admin/users/[id]/reactivate
+    POST   /api/admin/users/[id]/anonymize         irreversible
+
+    GET    /api/admin/enrollments
+    POST   /api/admin/enrollments            grant { user_id, programme_slug, lead_instructor_id? }
+    PATCH  /api/admin/enrollments/[id]       status, lead_instructor_id
+    POST   /api/admin/enrollments/[id]/modules        add (auto-resolve deps)
+    DELETE /api/admin/enrollments/[id]/modules/[slug] remove (block on dependents)
+    ```
+    **Отдельного `invite` endpoint нет** — `POST /api/admin/users` =
+    create + auto-send password-setup email через существующую
+    password-reset infrastructure (KV_VERIFY_TOKENS + email-template
+    вариант).
+
+15. **Lead instructor per enrollment** — `enrollments.lead_instructor_id NULLABLE`.
+    Single lead (Option 1 из обсуждения). Только lead + admin могут
+    add/remove modules + менять price. Другие instructor'ы видят
+    read-only + могут оставлять feedback на homework через
+    `feedback.instructor_id`. Cohort scheduling с 2+ instructors —
+    Sprint 2 через `runs.lead_instructor_id` + `run_instructors` M2M.
+
+### Доступ и helpers
+
+16. **`hasAccessToModule(env, userId, slug)`** — централизованный helper:
+    проверяет `users.deactivated_at IS NULL` + active enrollment с
+    этим slug в `enrollment_modules`. Используется во всех точках
+    рендера приватного контента (media, modules page, homework).
+
+17. **`requireRole(ctx, role)`** — guard helper. Не залогинен →
+    redirect на `/{locale}/login?return_to=...`. Не та роль → 404
+    (info-hiding). Deactivated → redirect на `/{locale}/inactive`.
+
+18. **`computeRedirectTarget(user, returnTo)`** — единая логика
+    post-login redirect. `sanitizeReturnTo` валидирует что
+    `return_to` ведёт в зону доступную user'ской роли (иначе silent
+    fallback на role-home).
+
+19. **JWT теряет role** — access JWT шифрует только user_id. Roles
+    читаются из БД на каждый guard через `getUserWithRoles`. Force-logout
+    на role change не нужен (additive — новая зона доступна сразу,
+    removal — guard блокирует на след. запрос).
+
+20. **Локаль-completeness:** каждый module обязан иметь обе локали
+    (`{slug}.en.mdx` И `{slug}.ru.mdx`). External repo CI ломает
+    merge при mismatch. Translation-pair validator Stage 7 — extended
+    version того же паттерна.
+
+### Programme pages rendering
+
+21. **`/[locale]/programmes/[id]` — `prerender = false`** (SSR).
+    Module titles живут в D1, denormalize в Content Collection
+    означает drift. SSR + CF edge cache `Cache-Control: s-maxage=60,
+    stale-while-revalidate=3600` даёт перф достаточный для маркетинг-страниц.
+
+### Bootstrap
+
+22. **Первый admin** — `lottoprof@gmail.com` (текущий пользователь).
+    Назначается one-off wrangler-командой после применения миграции
+    0004. Записано в `.agent/skills/deploy/SKILL.md` как bootstrap
+    procedure.
+
+### Что НЕ входит сейчас (явно отложено)
+
+- **Sync pipeline** методическое-репо → D1+R2 — Sprint 2 (Stage 21
+  использует STUB seeded модули)
+- **Payments** (real checkout, Lemon Squeezy/Paddle) — Sprint 2
+- **Runs / cohorts / scheduling** — Sprint 2
+- **Feedback / homework submission** — Sprint 2
+- **Optimistic concurrency** на enrollment_modules — Sprint 2 (риск
+  при ≤5 instructors практически отсутствует)
+- **Free preview modules** — Sprint 2 (lead magnet)
+- **Build-time validation programme.default_modules** — Sprint 2
+  (сейчас server expand'ит deps при checkout)
+
+**Альтернативы.**
+
+- **Сохранить tiers/bundles как отдельные сущности.** Отказ:
+  усложняет схему (4 таблицы вместо 2), bundles по факту были
+  "марикетинг = programme с подобранными модулями", tiers смешивались
+  с "programme-variant" — пользователи путались.
+- **Module body в D1 как TEXT.** Отказ: long body раздувает строки,
+  R2 дешевле и проще для версионности.
+- **Module body в moirai's Content Collection.** Отказ: методисты не
+  должны иметь доступ к фронтенд-коду; отдельный repo даёт чистую
+  границу ответственности.
+- **Single role с автоматической эскалацией** (admin → instructor →
+  student permissions). Отказ: не покрывает кейс admin-преподавателя
+  чисто (admin ≠ instructor в зонах, у каждой свой Nav). M2M даёт
+  семантически явный набор.
+- **JWT с roles внутри.** Отказ: refresh+verify добавляют latency
+  при role change; M2M запрос дёшев (одна индексированная D1-запрос).
+- **`/admin/[locale]/` (locale-prefixed).** Отказ: было предложено
+  пользователем, отозвано в пользу `/admin/` без локали (admin'ская
+  локаль в user.locale, контент language-aware на уровне страниц).
+
+**Причина.** Модель упрощается семантически (две таблицы вместо
+четырёх для enrollment-flow), даёт композицию programmes из reusable
+modules, отделяет методический контент от моиrai-кода, и поддерживает
+admin-преподавателей как natural multi-role. Каждое решение покрывает
+конкретный pain (tier confusion, single-role lockout, module-not-reusable,
+admin-zone-locale) без введения spec-уровневой сложности.
+
