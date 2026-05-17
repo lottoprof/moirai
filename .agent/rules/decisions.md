@@ -10,6 +10,12 @@
 
 ## 2026-05
 
+- **2026-05-17** (clarification) — Staff ⊥ Student: trigger
+  `staff_role_excludes_student` (migration 0006) автоматически
+  удаляет student-роль при INSERT admin/instructor. Admin/instructor
+  не могут одновременно быть student (staff = работают в платформе,
+  student = клиенты). Multi-role admin+instructor остаётся валидным
+  (admin-преподаватель). См. archive 2026-05-17 §staff⊥student.
 - **2026-05-17** — Переосмысление модели: **модули — first-class
   сущность** (источник в отдельном git-репо методистов, sync в
   D1+R2), **programmes — Content Collection шаблоны** с
