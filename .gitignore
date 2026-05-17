@@ -37,3 +37,4 @@ coverage/
 # Старый worktree от factory — удалён; запрет на повторное появление
 .agent/worktrees/
 .playwright-mcp/
+*.png
