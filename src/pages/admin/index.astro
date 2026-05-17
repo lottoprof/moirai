@@ -25,14 +25,25 @@ import Layout from "../../layouts/admin/Layout.astro";
 import InstructorHero from "../../components/instructor/InstructorHero.astro";
 import StatCard from "../../components/dashboard/StatCard.astro";
 import StudentRow from "../../components/instructor/StudentRow.astro";
-import { requireRole } from "../../lib/server/guards";
+import { getUserWithRoles } from "../../lib/server/guards";
+import { verifyRefreshSession } from "../../lib/server/session";
 
 export const prerender = false;
 
-const userOrRes = await requireRole(Astro, "admin");
-if (userOrRes instanceof Response) return userOrRes;
-const user = userOrRes;
+// Inline guard — без requireRole helper, потому что i18n + non-[locale]
+// route + return Response из вспомогательной функции даёт 404 со статусом
+// (вероятно Astro 5 adapter quirk). Astro.redirect() напрямую из
+// frontmatter работает корректно.
 const env = Astro.locals.runtime.env;
+const session = await verifyRefreshSession(env, Astro.request);
+if (!session) {
+  return Astro.redirect(`/en/login?return_to=${encodeURIComponent(Astro.url.pathname)}`, 302);
+}
+const user = await getUserWithRoles(env, session.userId);
+if (!user) return Astro.redirect("/en/login", 302);
+if (user.deactivated_at !== null) return Astro.redirect(`/${user.locale}/inactive`, 302);
+if (!user.roles.has("admin")) return new Response(null, { status: 404 });
+
 const locale = user.locale;
 
 // Реальные данные из D1

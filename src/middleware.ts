@@ -40,7 +40,7 @@ function detectLocale(
   return DEFAULT_LOCALE;
 }
 
-export const onRequest = defineMiddleware((ctx, next) => {
+export const onRequest = defineMiddleware(async (ctx, next) => {
   // Root: редирект на /{detected-locale}/ + X-Robots-Tag: noindex,
   // чтобы / не плодил duplicate content с локализованными версиями.
   // См. docs/Home_page_SEO.md §3, docs/Architecture.md §3.
@@ -58,9 +58,42 @@ export const onRequest = defineMiddleware((ctx, next) => {
     });
   }
 
-  // Auth-guard для [locale]/dashboard/** и /admin/** добавится здесь
-  // когда появятся auth_sessions и роуты dashboard/admin
-  // (см. docs/Architecture.md §13, .agent/rules/security.md).
+  // /admin/** auth-guard в middleware. Astro page-level redirect для
+  // non-[locale] SSR routes возвращает 404 со статусом (Astro 5 + CF
+  // adapter quirk — Response из frontmatter не сохраняет status 302).
+  // Middleware-level redirect работает корректно.
+  if (ctx.url.pathname === "/admin" || ctx.url.pathname.startsWith("/admin/")) {
+    const env = ctx.locals.runtime.env;
+    const { verifyRefreshSession } = await import("./lib/server/session");
+    const { getUserWithRoles } = await import("./lib/server/guards");
+    const session = await verifyRefreshSession(env, ctx.request);
+    if (!session) {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: `/en/login?return_to=${encodeURIComponent(ctx.url.pathname + ctx.url.search)}`,
+        },
+      });
+    }
+    const user = await getUserWithRoles(env, session.userId);
+    if (!user) {
+      return new Response(null, {
+        status: 302,
+        headers: { Location: `/en/login` },
+      });
+    }
+    if (user.deactivated_at !== null) {
+      return new Response(null, {
+        status: 302,
+        headers: { Location: `/${user.locale}/inactive` },
+      });
+    }
+    if (!user.roles.has("admin")) {
+      return new Response(null, { status: 404 });
+    }
+    // Прокидываем user в ctx.locals чтобы admin page не дублировал query
+    (ctx.locals as unknown as Record<string, unknown>).adminUser = user;
+  }
 
   return next();
 });

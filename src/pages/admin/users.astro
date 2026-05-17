@@ -13,15 +13,23 @@
 import Layout from "../../layouts/admin/Layout.astro";
 import InstructorHero from "../../components/instructor/InstructorHero.astro";
 import RoleBadge from "../../components/admin/RoleBadge.astro";
-import { requireRole } from "../../lib/server/guards";
+import { getUserWithRoles } from "../../lib/server/guards";
+import { verifyRefreshSession } from "../../lib/server/session";
 import type { Role } from "../../../db/types";
 
 export const prerender = false;
 
-const userOrRes = await requireRole(Astro, "admin");
-if (userOrRes instanceof Response) return userOrRes;
-const adminUser = userOrRes;
+// Inline guard — см. admin/index.astro объяснение workaround'а.
 const env = Astro.locals.runtime.env;
+const session = await verifyRefreshSession(env, Astro.request);
+if (!session) {
+  return Astro.redirect(`/en/login?return_to=${encodeURIComponent(Astro.url.pathname)}`, 302);
+}
+const adminUser = await getUserWithRoles(env, session.userId);
+if (!adminUser) return Astro.redirect("/en/login", 302);
+if (adminUser.deactivated_at !== null) return Astro.redirect(`/${adminUser.locale}/inactive`, 302);
+if (!adminUser.roles.has("admin")) return new Response(null, { status: 404 });
+
 const locale = adminUser.locale;
 
 const roleFilter = (Astro.url.searchParams.get("role") ?? "all") as

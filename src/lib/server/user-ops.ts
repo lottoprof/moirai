@@ -23,7 +23,7 @@ import type {
 // ============================================================
 
 const USER_COLUMNS =
-  "id, email, email_verified_at, name, locale, role, referral_code, created_at, updated_at";
+  "id, email, email_verified_at, name, locale, referral_code, deactivated_at, created_at, updated_at";
 
 /** SELECT user by email (case-insensitive). */
 export async function findUserByEmail(
@@ -281,6 +281,35 @@ export async function unlinkAuthMethod(
   await env.DB.prepare(`DELETE FROM auth_methods WHERE id = ?`)
     .bind(methodId)
     .run();
+}
+
+/**
+ * Hard delete user — caacade очищает user_roles, auth_methods,
+ * auth_sessions. Перед DELETE FROM users NULL'ит ссылки granted_by
+ * во всех user_roles записях (FK без ON DELETE clause).
+ *
+ * Triggers prevent_role_orphan и prevent_last_admin_demotion (после
+ * migration 0005) проверяют `EXISTS user` и пропускают cascade-delete
+ * → удаление работает даже для последнего active admin'a.
+ *
+ * Для admin-UI: предпочитать `anonymize` (irreversible но preserves
+ * audit). Hard `deleteUser` — для специальных кейсов (test cleanup,
+ * GDPR full-erase, exceptional ops).
+ */
+export async function deleteUser(
+  env: Cloudflare.Env,
+  userId: string,
+): Promise<void> {
+  await env.DB.batch([
+    // 1. NULL granted_by во всех user_roles где он указывает на этого user'a
+    //    (FK без ON DELETE SET NULL — нужно ручное обнуление перед DELETE).
+    env.DB.prepare(
+      `UPDATE user_roles SET granted_by = NULL WHERE granted_by = ?`,
+    ).bind(userId),
+    // 2. DELETE user — cascade сносит user_roles, auth_methods, auth_sessions.
+    //    audit_log.user_id → SET NULL per 0001 schema.
+    env.DB.prepare(`DELETE FROM users WHERE id = ?`).bind(userId),
+  ]);
 }
 
 // ============================================================

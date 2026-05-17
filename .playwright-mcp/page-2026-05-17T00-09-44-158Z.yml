@@ -1,0 +1,77 @@
+- generic [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - navigation "Primary" [ref=e3]:
+    - link "Moirai." [ref=e4] [cursor=pointer]:
+      - /url: /en/
+    - generic [ref=e5]:
+      - group "Language" [ref=e6]:
+        - link "EN" [ref=e7] [cursor=pointer]:
+          - /url: /en/register
+        - generic [ref=e8]: /
+        - link "RU" [ref=e9] [cursor=pointer]:
+          - /url: /ru/register
+      - group "Primary" [ref=e10]:
+        - link "Sign in" [ref=e11] [cursor=pointer]:
+          - /url: /en/login
+        - generic [ref=e12]: /
+        - link "Sign up" [ref=e13] [cursor=pointer]:
+          - /url: /en/register
+  - main [ref=e14]:
+    - region "Create an account." [ref=e15]:
+      - generic [ref=e16]:
+        - paragraph [ref=e17]: Sign up
+        - heading "Create an account." [level=1] [ref=e18]
+        - paragraph [ref=e19]: Get access to the program and your dashboard.
+      - generic [ref=e20]:
+        - alert [ref=e56]: Too many attempts. Please wait an hour.
+        - generic [ref=e21]:
+          - generic [ref=e22]: Email
+          - textbox "Email" [ref=e23]: lottoprof@gmail.com
+        - generic [ref=e24]:
+          - generic [ref=e25]: Password
+          - textbox "Password" [ref=e26]: mP7zX-bridge-spring-2026
+          - paragraph [ref=e27]: Minimum 10 characters.
+        - generic [ref=e28]:
+          - generic [ref=e29]: Name
+          - textbox "Name" [ref=e30]: lottoprof
+          - paragraph [ref=e31]: Optional — how should we address you?
+        - button "Create account" [active] [ref=e34] [cursor=pointer]:
+          - text: Create account
+          - generic [ref=e35]: →
+        - generic [ref=e36]: or
+        - generic [ref=e37]:
+          - link "Continue with Google" [ref=e38] [cursor=pointer]:
+            - /url: /api/auth/oauth/google/start?locale=en
+          - link "Continue with Discord" [ref=e39] [cursor=pointer]:
+            - /url: /api/auth/oauth/discord/start?locale=en
+        - paragraph [ref=e40]:
+          - text: Already have an account?
+          - link "Sign in" [ref=e41] [cursor=pointer]:
+            - /url: /en/login
+          - text: .
+  - contentinfo [ref=e42]:
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - link "Moirai." [ref=e45] [cursor=pointer]:
+          - /url: /en/
+        - navigation "Footer" [ref=e46]:
+          - link "Beginner" [ref=e47] [cursor=pointer]:
+            - /url: /en/beginner
+          - link "Intermediate" [ref=e48] [cursor=pointer]:
+            - /url: /en/intermediate
+          - link "Works" [ref=e49] [cursor=pointer]:
+            - /url: /en/works
+          - link "Journal" [ref=e50] [cursor=pointer]:
+            - /url: /en/journal
+          - link "FAQ" [ref=e51] [cursor=pointer]:
+            - /url: /en/faq
+          - link "Contact" [ref=e52] [cursor=pointer]:
+            - /url: /en/contact
+      - generic [ref=e53]:
+        - text: © 2026 Moirai ·
+        - link "Privacy" [ref=e54] [cursor=pointer]:
+          - /url: /en/legal/privacy
+        - text: ·
+        - link "Terms" [ref=e55] [cursor=pointer]:
+          - /url: /en/legal/terms
