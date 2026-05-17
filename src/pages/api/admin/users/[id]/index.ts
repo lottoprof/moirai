@@ -56,10 +56,12 @@ export const PATCH: APIRoute = async (ctx) => {
     updates.push("name = ?");
     binds.push(name);
   }
-  if (email !== undefined) {
+  if (email !== undefined && email.toLowerCase() !== target.email) {
+    // Только при ФАКТИЧЕСКОМ изменении email — сбрасываем verified.
+    // Иначе frontend (admin drawer) при каждом Save'е "обнулял" verified
+    // даже если email не трогали — pending status у активных user'ов.
     updates.push("email = ?");
     binds.push(email.toLowerCase());
-    // Reset email_verified_at on email change (user должен пере-verify'нуть)
     updates.push("email_verified_at = NULL");
   }
   if (locale !== undefined) {
