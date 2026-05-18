@@ -54,11 +54,16 @@ const robotsContent = seo.noindex
   : "index, follow, max-image-preview:large";
 ---
 
-{/* Favicon — film-strip SVG с "M" в центральном кадре, brand colors
-    (ink + amber + paper, Cormorant italic). Vector → масштабируется
-    для всех размеров. apple-touch-icon добавим когда понадобится
-    (требует rasterized PNG 180×180 на ink-фоне). */}
+{/* Favicons — film-strip с "M" в центральном кадре, brand colors
+    (ink + amber + paper, Cormorant italic).
+      - .svg — modern браузеры, vector, scales
+      - 32×32 / 16×16 PNG — legacy browser fallback
+      - 180×180 PNG — apple-touch-icon (iOS Home Screen + Safari)
+    Все три PNG растеризованы из favicon.svg через sharp (см. plan). */}
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
 {/* Font preload — критичные файлы для LCP (hero h1 + body на старте).
     crossorigin обязателен даже для same-origin, иначе preload не
