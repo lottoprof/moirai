@@ -54,6 +54,12 @@ const robotsContent = seo.noindex
   : "index, follow, max-image-preview:large";
 ---
 
+{/* Favicon — film-strip SVG с "M" в центральном кадре, brand colors
+    (ink + amber + paper, Cormorant italic). Vector → масштабируется
+    для всех размеров. apple-touch-icon добавим когда понадобится
+    (требует rasterized PNG 180×180 на ink-фоне). */}
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
 {/* Font preload — критичные файлы для LCP (hero h1 + body на старте).
     crossorigin обязателен даже для same-origin, иначе preload не
     match'ится с @font-face запросом и грузится дважды. */}

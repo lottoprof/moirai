@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" fill="#0D0B09"/>
+
+  <!-- top perf strip -->
+  <rect x="0" y="0" width="64" height="13" fill="#1A1612"/>
+  <!-- bottom perf strip -->
+  <rect x="0" y="51" width="64" height="13" fill="#1A1612"/>
+
+  <!-- top perforations -->
+  <rect x="4"  y="3.5" width="7" height="6" rx="1" fill="#D4820A"/>
+  <rect x="15" y="3.5" width="7" height="6" rx="1" fill="#D4820A"/>
+  <rect x="26" y="3.5" width="7" height="6" rx="1" fill="#D4820A"/>
+  <rect x="37" y="3.5" width="7" height="6" rx="1" fill="#D4820A"/>
+  <rect x="48" y="3.5" width="7" height="6" rx="1" fill="#D4820A"/>
+
+  <!-- bottom perforations -->
+  <rect x="4"  y="54.5" width="7" height="6" rx="1" fill="#D4820A"/>
+  <rect x="15" y="54.5" width="7" height="6" rx="1" fill="#D4820A"/>
+  <rect x="26" y="54.5" width="7" height="6" rx="1" fill="#D4820A"/>
+  <rect x="37" y="54.5" width="7" height="6" rx="1" fill="#D4820A"/>
+  <rect x="48" y="54.5" width="7" height="6" rx="1" fill="#D4820A"/>
+
+  <!-- frame dividers -->
+  <line x1="21" y1="13" x2="21" y2="51" stroke="#1A1612" stroke-width="1.5"/>
+  <line x1="43" y1="13" x2="43" y2="51" stroke="#1A1612" stroke-width="1.5"/>
+
+  <!-- side frames dimmed -->
+  <rect x="0"  y="13" width="21" height="38" fill="#0D0B09" opacity="0.55"/>
+  <rect x="43" y="13" width="21" height="38" fill="#0D0B09" opacity="0.55"/>
+
+  <!-- M in center frame -->
+  <text
+    x="32" y="40"
+    font-family="Cormorant Garamond, Georgia, 'Times New Roman', serif"
+    font-size="26"
+    font-weight="300"
+    font-style="italic"
+    fill="#F7F3EC"
+    text-anchor="middle"
+  >M</text>
+</svg>
