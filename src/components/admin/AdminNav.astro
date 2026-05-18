@@ -5,6 +5,7 @@
  */
 
 import type { Role } from "../../../db/types";
+import Logo from "../shared/Logo.astro";
 
 interface Props {
   locale: "en" | "ru";
@@ -63,7 +64,7 @@ if (roles?.has("student")) {
 
 <nav class="admin-nav" aria-label={labels.aria}>
   <div class="admin-nav__brand">
-    <a href={`/admin/`} class="admin-nav__logo">Moirai.</a>
+    <a href={`/admin/`} class="admin-nav__logo" aria-label="Moirai admin"><Logo height={22} /></a>
     <a href={`/${locale}/`} class="admin-nav__site">{labels.site} <span aria-hidden="true">→</span></a>
   </div>
   <ul class="admin-nav__list" role="list">

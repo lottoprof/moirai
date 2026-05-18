@@ -16,6 +16,7 @@
  */
 
 import LangSwitcher from "./LangSwitcher.astro";
+import Logo from "../shared/Logo.astro";
 
 interface Props {
   locale: "en" | "ru";
@@ -47,7 +48,7 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
 ---
 
 <nav class="nav" aria-label={labels.aria}>
-  <a href={`/${locale}/`} class="nav__logo">Moirai.</a>
+  <a href={`/${locale}/`} class="nav__logo" aria-label="Moirai home"><Logo height={28} /></a>
   <div class="nav__right">
     <LangSwitcher current={locale} pathname={pathname} />
 

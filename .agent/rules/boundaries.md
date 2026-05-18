@@ -109,6 +109,12 @@ Owner: `agents/astro-admin.md`.
   `hasAccessToModule`.
 - `src/lib/server/auth-redirect.ts` — `computeRedirectTarget`,
   `sanitizeReturnTo`.
+- `src/components/shared/**` — UI-компоненты используемые во ВСЕХ
+  Nav/Layout (public, dashboard, instructor, admin). Сейчас: `Logo.astro`
+  (wordmark с reel-monogram, theme-adaptive через currentColor).
+  Допустимо импортировать из любого слоя. Не клади сюда зональную
+  логику — только нейтральные UI-примитивы (logo, brand-marks, отметки
+  бренда).
 
 ## Server layer
 
