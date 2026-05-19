@@ -13,6 +13,9 @@
     "lint": "eslint .",
     "typecheck": "astro check",
     "prepare": "wrangler types || true",
+    "seed:modules": "node scripts/seed-modules.mjs",
+    "seed:modules:local": "node scripts/seed-modules.mjs --local",
+    "seed:modules:dry": "node scripts/seed-modules.mjs --dry-run",
     "deploy": "pnpm build && wrangler pages deploy ./dist --project-name moirai --branch main --commit-message \"$(git log -1 --pretty=%s)\"",
     "deploy:preview": "pnpm build && wrangler pages deploy ./dist --project-name moirai --commit-message \"$(git log -1 --pretty=%s)\""
   },

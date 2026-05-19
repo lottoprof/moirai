@@ -1,0 +1,1040 @@
+{
+  "version": "2026-05-19",
+  "source": "Moirai_Modules_Template 1V.ods (methodist initial)",
+  "translation_note": "EN — professional translation. Будут править через git когда заведём external repo.",
+  "schema_note": "lessons = количество занятий (не дней); длительность одного занятия не фиксируется. has_external_video = есть YouTube/Vimeo ссылки в body.",
+  "modules": [
+    {
+      "slug": "beg-01-lumiere-frame",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 1,
+      "ru": {
+        "title": "Кадр Люмьера",
+        "summary": "Погружение в истоки кинематографа через практику наблюдения за повседневной жизнью и освоение основ композиции кадра.",
+        "objectives": [
+          "Знать, откуда пошёл кинематограф",
+          "Научиться вести наблюдение и различать интересные ситуации в повседневной жизни",
+          "Практика постановки кадра"
+        ],
+        "concepts": [
+          "Зарождение кино",
+          "братья Люмьер",
+          "кинематограф",
+          "неподвижная камера",
+          "наблюдение"
+        ],
+        "homework": "Упражнение «Кадр Люмьера». Документальный видеофрагмент до одной минуты, статичная камера, с живыми объектами в кадре, без монтажных склеек, VFX и экранной речи (желательно также обойтись без музыки)."
+      },
+      "en": {
+        "title": "Lumière Frame",
+        "summary": "A dive into the origins of cinema through the practice of observing everyday life and mastering the fundamentals of frame composition.",
+        "objectives": [
+          "Understand the origins of cinema",
+          "Learn to observe and identify compelling moments in everyday life",
+          "Practice composing a frame"
+        ],
+        "concepts": [
+          "Birth of cinema",
+          "the Lumière brothers",
+          "cinematograph",
+          "static camera",
+          "observation"
+        ],
+        "homework": "“Lumière Frame” exercise. A documentary video clip up to one minute, with a static camera and live subjects in the frame, no edits, VFX, or on-screen speech (music ideally avoided too)."
+      }
+    },
+    {
+      "slug": "beg-02-melies-frame",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 2,
+      "ru": {
+        "title": "Кадр Мельеса",
+        "summary": "Знакомство с магией раннего кино через первые эксперименты с монтажом, историю спецэффектов и поиск неожиданных визуальных решений в обычных сценах.",
+        "objectives": [
+          "Первые эксперименты с монтажом",
+          "Экскурс в историю спецэффектов",
+          "Поиск нестандартных визуальных решений в простых сценах"
+        ],
+        "concepts": [
+          "Жорж Мельес",
+          "базовый монтаж",
+          "примитивные спецэффекты"
+        ],
+        "homework": "Снять «Кадр Мельеса». Художественная зарисовка до двух минут с использованием примитивных спецэффектов (стоп-кадры, межкадровый монтаж, многократная экспозиция). Использование звука и музыки допускается."
+      },
+      "en": {
+        "title": "Méliès Frame",
+        "summary": "Encountering the magic of early cinema through the first experiments in editing, the history of visual effects, and the search for unexpected visual solutions in ordinary scenes.",
+        "objectives": [
+          "Early experiments in editing",
+          "An excursion into the history of visual effects",
+          "Finding unconventional visual solutions in simple scenes"
+        ],
+        "concepts": [
+          "Georges Méliès",
+          "basic editing",
+          "primitive visual effects"
+        ],
+        "homework": "Shoot a “Méliès Frame”. A fictional vignette up to two minutes using primitive visual effects (stop motion, in-camera edits, multiple exposure). Sound and music are allowed."
+      }
+    },
+    {
+      "slug": "beg-03-composition",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 2,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 3,
+      "ru": {
+        "title": "Композиция кадра",
+        "summary": "Освоение ключевых принципов построения кадра: размещение объектов и субъектов в пространстве экрана, работа с крупностями и правило третей.",
+        "objectives": [
+          "Учимся правильно выставлять кадры, объекты и субъекты на экране",
+          "Работа с крупностями и правилом третей"
+        ],
+        "concepts": [
+          "Крупности кадра",
+          "правило третей",
+          "линия горизонта",
+          "симметрия"
+        ],
+        "homework": "Снять два коротких видеоролика в виде натюрморта (неодушевлённые объекты в кадре) и портрета (человек в кадре) без монтажных склеек (не считая fade to black, background music, color correction и т.п.)."
+      },
+      "en": {
+        "title": "Frame Composition",
+        "summary": "Mastering the key principles of building a frame: placing objects and subjects within screen space, working with shot sizes, and the rule of thirds.",
+        "objectives": [
+          "Learn to compose frames correctly; place objects and subjects in the screen",
+          "Work with shot sizes and the rule of thirds"
+        ],
+        "concepts": [
+          "Shot sizes",
+          "rule of thirds",
+          "horizon line",
+          "symmetry"
+        ],
+        "homework": "Shoot two short clips: a still life (inanimate objects in frame) and a portrait (a person in frame), without edits (apart from fade to black, background music, color correction, etc.)."
+      }
+    },
+    {
+      "slug": "beg-04-kuleshov-effect",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 4,
+      "ru": {
+        "title": "Эффект Кулешова",
+        "summary": "Введение в искусство монтажа через знаменитый эксперимент Кулешова: как порядок кадров меняет восприятие истории зрителем.",
+        "objectives": [
+          "Введение в монтаж",
+          "Изучение влияния следующих друг за другом кадров на восприятие истории зрителем"
+        ],
+        "concepts": [
+          "Эффект Кулешова",
+          "пазл",
+          "восприятие"
+        ],
+        "homework": "Проверить эффект Кулешова на практике: снять три разных сцены по три кадра в каждой с одинаковым кадром посередине."
+      },
+      "en": {
+        "title": "Kuleshov Effect",
+        "summary": "An introduction to the art of editing through Kuleshov’s famous experiment: how the order of shots shapes the viewer’s perception of a story.",
+        "objectives": [
+          "Introduction to editing",
+          "Study how a sequence of shots influences the viewer’s perception of the story"
+        ],
+        "concepts": [
+          "Kuleshov effect",
+          "puzzle",
+          "perception"
+        ],
+        "homework": "Test the Kuleshov effect in practice: shoot three different scenes with three shots each, sharing the same middle shot."
+      }
+    },
+    {
+      "slug": "beg-05-voiceover",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 5,
+      "ru": {
+        "title": "Монолог, закадровый голос, рассказчик",
+        "summary": "Роль закадрового голоса в кино: его функции, возможности и способы выстраивания повествования с его помощью.",
+        "objectives": [
+          "Зачем нужен закадровый голос и какую функцию он может выполнять",
+          "Каким образом с его помощью выстраивается нарратив"
+        ],
+        "concepts": [
+          "Голос за кадром",
+          "использование в игровом/неигровом кино",
+          "надёжный/ненадёжный рассказчик"
+        ],
+        "homework": "Снять две коротких зарисовки (1–2 минуты) с использованием закадрового голоса в игровом и неигровом формате."
+      },
+      "en": {
+        "title": "Monologue, Voice-Over, Narrator",
+        "summary": "The role of voice-over in cinema: its functions, possibilities, and ways of building narrative with it.",
+        "objectives": [
+          "Why voice-over exists and what function it can serve",
+          "How a narrative is shaped using voice-over"
+        ],
+        "concepts": [
+          "Voice-over",
+          "use in fiction/non-fiction",
+          "reliable/unreliable narrator"
+        ],
+        "homework": "Shoot two short vignettes (1–2 minutes) using voice-over — one fiction, one non-fiction."
+      }
+    },
+    {
+      "slug": "beg-06-three-act-structure",
+      "track": "Scriptwriting",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 6,
+      "ru": {
+        "title": "Основы драматургии + трёхактная структура",
+        "summary": "Освоение классической трёхактной структуры как основы сторителлинга: от завязки через развитие событий к финалу истории.",
+        "objectives": [
+          "Учимся структурировать историю",
+          "Изучаем акты — где начинается, развивается и заканчивается сюжет"
+        ],
+        "concepts": [
+          "Трёхактная структура",
+          "драматургия",
+          "тайминг",
+          "развитие истории",
+          "темп повествования"
+        ],
+        "homework": "Написать короткую историю (одна страница А4), в которой чётко расписаны начало, середина и конец."
+      },
+      "en": {
+        "title": "Dramaturgy Basics + Three-Act Structure",
+        "summary": "Mastering the classical three-act structure as the foundation of storytelling: from setup through development to the story’s resolution.",
+        "objectives": [
+          "Learn to structure a story",
+          "Study acts — where a plot begins, develops, and ends"
+        ],
+        "concepts": [
+          "Three-act structure",
+          "dramaturgy",
+          "timing",
+          "story development",
+          "narrative pace"
+        ],
+        "homework": "Write a short story (one A4 page) with a clearly defined beginning, middle, and end."
+      }
+    },
+    {
+      "slug": "beg-07-characters",
+      "track": "Scriptwriting",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 7,
+      "ru": {
+        "title": "Персонажи — протагонист, антагонист",
+        "summary": "Создание убедительных главных и второстепенных персонажей через глубокую проработку их психологического и визуального портрета.",
+        "objectives": [
+          "Создание персонажей (заглавных и второстепенных) для истории",
+          "Проработка деталей, психологический и визуальный портрет"
+        ],
+        "concepts": [
+          "Протагонист",
+          "антагонист",
+          "второстепенные персонажи",
+          "характеры",
+          "манера общения",
+          "бэкграунд",
+          "визуальный портрет"
+        ],
+        "homework": "Прописать нового (главного или второстепенного) героя для короткой истории из предыдущего задания и ответить на вопросы вида «Что привносит в сюжет данный персонаж? Почему он интересен зрителю? Он протагонист или антагонист?» и т.д."
+      },
+      "en": {
+        "title": "Characters — Protagonist, Antagonist",
+        "summary": "Creating convincing main and supporting characters through deep work on their psychological and visual portrait.",
+        "objectives": [
+          "Create characters (leads and supporting) for a story",
+          "Work on detail; build a psychological and visual portrait"
+        ],
+        "concepts": [
+          "Protagonist",
+          "antagonist",
+          "supporting characters",
+          "personality",
+          "communication style",
+          "backstory",
+          "visual portrait"
+        ],
+        "homework": "Write a new character (lead or supporting) for the short story from the previous assignment and answer questions like “What does this character bring to the plot? Why is the character interesting to the viewer? Are they a protagonist or an antagonist?” and so on."
+      }
+    },
+    {
+      "slug": "beg-08-dialogue",
+      "track": "Scriptwriting",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 8,
+      "ru": {
+        "title": "Монолог и диалог в сценарии",
+        "summary": "Изучаем разницу между монологом и диалогом и их роль в повествовании.",
+        "objectives": [
+          "Выяснить, чем отличается монолог от диалога",
+          "Как правильно использовать их в повествовании"
+        ],
+        "concepts": [
+          "Монолог",
+          "диалог",
+          "функция в повествовании"
+        ],
+        "homework": "Написать монолог или диалог для предыдущей истории, который коренным образом влияет на сюжет и изменяет дальнейшее повествование."
+      },
+      "en": {
+        "title": "Monologue and Dialogue in Screenwriting",
+        "summary": "We explore the difference between monologue and dialogue and their role in narrative.",
+        "objectives": [
+          "Identify the difference between monologue and dialogue",
+          "Learn how to use them correctly in narrative"
+        ],
+        "concepts": [
+          "Monologue",
+          "dialogue",
+          "function within narrative"
+        ],
+        "homework": "Write a monologue or dialogue for the previous story that fundamentally changes the plot and the rest of the narrative."
+      }
+    },
+    {
+      "slug": "beg-09-sound-editing",
+      "track": "Editing",
+      "has_text": 1,
+      "has_video": 1,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 9,
+      "ru": {
+        "title": "Монтаж звука",
+        "summary": "Практическое знакомство с инструментами звукового оформления фильма: работа с бесплатными звукобанками, подбор SFX и музыки без авторских отчислений, базовые аудиоэффекты и переходы.",
+        "objectives": [
+          "Знакомство с бесплатными звукобанками; поиск нужных SFX и royalty-free music",
+          "Минимальные аудиоэффекты и переходы"
+        ],
+        "concepts": [
+          "монтаж звука",
+          "звукобанки",
+          "royalty-free",
+          "SFX",
+          "BGM (background music)",
+          "audio effects",
+          "volume meters"
+        ],
+        "homework": "Берём короткую сцену без звука и добавляем в неё необходимые SFX и, при желании, background music."
+      },
+      "en": {
+        "title": "Sound Editing",
+        "summary": "A practical introduction to film sound design tools: working with free sound libraries, selecting royalty-free SFX and music, basic audio effects and transitions.",
+        "objectives": [
+          "Get to know free sound libraries; find the right SFX and royalty-free music",
+          "Basic audio effects and transitions"
+        ],
+        "concepts": [
+          "sound editing",
+          "sound libraries",
+          "royalty-free",
+          "SFX",
+          "BGM (background music)",
+          "audio effects",
+          "volume meters"
+        ],
+        "homework": "Take a short silent scene and add the necessary SFX and, optionally, background music."
+      }
+    },
+    {
+      "slug": "beg-10-shot-sizes-editing",
+      "track": "Editing",
+      "has_text": 1,
+      "has_video": 1,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 10,
+      "ru": {
+        "title": "Монтаж по крупности",
+        "summary": "Закрепление знаний о крупностях кадра и отработка навыков их чередования на практике в монтажных программах.",
+        "objectives": [
+          "Повторяем крупности кадра и учимся ими жонглировать",
+          "Практикуем знания в монтажных программах"
+        ],
+        "concepts": [
+          "long shot",
+          "master shot",
+          "medium shot",
+          "close-up",
+          "extreme close-up / detail shot"
+        ],
+        "homework": "Берём raw footage одной короткой сцены и монтируем её, соблюдая правила монтажа по крупности."
+      },
+      "en": {
+        "title": "Editing by Shot Size",
+        "summary": "Reinforcing knowledge of shot sizes and practicing how to alternate them in editing software.",
+        "objectives": [
+          "Review shot sizes and learn to juggle them",
+          "Practice in editing software"
+        ],
+        "concepts": [
+          "long shot",
+          "master shot",
+          "medium shot",
+          "close-up",
+          "extreme close-up / detail shot"
+        ],
+        "homework": "Take raw footage of one short scene and edit it following the rules of shot-size editing."
+      }
+    },
+    {
+      "slug": "beg-11-video-editors",
+      "track": "Editing",
+      "has_text": 1,
+      "has_video": 1,
+      "has_external_video": 0,
+      "has_homework": 0,
+      "lessons": 2,
+      "requires_modules": [],
+      "suggested_programme": "beginner",
+      "suggested_order": 11,
+      "ru": {
+        "title": "Знакомство с видеоредакторами (CapCut / Premiere)",
+        "summary": "Первое знакомство с видеоредактором: изучение интерфейса, организация материала, работа с таймлайном, добавление титров и финальный рендеринг.",
+        "objectives": [
+          "Знакомство с интерфейсом",
+          "Структуризация отснятого материала (bins), работа с таймлайном, рендеринг, титры"
+        ],
+        "concepts": [
+          "Adobe Premiere",
+          "CapCut",
+          "bins",
+          "timeline",
+          "рендеринг",
+          "форматы аудио и видео",
+          "fade-in / fade-out",
+          "credits"
+        ],
+        "homework": ""
+      },
+      "en": {
+        "title": "Intro to Video Editors (CapCut / Premiere)",
+        "summary": "A first encounter with a video editor: learning the interface, organizing material, working with the timeline, adding titles, and final rendering.",
+        "objectives": [
+          "Get to know the interface",
+          "Organize footage (bins); work with the timeline; rendering; titles"
+        ],
+        "concepts": [
+          "Adobe Premiere",
+          "CapCut",
+          "bins",
+          "timeline",
+          "rendering",
+          "audio and video formats",
+          "fade-in / fade-out",
+          "credits"
+        ],
+        "homework": ""
+      }
+    },
+    {
+      "slug": "int-01-dialogue-coverage",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 1,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 1,
+      "ru": {
+        "title": "Диалог — «восьмёрка», конфликт, разрешение",
+        "summary": "Освоение техники съёмки диалоговых сцен: позиционирование камер, работа с актёром в кадре и знакомство с нестандартными подходами к диалогу.",
+        "objectives": [
+          "Изучение съёмки диалоговых сцен",
+          "Позиционирование камер; человек в кадре",
+          "Бонус — рассматриваем необычный подход к съёмке диалогов"
+        ],
+        "concepts": [
+          "«Восьмёрка» (coverage)",
+          "конфликт",
+          "разрешение"
+        ],
+        "homework": "Экранизируем короткий литературный диалог: снимаем сцену «восьмёркой» + оправданно меняем крупность кадра внутри сцены."
+      },
+      "en": {
+        "title": "Dialogue — “Eight” Coverage, Conflict, Resolution",
+        "summary": "Mastering the technique of shooting dialogue scenes: camera positioning, working with the actor on camera, and exploring unconventional approaches to dialogue.",
+        "objectives": [
+          "Learn to shoot dialogue scenes",
+          "Camera positioning; the person on camera",
+          "Bonus — a look at an unusual approach to shooting dialogue"
+        ],
+        "concepts": [
+          "“Eight” coverage",
+          "conflict",
+          "resolution"
+        ],
+        "homework": "Adapt a short literary dialogue to screen: shoot the scene using “eight” coverage and change shot sizes within the scene in a justified way."
+      }
+    },
+    {
+      "slug": "int-02-chase-scene",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 1,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 2,
+      "ru": {
+        "title": "Погоня — динамика, монтаж действия",
+        "summary": "Разбор культовых сцен погонь через призму темпоритма, монтажа действия, роли музыки и препятствий — с пониманием погони как самостоятельной мини-истории.",
+        "objectives": [
+          "Разбор известных сцен с погонями",
+          "Темпоритм, препятствия на пути, использование музыки",
+          "Погоня как мини-история"
+        ],
+        "concepts": [
+          "Погоня",
+          "препятствия",
+          "догоняющий и убегающий",
+          "факторы скорости"
+        ],
+        "homework": "Снять короткую погоню, оправдать её сюжетно, выстроить вокруг неё маленькую историю, удержать правильный ритм."
+      },
+      "en": {
+        "title": "Chase — Dynamics, Action Editing",
+        "summary": "An analysis of iconic chase scenes through the lens of rhythm, action editing, the role of music and obstacles — understanding the chase as a self-contained mini-story.",
+        "objectives": [
+          "Analyze famous chase scenes",
+          "Rhythm; obstacles in the path; use of music",
+          "The chase as a mini-story"
+        ],
+        "concepts": [
+          "Chase",
+          "obstacles",
+          "pursuer and pursued",
+          "speed factors"
+        ],
+        "homework": "Shoot a short chase, justify it within the plot, build a small story around it, and keep the right rhythm."
+      }
+    },
+    {
+      "slug": "int-03-pitching",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 2,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 3,
+      "ru": {
+        "title": "Короткометражный фильм — питчинг",
+        "summary": "Практика питчинга короткометражного фильма: умение презентовать идею, отстаивать её под вопросами и конструктивно воспринимать критику.",
+        "objectives": [
+          "Проходим процедуру питчинга",
+          "Учимся продавать идеи, отвечать на дополнительные вопросы",
+          "Защищать свою идею и правильно воспринимать критику"
+        ],
+        "concepts": [
+          "Питчинг",
+          "синопсис",
+          "идея",
+          "Q&A"
+        ],
+        "homework": "Запитчить идею короткометражного фильма (проще говоря — подготовить презентацию)."
+      },
+      "en": {
+        "title": "Short Film — Pitching",
+        "summary": "Pitching practice for a short film: the ability to present an idea, defend it under questions, and constructively receive criticism.",
+        "objectives": [
+          "Go through the pitching process",
+          "Learn to sell ideas; answer follow-up questions",
+          "Defend your idea; receive criticism well"
+        ],
+        "concepts": [
+          "Pitching",
+          "synopsis",
+          "idea",
+          "Q&A"
+        ],
+        "homework": "Pitch the idea of a short film (in plain terms — prepare a presentation)."
+      }
+    },
+    {
+      "slug": "int-04-actor-direction",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 2,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 4,
+      "ru": {
+        "title": "Работа с актёром — кастинг, читка, съёмки",
+        "summary": "От кастинга до площадки. Типы актёров и что от них ждать, как проводить прослушивание, зачем нужны ридтруны и как давать direction, который реально работает.",
+        "objectives": [
+          "Научиться общаться",
+          "Правильно и результативно проводить кастинг"
+        ],
+        "concepts": [
+          "Типы актёров (профессионалы / студенты / непрофессионалы)",
+          "портфолио",
+          "кастинг"
+        ],
+        "homework": "Разделиться на пары и провести кастинг друг другу, записав. Разбор будет на следующем уроке."
+      },
+      "en": {
+        "title": "Working with the Actor — Casting, Read-Through, Shoot",
+        "summary": "From casting to set. Types of actors and what to expect from them, how to conduct auditions, why read-throughs matter, and how to give direction that actually works.",
+        "objectives": [
+          "Learn to communicate",
+          "Conduct a productive casting session"
+        ],
+        "concepts": [
+          "Types of actors (professionals / students / non-professionals)",
+          "portfolio",
+          "casting"
+        ],
+        "homework": "Split into pairs and run a casting for each other, recording it. Review will happen in the next session."
+      }
+    },
+    {
+      "slug": "int-05-director-skills",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 5,
+      "ru": {
+        "title": "Работа с собой — скиллы режиссёра, взаимодействие с цехами",
+        "summary": "Психология режиссёра до и во время съёмок. Как выстраивать авторитет, разговаривать с командой и актёрами на разных языках, управлять конфликтами и не сгореть.",
+        "objectives": [
+          "Понять, как решать проблемы с разными типами людей на площадке"
+        ],
+        "concepts": [
+          "Режиссёр как менеджер",
+          "коммуникация с цехами",
+          "управление конфликтами"
+        ],
+        "homework": "Выбрать на свой вкус актёра и музыканта, изучить их биографии и всё, что найдётся в интернете, дать короткий бриф и рассказать, как решали бы проблему с такими людьми."
+      },
+      "en": {
+        "title": "Working on Yourself — Director’s Skills, Department Interaction",
+        "summary": "A director’s psychology before and during a shoot. How to build authority, speak the right “language” with crew and actors, manage conflicts, and avoid burnout.",
+        "objectives": [
+          "Understand how to handle problems with different types of people on set"
+        ],
+        "concepts": [
+          "Director as manager",
+          "communication with departments",
+          "conflict management"
+        ],
+        "homework": "Choose an actor and a musician you find interesting, study their biographies and everything you can find online, write a short brief, and explain how you would handle a problem with such people."
+      }
+    },
+    {
+      "slug": "int-06-production-phases",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 6,
+      "ru": {
+        "title": "Режиссура как нетворческая профессия — пре/прод/пост",
+        "summary": "Режиссёр как менеджер. Реалистичный тайминг препродакшна, что происходит на площадке и почему большинство первых фильмов разваливается именно в постпродакшне.",
+        "objectives": [
+          "Структурировать и понять ключевые моменты работы режиссёра"
+        ],
+        "concepts": [
+          "Препродакшн",
+          "продакшн",
+          "постпродакшн"
+        ],
+        "homework": "Взять одну из тем (препродакшн, продакшн, постпродакшн) и расписать под ваш будущий фильм, что вам необходимо, чтобы работа прошла успешно. Подробно расписать каждый этап."
+      },
+      "en": {
+        "title": "Directing as a Non-Creative Profession — Pre/Prod/Post",
+        "summary": "The director as a manager. Realistic pre-production timing, what really happens on set, and why most first films fall apart specifically in post-production.",
+        "objectives": [
+          "Structure and understand the key moments of a director’s work"
+        ],
+        "concepts": [
+          "Pre-production",
+          "production",
+          "post-production"
+        ],
+        "homework": "Take one of the topics (pre-production, production, post-production) and lay out what you need for your future film for the work to succeed. Describe each step in detail."
+      }
+    },
+    {
+      "slug": "int-07-shooting-script",
+      "track": "Directing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 7,
+      "ru": {
+        "title": "Режиссёрский сценарий — что это и с кем согласовывать",
+        "summary": "Что такое режиссёрский сценарий и почему он не то же самое, что screenplay.",
+        "objectives": [
+          "Научиться организовывать и структурировать работу и ключевые позиции по дням"
+        ],
+        "concepts": [
+          "Режиссёрский сценарий",
+          "тип кадра",
+          "движение камеры",
+          "монтажный переход",
+          "технические пометки для департаментов"
+        ],
+        "homework": "Сделать режиссёрский сценарий для своего фильма."
+      },
+      "en": {
+        "title": "Shooting Script — What It Is and Whom to Coordinate With",
+        "summary": "What a shooting script is and why it is not the same as a screenplay.",
+        "objectives": [
+          "Learn to organize and structure the work and key positions by day"
+        ],
+        "concepts": [
+          "Shooting script",
+          "shot type",
+          "camera movement",
+          "editing transition",
+          "technical notes for departments"
+        ],
+        "homework": "Create a shooting script for your film."
+      }
+    },
+    {
+      "slug": "int-08-world-building",
+      "track": "Scriptwriting",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 8,
+      "ru": {
+        "title": "Проработка мира — лор, среда, атмосфера",
+        "summary": "Создание убедительного мира истории через проработку лора и атмосферы средствами окружения и визуальной среды.",
+        "objectives": [
+          "Учимся создавать атмосферу за счёт окружения"
+        ],
+        "concepts": [
+          "Локация",
+          "освещение",
+          "погодные условия",
+          "цветовая палитра",
+          "ambient sounds"
+        ],
+        "homework": "Детально описать место действия для фильма."
+      },
+      "en": {
+        "title": "World-Building — Lore, Environment, Atmosphere",
+        "summary": "Creating a convincing story world through lore and atmosphere using environment and visual surroundings.",
+        "objectives": [
+          "Learn to build atmosphere through environment"
+        ],
+        "concepts": [
+          "Location",
+          "lighting",
+          "weather",
+          "color palette",
+          "ambient sounds"
+        ],
+        "homework": "Describe the setting of the film in detail."
+      }
+    },
+    {
+      "slug": "int-09-final-script",
+      "track": "Scriptwriting",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 9,
+      "ru": {
+        "title": "Готовый сценарий — структура и финальный вариант",
+        "summary": "Финальная доработка и утверждение сценария с проверкой его структуры и готовности к производству.",
+        "objectives": [
+          "Утверждение сценария"
+        ],
+        "concepts": [
+          "Драфты (от первого к финальному)",
+          "финализация",
+          "правки"
+        ],
+        "homework": "Предоставить готовый сценарий своего будущего короткометражного фильма."
+      },
+      "en": {
+        "title": "Final Script — Structure and Final Version",
+        "summary": "Final polishing and approval of the script with a check of its structure and production readiness.",
+        "objectives": [
+          "Approval of the script"
+        ],
+        "concepts": [
+          "Drafts (first to final)",
+          "finalization",
+          "revisions"
+        ],
+        "homework": "Submit the final script of your future short film."
+      }
+    },
+    {
+      "slug": "int-10-editing-principles",
+      "track": "Editing",
+      "has_text": 1,
+      "has_video": 1,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 3,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 10,
+      "ru": {
+        "title": "10 принципов монтажа",
+        "summary": "Изучение десяти ключевых принципов видеомонтажа на основе системы Алексея Соколова.",
+        "objectives": [
+          "Изучение принципов видеомонтажа по Алексею Соколову"
+        ],
+        "concepts": [
+          "Монтаж по крупности",
+          "по ориентации в пространстве",
+          "по направлению движения",
+          "по фазе движущихся объектов",
+          "по темпу",
+          "по композиции",
+          "по свету",
+          "по цвету",
+          "по смещению осей"
+        ],
+        "homework": "Показать и объяснить пять принципов монтажа на примере любой доступной сцены из любого фильма."
+      },
+      "en": {
+        "title": "10 Principles of Editing",
+        "summary": "A study of ten key principles of video editing based on Alexey Sokolov’s system.",
+        "objectives": [
+          "Study video-editing principles by Alexey Sokolov"
+        ],
+        "concepts": [
+          "Editing by shot size",
+          "spatial orientation",
+          "direction of movement",
+          "phase of moving objects",
+          "tempo",
+          "composition",
+          "light",
+          "color",
+          "axis shift"
+        ],
+        "homework": "Demonstrate and explain five editing principles using any available scene from any film."
+      }
+    },
+    {
+      "slug": "int-11-editing-practice",
+      "track": "Editing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 11,
+      "ru": {
+        "title": "Финальное упражнение по монтажу",
+        "summary": "Практическое закрепление знаний десяти принципов монтажа.",
+        "objectives": [
+          "Закрепление знаний практической работой"
+        ],
+        "concepts": [
+          "Монтаж по крупности",
+          "по ориентации в пространстве",
+          "по направлению движения",
+          "по фазе движущихся объектов",
+          "по темпу",
+          "по композиции",
+          "по свету",
+          "по цвету",
+          "по смещению осей"
+        ],
+        "homework": "Берём raw footage одной короткой сцены, монтируем её, последующий разбор решений с преподавателем."
+      },
+      "en": {
+        "title": "Final Editing Exercise",
+        "summary": "A practical consolidation of the ten editing principles.",
+        "objectives": [
+          "Consolidate knowledge through practical work"
+        ],
+        "concepts": [
+          "Editing by shot size",
+          "spatial orientation",
+          "direction of movement",
+          "phase of moving objects",
+          "tempo",
+          "composition",
+          "light",
+          "color",
+          "axis shift"
+        ],
+        "homework": "Take raw footage of one short scene, edit it, and afterwards review your decisions with the instructor."
+      }
+    },
+    {
+      "slug": "int-12-budget",
+      "track": "Producing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 12,
+      "ru": {
+        "title": "Как рассчитать бюджет фильма",
+        "summary": "Когда начинать считать деньги, как исследовать рынок, какие расходы новички всегда забывают, зачем нужен резерв 15% и как платить людям так, чтобы не потерять их доверие.",
+        "objectives": [
+          "Научиться считать бюджет"
+        ],
+        "concepts": [
+          "Максимальная смета",
+          "исследование рынка",
+          "скрытые расходы",
+          "резерв"
+        ],
+        "homework": "Составить бюджет для своего фильма, расписать и аргументировать каждый пункт."
+      },
+      "en": {
+        "title": "How to Budget a Film",
+        "summary": "When to start counting money, how to research the market, which expenses beginners always forget, why a 15% reserve matters, and how to pay people without losing their trust.",
+        "objectives": [
+          "Learn to budget a film"
+        ],
+        "concepts": [
+          "Maximum estimate",
+          "market research",
+          "hidden expenses",
+          "reserve"
+        ],
+        "homework": "Create a budget for your film, lay out each line and justify each item."
+      }
+    },
+    {
+      "slug": "int-13-locations-props",
+      "track": "Producing",
+      "has_text": 1,
+      "has_video": 0,
+      "has_external_video": 0,
+      "has_homework": 1,
+      "lessons": 1,
+      "requires_modules": [],
+      "suggested_programme": "intermediate",
+      "suggested_order": 13,
+      "ru": {
+        "title": "Локации, реквизит, выплаты",
+        "summary": "Практическая сторона производства. Как искать и закрывать локации, работать с реквизитом и костюмами, и почему беспорядок в деньгах разрушает съёмку быстрее всего остального.",
+        "objectives": [
+          "Познакомиться с концепцией создания препродакшена"
+        ],
+        "concepts": [
+          "Локации",
+          "разрешение на съёмку",
+          "реквизит",
+          "костюмы"
+        ],
+        "homework": "1) Составить экспликацию к своему будущему фильму. 2) Выбрать и обосновать 2–3 локации к своему будущему фильму."
+      },
+      "en": {
+        "title": "Locations, Props, Payments",
+        "summary": "The practical side of production. How to find and secure locations, work with props and costumes, and why financial disorder destroys a shoot faster than anything else.",
+        "objectives": [
+          "Get acquainted with the concept of building a pre-production"
+        ],
+        "concepts": [
+          "Locations",
+          "shooting permits",
+          "props",
+          "costumes"
+        ],
+        "homework": "1) Create a scene breakdown (экспликация) for your future film. 2) Choose and justify 2–3 locations for your future film."
+      }
+    }
+  ]
+}

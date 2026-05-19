@@ -183,10 +183,14 @@ export interface JwtKeyRow {
 }
 
 /**
- * modules — каталог из external repo (migration 0004).
+ * modules — каталог из external repo (migration 0004, 0007).
  *
  * PK = (slug, locale). Body живёт в R2 по `body_r2_key`. Видео тоже
  * в R2. `requires_modules_json` — массив slug'ов модулей-зависимостей.
+ *
+ * Метаданные (summary/objectives/concepts/homework) денормализованы в
+ * D1 columns из yaml frontmatter для list-view performance (programme
+ * page, dashboard module-card, instructor compose).
  */
 export interface ModuleRow {
   slug: string;
@@ -194,11 +198,21 @@ export interface ModuleRow {
   title: string;
   track: string | null;
   status: ModuleStatus;
-  has_video: number;        // 0 | 1
-  has_homework: number;     // 0 | 1
-  has_text: number;         // 0 | 1
-  default_duration_days: number;
-  requires_modules_json: string;   // JSON-array of slugs
+  has_video: number;            // 0 | 1
+  has_external_video: number;   // 0 | 1 — YouTube/Vimeo refs in body (subset has_video)
+  has_homework: number;         // 0 | 1
+  has_text: number;             // 0 | 1
+  default_lessons: number;      // количество занятий (не дней)
+  requires_modules_json: string;     // JSON-array of slugs
+  // Methodist hints (см. methodist-modules-guide.md)
+  suggested_programme: string | null;
+  suggested_order: number | null;
+  // Денормализованные метаданные (из yaml frontmatter)
+  summary: string | null;
+  objectives_json: string;           // JSON-array of strings
+  concepts_json: string;             // JSON-array of strings
+  homework_md: string | null;        // markdown
+  // Storage
   body_r2_key: string;
   video_r2_key: string | null;
   source_commit: string | null;
