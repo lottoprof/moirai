@@ -1071,3 +1071,134 @@ inconsistency-багов на DB-уровне.
 
 Все три trigger'a вместе формируют целостный набор role-invariants.
 
+---
+
+## 2026-05-19: метаданные модулей и workflow методистов (clarifications)
+
+**Контекст.** Получен первый methodist `.ods` шаблон (`Moirai_Modules_Template
+1V.ods`) с реальными модулями для Beginner и Intermediate (11+13 модулей).
+В шаблоне колонки: ID, Программа, Трек, Порядок, Название (ru), Краткое
+описание, Тип содержания, Длительность, Домашка, Описание домашки, Цели,
+Ключевые понятия. После обсуждения пересмотрены несколько аспектов модели
+из 2026-05-17.
+
+**Решение.**
+
+### Module ↔ Programme отношение
+
+1. **Модуль — атомарная независимая единица.** В `modules` table НЕТ полей
+   `programme_slug` / `order_in_programme`. Модуль может быть включён в
+   любое количество programmes.
+
+2. **Programme — wrapper над 1+ модулей с ценой и features.** Single-module
+   programmes — валидный кейс. Пример: `programmes/budget-calculation.mdx`
+   содержит один модуль `int-12-budget` и продаётся за €49, тогда как
+   тот же модуль также является частью programme `intermediate` за €499.
+
+3. **Programme.mdx содержит ordered list module slugs** (поле `modules:` в
+   frontmatter). Один и тот же slug может фигурировать в нескольких
+   programme файлах — это нормально.
+
+4. **Methodist `.ods` колонки «Программа» и «Порядок»** — suggestion-only,
+   НЕ data-model constraint. Это удобство для методиста (группировка строк
+   в шаблоне). При sync можно сохранять как `modules.suggested_programme` /
+   `modules.suggested_order` для UI-подсказок в admin compose, но primary
+   source-of-truth о составе programme — programme.mdx файл.
+
+### Дополнительные metadata колонки в modules
+
+5. **Добавляются 3 столбца** (миграция позже, когда понадобятся):
+   - `summary TEXT` — 1-2 sentence description (для programme-page и
+     dashboard module-card list views)
+   - `objectives_json TEXT NOT NULL DEFAULT '[]'` — learning objectives
+     (2-4 пункта)
+   - `concepts_json TEXT NOT NULL DEFAULT '[]'` — ключевые термины
+   Метаданные дублируются между .yaml frontmatter (source) и D1 columns
+   (denormalized cache) — sync pipeline копирует. Это нужно для быстрых
+   list-queries без R2 round-trip за каждым модулем.
+
+6. **`requires_modules` default `[]`** — методисты заполняют только когда
+   модуль действительно "не работает без других". Большинство модулей —
+   пусто. Schema `modules.requires_modules_json TEXT NOT NULL DEFAULT '[]'`
+   уже это поддерживает.
+
+### Состав модуля у методиста
+
+7. **Три типа материала** в работе методиста над модулем:
+   - **Личные заметки** — рабочий материал методиста, НЕ публикуется.
+     Хранение — локально у методиста или в `private/` папке external repo
+     (gitignored). Платформа не видит.
+   - **student_book** — body, который видит студент. Опубликованный материал.
+     Формат: PDF (бинарник) ИЛИ markdown. Методист выбирает на модуль.
+     Storage: R2.
+   - **Метаданные** — структурированные поля (см. выше). Storage: yaml в
+     external repo → sync в D1 columns.
+
+### External git repo и workflow
+
+8. **External git repo `moirai-content`** (или аналог) — источник правды
+   для всех модулей. Git обязателен для истории.
+
+9. **Структура repo:**
+   ```
+   modules/
+     {slug}/
+       metadata.yaml         ← структурированные метаданные
+       student_book.ru.pdf   ← body для студента (PDF или md)
+       student_book.en.pdf
+       images/               ← assets (если markdown + relative refs)
+       private/              ← опц. — личные заметки методиста (gitignored)
+   ```
+
+10. **Sync pipeline (Sprint 2):**
+    GH Actions on push to main → парсит metadata.yaml + загружает PDF/md
+    в R2 + POST на `/api/admin/modules/sync` с manifest и shared secret.
+    Server: UPSERT в `modules`, PUT в R2.
+
+### Workflow методиста: Path A первый
+
+11. **Path A — Git-нативный методист** (первый этап):
+    Методист клонирует repo, работает в любом редакторе, commit'ит файлы,
+    git push. Sync автоматически.
+
+12. **Path B — Admin web-UI** (опционально позже):
+    Когда появятся методисты без git-навыков — отдельная admin-страница
+    с формой + upload PDF. Backend commit'ит в git через GitHub API и
+    параллельно пишет в D1+R2.
+
+### Что НЕ входит сейчас
+
+- Webhook/CI sync pipeline — Sprint 2 (текущий .ods обрабатываем вручную
+  через скрипт когда понадобится seed test-modules в D1).
+- Admin Web-UI для методистов (Path B) — после первого реального опыта
+  с Path A.
+- `.ods → manifest.json` парсер — нужен для одноразового seed test data
+  (есть готовое использование unzip + content.xml в bash).
+- Локализация body — `student_book.{locale}.pdf|md` per language; единый
+  файл с language-блоками отвергнут (плохо для PDF binary).
+
+**Альтернативы.**
+
+- **modules.programme_slug (1-to-many)** — отвергнут: модуль может быть
+  в нескольких programmes (single-module sale + as part of Beginner).
+  M2M через programme.modules array решает чище без denormalized FK.
+- **Метаданные в body markdown frontmatter (source) с runtime parse** —
+  отвергнут: каждый list-view вызывает R2 GET для каждого модуля.
+  Денормализация в D1 даёт O(1) на программу.
+- **.ods как primary format в git** — допускается как промежуточный
+  этап (текущий шаблон), но долгосрочно — yaml+pdf per-module folder
+  чище для git diffs и автоматизации.
+- **Web-UI как основной интерфейс методиста (Path B сразу)** —
+  отвергнут: преждевременно. Сначала Path A — поймём реальный workflow.
+
+**Причина.** Модель «модуль атомарный, programme — wrapper» даёт максимум
+гибкости (single-module sales, bundle reuse, custom compose) без
+усложнения схемы. Metadata в D1 columns + body в R2 — практичный split:
+D1 для быстрых queries, R2 для тяжёлого контента. Git-first workflow
+сохраняет историю методистской работы; admin-UI можно добавить как
+convenience layer когда workflow устаканится.
+
+Связанные решения:
+- 2026-05-17 §модули — оригинальная модель modules in external repo + D1+R2
+- 2026-05-17 §programmes — programmes как Content Collection wrappers
+

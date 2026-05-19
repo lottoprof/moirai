@@ -10,6 +10,18 @@
 
 ## 2026-05
 
+- **2026-05-19** (clarifications) — Модули и workflow методистов:
+  модуль остаётся атомарным (БЕЗ `programme_slug`/`order_in_programme`),
+  programme — wrapper над 1+ модулями (single-module sales — валидный
+  кейс), методистская колонка «Программа» в .ods — suggestion-only.
+  3 новые мета-колонки в modules: `summary`, `objectives_json`,
+  `concepts_json` (sync копирует из yaml frontmatter в D1 для list-views).
+  `requires_modules` default `[]`. External git repo `moirai-content`:
+  `modules/{slug}/{metadata.yaml,student_book.{locale}.pdf|md,images/,private/}`
+  + GH Actions sync на `/api/admin/modules/sync`. Workflow: Path A
+  (git-нативный, первый) → Path B (admin Web-UI, опц. позже). Личные
+  заметки методиста — не storage платформы (gitignored или локально).
+  См. archive 2026-05-19.
 - **2026-05-17** (clarification) — Staff ⊥ Student: trigger
   `staff_role_excludes_student` (migration 0006) автоматически
   удаляет student-роль при INSERT admin/instructor. Admin/instructor
