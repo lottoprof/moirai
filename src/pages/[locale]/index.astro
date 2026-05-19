@@ -15,7 +15,7 @@
  * (см. ADR `dd7d91c` Sprint 0 bootstrap).
  */
 
-import { getEntry } from "astro:content";
+import { getEntry, getCollection, type CollectionEntry } from "astro:content";
 import Layout from "../../layouts/public/Layout.astro";
 import Hero from "../../components/public/Hero.astro";
 import Ticker from "../../components/public/Ticker.astro";
@@ -91,6 +91,38 @@ if (!sections) {
 const seo = home.data.seo;
 const faqs: { q: string; a: string }[] = home.data.faqs ?? [];
 
+// Programme cards: фиксированный порядок (Beginner → Intermediate → Bundle → Individual).
+// Читаем programmes коллекцию + фильтруем по локали, потом по slug.
+type ProgrammeEntry = CollectionEntry<"programmes">;
+const allProgrammes = await getCollection("programmes");
+const cardOrder = ["beginner", "intermediate", "bundle", "individual"];
+const localeProgrammes = allProgrammes.filter((p: ProgrammeEntry) => p.id.endsWith(`.${typedLocale}`));
+const programmeCards = cardOrder
+  .map((slug) => localeProgrammes.find((p: ProgrammeEntry) => p.id === `${slug}.${typedLocale}`))
+  .filter((p): p is ProgrammeEntry => p !== undefined);
+
+// Currency formatter — €399.00 → "€399"
+function formatPrice(cents: number, currency: string, locale: "en" | "ru"): string {
+  if (cents === 0) return locale === "ru" ? "по запросу" : "on request";
+  const value = Math.round(cents / 100);
+  const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : currency;
+  return `${symbol}${value}`;
+}
+
+function programmeMeta(p: ProgrammeEntry, locale: "en" | "ru"): string {
+  const d = p.data;
+  if (d.modules.length === 0) {
+    return locale === "ru" ? "Гибкий план · 1:1 с инструктором" : "Flexible plan · 1:1 with instructor";
+  }
+  const modulesLabel = locale === "ru"
+    ? `${d.module_count_hint} модул${d.module_count_hint % 10 === 1 && d.module_count_hint !== 11 ? "ь" : "ей"}`
+    : `${d.module_count_hint} module${d.module_count_hint === 1 ? "" : "s"}`;
+  const lessonsLabel = locale === "ru"
+    ? `${d.lessons_total_hint} занят${d.lessons_total_hint % 10 === 1 && d.lessons_total_hint !== 11 ? "ие" : "ий"}`
+    : `${d.lessons_total_hint} lesson${d.lessons_total_hint === 1 ? "" : "s"}`;
+  return `${modulesLabel} · ${lessonsLabel} · ${formatPrice(d.price_amount, d.price_currency, locale)}`;
+}
+
 // UI-строки, не привязанные к данным коллекций. Когда появится
 // общий dictionary (Stage 7 translation-pair validator + i18n
 // helpers), переедет туда.
@@ -139,13 +171,14 @@ const ui = typedLocale === "ru"
       <p class="text-muted">{sections.curriculum.intro}</p>
     </header>
     <div class="programme-grid">
-      {sections.curriculum.levels.map((lvl, i) => (
+      {programmeCards.map((p) => (
         <ProgrammeCard
-          label={ui.levelLabel(i)}
-          title={lvl.title}
-          lede={lvl.lede}
-          linkHref={`/${typedLocale}/${lvl.id}`}
-          linkText={ui.explore(lvl.title)}
+          label={p.data.marketing.tagline}
+          title={p.data.title}
+          lede={p.data.summary}
+          meta={programmeMeta(p, typedLocale)}
+          linkHref={`/${typedLocale}/programmes/${p.id.replace(`.${typedLocale}`, "")}`}
+          linkText={ui.explore(p.data.title)}
         />
       ))}
     </div>

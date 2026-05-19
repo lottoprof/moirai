@@ -1,16 +1,18 @@
 /*
- * Content Collections — zod-схемы для 7 коллекций из
+ * Content Collections — zod-схемы для коллекций из
  * docs/Architecture.md §4 + Home_page_SEO.md §6.
  *
  * Конвенция файлов: `[id].{locale}.mdx` (locale в [en, ru], см.
  * astro.config.mjs). Astro трактует каждый файл как отдельный
- * entry с id = "{base}.{locale}". Translation-pair check
- * (каждый base-id во всех активных локалях, либо
- * `monolingual: true`) — build-time скрипт, добавится отдельно.
+ * entry с id = "{base}.{locale}".
  *
- * Anti-hardcode: цены живут только в tiers[]; никакие денежные
- * значения свободным текстом в MDX-теле не допускаются (см.
- * .agent/rules/forbidden.md §Anti-hardcode + pre-commit hook).
+ * Anti-hardcode: цены живут только в programme frontmatter; никакие
+ * денежные значения свободным текстом в MDX-теле не допускаются (см.
+ * .agent/rules/forbidden.md §Anti-hardcode).
+ *
+ * Модули в programmes — список slug'ов (D1 modules). Programme — wrapper
+ * над модулями + price + features. См. decisions 2026-05-17 §programmes
+ * и 2026-05-19 §module-metadata.
  */
 
 import { defineCollection, z } from "astro:content";
@@ -46,28 +48,21 @@ const seoSchema = z.object({
 });
 
 /**
- * Открытое множество фич тира (Architecture v0.8.1 §5).
- * Ключи определяют методисты/админ; используются в:
- *  - сравнительной таблице на странице программы
- *  - Worker assertAccess / resolveAndAuthorize для проверок доступа
+ * Открытое множество фич programme'ы (Architecture v0.8.x → decisions 2026-05-17).
+ * Ключи определяют методисты/админ; используются на странице programme
+ * и в snapshot при создании enrollment.features_json.
  */
-const tierFeaturesSchema = z.record(
+const programmeFeaturesSchema = z.record(
   z.string(),
   z.union([z.boolean(), z.number().int().nonnegative(), z.string()]),
 );
 
-/** Базовый tier — общий между programme и bundle. */
-const tierBaseSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  base_price_amount: z.number().int().nonnegative(), // центы
-  base_price_currency: z.string().length(3), // ISO 4217
-  features: tierFeaturesSchema,
-});
-
-/** Bundle tier — добавляет savings_vs_separate. */
-const bundleTierSchema = tierBaseSchema.extend({
-  savings_vs_separate: z.number().int().nonnegative().optional(),
+/** Marketing-блок programme: hero-данные для страницы и карточки на главной. */
+const programmeMarketingSchema = z.object({
+  tagline: z.string().min(1),       // 1 строка, hero-eyebrow
+  hero_lede: z.string().min(1),     // абзац под hero
+  hero_image: z.string().optional(), // R2 ключ или path
+  cta_label: z.string().min(1),      // "Apply now" / "Get started"
 });
 
 /** Monolingual override — для контента без translation pair. */
@@ -77,25 +72,32 @@ const monolingualField = { monolingual: z.boolean().optional() } as const;
 // Collections
 // ============================================================
 
+/**
+ * programmes — wrapper над набором модулей (decisions 2026-05-17 §programmes).
+ *
+ * `modules` — упорядоченный список module slugs из D1. Может быть 1+
+ * (single-module programme типа "budget-calculation" допустим, см.
+ * decisions 2026-05-19).
+ *
+ * `module_count` / `lessons_total` — denormalized static hints (для
+ * отображения на главной без runtime D1 fetch). Обновляются manually
+ * при изменении modules[] или через build-script.
+ *
+ * Price snapshot копируется в `enrollments.price_paid_amount` /
+ * `features_json` при создании enrollment.
+ */
 const programmes = defineCollection({
   loader: localeAwareGlob("programmes"),
   schema: z.object({
     title: z.string().min(1),
     summary: z.string().min(1),
-    duration_weeks: z.number().int().positive().optional(), // производная для отображения
-    tiers: z.array(tierBaseSchema).min(1),
-    seo: seoSchema,
-    ...monolingualField,
-  }),
-});
-
-const bundles = defineCollection({
-  loader: localeAwareGlob("bundles"),
-  schema: z.object({
-    title: z.string().min(1),
-    summary: z.string().min(1),
-    includes_programmes: z.array(z.string().min(1)).min(2), // ссылки на programme id (build-time валидация — отдельно)
-    tiers: z.array(bundleTierSchema).min(1),
+    marketing: programmeMarketingSchema,
+    modules: z.array(z.string().min(1)),                 // pусто для individual; для bundle — все 24 slug'a
+    module_count_hint: z.number().int().nonnegative(),   // denormalized hint
+    lessons_total_hint: z.number().int().nonnegative(),  // denormalized hint
+    price_amount: z.number().int().nonnegative(),        // центы; 0 для individual (договорная)
+    price_currency: z.string().length(3),                // ISO 4217
+    features: programmeFeaturesSchema,
     seo: seoSchema,
     ...monolingualField,
   }),
@@ -190,7 +192,6 @@ const works = defineCollection({
 
 export const collections = {
   programmes,
-  bundles,
   instructors,
   segments,
   pages,

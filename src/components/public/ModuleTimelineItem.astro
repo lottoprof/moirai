@@ -1,0 +1,146 @@
+---
+/*
+ * <ModuleTimelineItem /> — одна строка в timeline на странице programme.
+ * Показывает: номер по порядку + title + track + lessons + has_homework
+ * + summary + concepts (compact).
+ *
+ * Используется в /[locale]/programmes/[id].astro.
+ */
+
+interface Props {
+  order: number;        // 1-based
+  title: string;
+  track: string | null;
+  lessons: number;
+  hasHomework: boolean;
+  hasVideo: boolean;
+  summary: string | null;
+  concepts: string[];
+  /** UI labels (i18n inline до Stage 7 dict). */
+  i18n: {
+    lessonLabel: (n: number) => string;
+    homework: string;
+    video: string;
+    concepts: string;
+  };
+}
+
+const { order, title, track, lessons, hasHomework, hasVideo, summary, concepts, i18n } = Astro.props;
+const orderStr = String(order).padStart(2, "0");
+---
+
+<li class="timeline-item">
+  <span class="timeline-item__order">{orderStr}</span>
+  <div class="timeline-item__body">
+    <header class="timeline-item__head">
+      <h3 class="timeline-item__title">{title}</h3>
+      <div class="timeline-item__chips" aria-label="meta">
+        {track && <span class="timeline-item__chip timeline-item__chip--track">{track}</span>}
+        <span class="timeline-item__chip">{i18n.lessonLabel(lessons)}</span>
+        {hasHomework && <span class="timeline-item__chip timeline-item__chip--hw">{i18n.homework}</span>}
+        {hasVideo && <span class="timeline-item__chip">{i18n.video}</span>}
+      </div>
+    </header>
+    {summary && <p class="timeline-item__summary">{summary}</p>}
+    {concepts.length > 0 && (
+      <p class="timeline-item__concepts">
+        <span class="timeline-item__concepts-label">{i18n.concepts}: </span>
+        {concepts.join(" · ")}
+      </p>
+    )}
+  </div>
+</li>
+
+<style>
+  .timeline-item {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: var(--space-lg);
+    padding: var(--space-lg) 0;
+    border-bottom: 1px solid var(--border);
+    list-style: none;
+  }
+  .timeline-item:last-child {
+    border-bottom: none;
+  }
+
+  .timeline-item__order {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 300;
+    color: var(--amber);
+    line-height: 1;
+    padding-top: 4px;
+  }
+
+  .timeline-item__head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-md);
+    align-items: baseline;
+    margin-bottom: var(--space-sm);
+  }
+
+  .timeline-item__title {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 1.2;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .timeline-item__chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+
+  .timeline-item__chip {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  .timeline-item__chip--track {
+    color: color-mix(in srgb, var(--amber) 70%, transparent);
+    border-color: color-mix(in srgb, var(--amber) 25%, transparent);
+  }
+  .timeline-item__chip--hw {
+    color: var(--text-accent);
+    border-color: color-mix(in srgb, var(--amber) 30%, transparent);
+  }
+
+  .timeline-item__summary {
+    color: var(--text-muted);
+    font-size: var(--type-body-md);
+    line-height: 1.6;
+    margin: var(--space-xs) 0;
+  }
+
+  .timeline-item__concepts {
+    color: var(--text-faint);
+    font-size: var(--type-micro-md);
+    margin-top: var(--space-xs);
+  }
+  .timeline-item__concepts-label {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+  }
+
+  @media (max-width: 640px) {
+    .timeline-item {
+      grid-template-columns: 40px 1fr;
+      gap: var(--space-md);
+    }
+    .timeline-item__order { font-size: 22px; }
+    .timeline-item__title { font-size: 18px; }
+  }
+</style>

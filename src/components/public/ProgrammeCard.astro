@@ -10,21 +10,24 @@
  */
 
 interface Props {
-  /** Например "Level 01" */
+  /** Например "Level 01" или "Полная программа" */
   label: string;
   title: string;
   lede: string;
   linkHref: string;
   linkText: string;
+  /** Опц. — meta-строка под lede: "11 модулей · 13 занятий · €399" */
+  meta?: string;
 }
 
-const { label, title, lede, linkHref, linkText } = Astro.props;
+const { label, title, lede, linkHref, linkText, meta } = Astro.props;
 ---
 
 <article class="programme-card">
   <div class="programme-card__label">{label}</div>
   <h3 class="programme-card__title">{title}</h3>
   <p class="programme-card__lede">{lede}</p>
+  {meta && <p class="programme-card__meta">{meta}</p>}
   <a href={linkHref} class="programme-card__link">
     {linkText}
     <span aria-hidden="true">→</span>
@@ -62,8 +65,15 @@ const { label, title, lede, linkHref, linkText } = Astro.props;
 
   .programme-card__lede {
     color: var(--text-muted);
-    margin-bottom: var(--space-xl);
+    margin-bottom: var(--space-md);
     line-height: 1.6;
+  }
+
+  .programme-card__meta {
+    color: var(--text-faint);
+    font-size: var(--type-micro-md);
+    letter-spacing: 0.04em;
+    margin-bottom: var(--space-xl);
   }
 
   .programme-card__link {

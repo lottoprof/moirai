@@ -1,0 +1,342 @@
+---
+/*
+ * /{locale}/programmes/{id} — страница programme.
+ *
+ * Programmes — Content Collection wrapper (см. decisions 2026-05-17 §programmes,
+ * 2026-05-19 §module-metadata). Body модулей живёт в D1+R2; metadata —
+ * в D1 columns (denormalized из methodist yaml).
+ *
+ * SSR (`prerender = false`) — нужен runtime D1 fetch для timeline'a
+ * модулей. CF edge cache 60sec + stale-while-revalidate.
+ *
+ * Структура:
+ *   - Hero: title + tagline + lede + price + cohort CTA
+ *   - Stats row: модули, занятия, треки, цена
+ *   - Modules timeline: упорядоченный список ModuleTimelineItem'ов
+ *   - Features list
+ *   - CTA внизу
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../../layouts/public/Layout.astro";
+import Btn from "../../../components/public/Btn.astro";
+import ModuleTimelineItem from "../../../components/public/ModuleTimelineItem.astro";
+
+export const prerender = false;
+
+const { locale, id } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/");
+}
+const typedLocale: "en" | "ru" = locale;
+
+if (!id) {
+  return new Response(null, { status: 404 });
+}
+
+const programme = await getEntry("programmes", `${id}.${typedLocale}`);
+if (!programme) {
+  return new Response(null, { status: 404 });
+}
+
+const env = Astro.locals.runtime.env;
+
+// Fetch module metadata из D1 для slugs из programme.modules
+interface ModuleRow {
+  slug: string;
+  title: string;
+  track: string | null;
+  default_lessons: number;
+  has_homework: number;
+  has_video: number;
+  summary: string | null;
+  concepts_json: string;
+}
+
+let modules: ModuleRow[] = [];
+if (programme.data.modules.length > 0) {
+  const placeholders = programme.data.modules.map(() => "?").join(",");
+  const sql = `
+    SELECT slug, title, track, default_lessons, has_homework, has_video,
+           summary, concepts_json
+    FROM modules
+    WHERE locale = ? AND status = 'published' AND slug IN (${placeholders})
+  `;
+  const rows = await env.DB.prepare(sql)
+    .bind(typedLocale, ...programme.data.modules)
+    .all<ModuleRow>();
+
+  // Preserve order from programme.modules array
+  const indexBySlug = new Map(rows.results.map((r) => [r.slug, r]));
+  modules = programme.data.modules
+    .map((slug: string) => indexBySlug.get(slug))
+    .filter((m: ModuleRow | undefined): m is ModuleRow => m !== undefined);
+}
+
+// CF edge cache: 60 sec fresh + 1h stale-while-revalidate
+Astro.response.headers.set(
+  "Cache-Control",
+  "public, s-maxage=60, stale-while-revalidate=3600",
+);
+
+const t = typedLocale === "ru"
+  ? {
+      apply: programme.data.marketing.cta_label,
+      modulesLabel: (n: number) => n === 1 ? "модуль" : n < 5 ? "модуля" : "модулей",
+      lessonsLabel: (n: number) => n === 1 ? "занятие" : n < 5 ? "занятия" : "занятий",
+      tracksLabel: "направления",
+      cohortLabel: "когорта до 10 чел · 2 занятия/нед",
+      individualNote: "Без когорты · 1:1 с инструктором · гибкий график",
+      whatInside: "Что внутри",
+      includedTitle: "Что включено",
+      bottomCta: programme.data.marketing.cta_label,
+      videoChip: "Видео",
+      homeworkChip: "Домашка",
+      conceptsChip: "Понятия",
+      lessonsChip: (n: number) => `${n} ${n === 1 ? "занятие" : n < 5 ? "занятия" : "занятий"}`,
+      noModulesYet: "Состав модулей определяется индивидуально после знакомства с инструктором.",
+    }
+  : {
+      apply: programme.data.marketing.cta_label,
+      modulesLabel: (n: number) => n === 1 ? "module" : "modules",
+      lessonsLabel: (n: number) => n === 1 ? "lesson" : "lessons",
+      tracksLabel: "tracks",
+      cohortLabel: "cohort up to 10 · 2 lessons/week",
+      individualNote: "No cohort · 1:1 with instructor · flexible schedule",
+      whatInside: "What's inside",
+      includedTitle: "What's included",
+      bottomCta: programme.data.marketing.cta_label,
+      videoChip: "Video",
+      homeworkChip: "Homework",
+      conceptsChip: "Concepts",
+      lessonsChip: (n: number) => `${n} ${n === 1 ? "lesson" : "lessons"}`,
+      noModulesYet: "Module composition is determined individually after a discovery call with an instructor.",
+    };
+
+// Stats computed
+const tracks = [...new Set(modules.map((m) => m.track).filter((t): t is string => t !== null))];
+const lessonsTotal = modules.reduce((s, m) => s + m.default_lessons, 0);
+const moduleCount = modules.length;
+
+// Price formatting
+function formatPrice(cents: number, currency: string): string {
+  if (cents === 0) return typedLocale === "ru" ? "по запросу" : "on request";
+  const v = Math.round(cents / 100);
+  const sym = currency === "EUR" ? "€" : currency === "USD" ? "$" : currency;
+  return `${sym}${v}`;
+}
+
+const isIndividual = programme.data.modules.length === 0;
+---
+
+<Layout locale={typedLocale} seo={programme.data.seo}>
+  <section class="programme-hero" aria-labelledby="prog-title">
+    <p class="programme-hero__eyebrow">{programme.data.marketing.tagline}</p>
+    <h1 id="prog-title" class="programme-hero__title">{programme.data.title}.</h1>
+    <p class="programme-hero__lede">{programme.data.marketing.hero_lede}</p>
+
+    <div class="programme-hero__stats">
+      {!isIndividual && (
+        <>
+          <div class="stat-box">
+            <span class="stat-box__value">{moduleCount}</span>
+            <span class="stat-box__label">{t.modulesLabel(moduleCount)}</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-box__value">{lessonsTotal}</span>
+            <span class="stat-box__label">{t.lessonsLabel(lessonsTotal)}</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-box__value">{tracks.length}</span>
+            <span class="stat-box__label">{t.tracksLabel}</span>
+          </div>
+        </>
+      )}
+      <div class="stat-box stat-box--price">
+        <span class="stat-box__value stat-box__value--amber">
+          {formatPrice(programme.data.price_amount, programme.data.price_currency)}
+        </span>
+        <span class="stat-box__label">
+          {isIndividual ? t.individualNote : t.cohortLabel}
+        </span>
+      </div>
+    </div>
+
+    <div class="programme-hero__cta">
+      <Btn href={`/${typedLocale}/apply?programme=${id}`} variant="primary" size="lg" arrow>{t.apply}</Btn>
+    </div>
+  </section>
+
+  <section class="programme-section" aria-labelledby="modules-title">
+    <header class="programme-section__head">
+      <p class="eyebrow">{t.whatInside}</p>
+      <h2 id="modules-title" class="h2">
+        {typedLocale === "ru" ? "Модули программы." : "Modules."}
+      </h2>
+    </header>
+
+    {modules.length === 0 ? (
+      <p class="programme-section__empty">{t.noModulesYet}</p>
+    ) : (
+      <ol class="programme-timeline">
+        {modules.map((m, i) => {
+          let concepts: string[] = [];
+          try {
+            const parsed: unknown = JSON.parse(m.concepts_json);
+            if (Array.isArray(parsed)) concepts = parsed.filter((x): x is string => typeof x === "string");
+          } catch { /* ignore */ }
+          return (
+            <ModuleTimelineItem
+              order={i + 1}
+              title={m.title}
+              track={m.track}
+              lessons={m.default_lessons}
+              hasHomework={m.has_homework === 1}
+              hasVideo={m.has_video === 1}
+              summary={m.summary}
+              concepts={concepts}
+              i18n={{
+                lessonLabel: t.lessonsChip,
+                homework: t.homeworkChip,
+                video: t.videoChip,
+                concepts: t.conceptsChip,
+              }}
+            />
+          );
+        })}
+      </ol>
+    )}
+  </section>
+
+  <section class="programme-cta" aria-label="cta">
+    <h2 class="programme-cta__title">{programme.data.title}.</h2>
+    <p class="programme-cta__lede">{programme.data.summary}</p>
+    <Btn href={`/${typedLocale}/apply?programme=${id}`} variant="primary" size="lg" arrow>{t.bottomCta}</Btn>
+  </section>
+</Layout>
+
+<style>
+  .programme-hero {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .programme-hero__eyebrow {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-accent);
+    margin-bottom: var(--space-md);
+  }
+
+  .programme-hero__title {
+    font-family: var(--font-display);
+    font-size: clamp(48px, 8vw, 96px);
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    color: var(--text);
+    margin: 0 0 var(--space-lg);
+  }
+
+  .programme-hero__lede {
+    font-family: var(--font-body);
+    color: var(--text-muted);
+    font-size: var(--type-body-lg);
+    line-height: var(--leading-relaxed);
+    max-width: 640px;
+    margin-bottom: var(--space-2xl);
+  }
+
+  .programme-hero__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--space-md);
+    margin-bottom: var(--space-2xl);
+  }
+
+  .stat-box {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+  }
+
+  .stat-box__value {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1;
+  }
+  .stat-box__value--amber {
+    color: var(--text-accent);
+  }
+
+  .stat-box__label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    letter-spacing: 0.03em;
+  }
+
+  .programme-hero__cta {
+    margin-top: var(--space-lg);
+  }
+
+  .programme-section {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  .programme-section__head {
+    margin-bottom: var(--space-2xl);
+  }
+
+  .programme-section__empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: var(--space-2xl);
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+  }
+
+  .programme-timeline {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .programme-cta {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+    text-align: center;
+    border-top: 1px solid var(--border);
+  }
+
+  .programme-cta__title {
+    font-family: var(--font-display);
+    font-size: clamp(36px, 6vw, 64px);
+    font-weight: 400;
+    color: var(--text);
+    margin-bottom: var(--space-md);
+  }
+
+  .programme-cta__lede {
+    font-family: var(--font-body);
+    color: var(--text-muted);
+    font-size: var(--type-body-lg);
+    line-height: var(--leading-relaxed);
+    max-width: 540px;
+    margin: 0 auto var(--space-2xl);
+  }
+</style>
