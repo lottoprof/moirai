@@ -287,6 +287,23 @@
   color: var(--text-faint);
   line-height: 1.6;
 }
+
+.form__checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-family: var(--font-body);
+  font-size: var(--type-body-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.form__checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--amber);
+  cursor: pointer;
+}
 .form__hint a {
   color: var(--amber);
   border-bottom: 1px solid var(--amber);

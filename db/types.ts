@@ -141,6 +141,8 @@ export interface AuthSessionRow {
   user_agent: string | null;
   ip_hash: string | null;
   revoked_at: number | null;
+  /** 0 = default 1d (обычный логин без "remember me"); 1 = 7d (remember-me checkbox или OAuth). */
+  persistent: number;
 }
 
 /**

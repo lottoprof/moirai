@@ -179,8 +179,9 @@ export const GET: APIRoute = async ({ request, url, locals }) => {
     }
   }
 
-  // Step 5: create refresh session (auto-login в текущем браузере)
-  const { sessionId, cookieHeader } = await createRefreshSession(env, userId, request);
+  // Step 5: create refresh session (auto-login в текущем браузере).
+  // mode="oauth" → 7 day TTL (нет UI для "remember me" чекбокса на redirect).
+  const { sessionId, cookieHeader } = await createRefreshSession(env, userId, request, "oauth");
 
   // Step 6: audit events
   if (isFirstLink) {

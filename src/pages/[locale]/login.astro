@@ -38,6 +38,8 @@ const t = locale === "ru"
       registerLink: "Зарегистрироваться",
       forgot: "Забыли пароль?",
       forgotLink: "Сбросить",
+      rememberMe: "Запомнить меня на 7 дней",
+      rememberHint: "Без галочки сессия истечёт через 1 день. С галочкой — 7 дней.",
       or: "или",
       google: "Войти через Google",
       discord: "Войти через Discord",
@@ -68,6 +70,8 @@ const t = locale === "ru"
       registerLink: "Create one",
       forgot: "Forgot password?",
       forgotLink: "Reset it",
+      rememberMe: "Remember me for 7 days",
+      rememberHint: "Without this, the session expires after 1 day. With it — 7 days.",
       or: "or",
       google: "Continue with Google",
       discord: "Continue with Discord",
@@ -135,6 +139,16 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
 
       <TurnstileWidget />
 
+      <label class="form__checkbox" for="login-remember">
+        <input
+          type="checkbox"
+          id="login-remember"
+          name="remember_me"
+          value="1"
+        />
+        <span>{t.rememberMe}</span>
+      </label>
+
       <Btn type="submit" variant="primary" size="lg" arrow>{t.submit}</Btn>
 
       <p class="form__hint">
@@ -170,6 +184,7 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
       const password = formData.get("password");
       const turnstileToken = formData.get("cf-turnstile-response");
       const returnTo = formData.get("return_to") as string | null;
+      const rememberMe = formData.get("remember_me") === "1";
 
       if (!turnstileToken) {
         window.location.search = "?error=turnstile_failed";
@@ -179,7 +194,7 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, turnstileToken, return_to: returnTo || undefined }),
+        body: JSON.stringify({ email, password, turnstileToken, return_to: returnTo || undefined, remember_me: rememberMe }),
         credentials: "same-origin",
       });
 

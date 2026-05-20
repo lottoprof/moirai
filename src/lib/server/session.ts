@@ -23,19 +23,37 @@
  *   Secure             — только HTTPS (localhost тоже secure context).
  *   SameSite=Lax       — CSRF защита (POST cross-site без cookie).
  *   Path=/             — обязательно для __Host-.
- *   Max-Age=2_592_000  — 30 days.
+ *   Max-Age             — зависит от mode (см. SessionMode):
+ *                         default → 1 day, remember/oauth → 7 days.
+ *
+ * SessionMode (Stage 23, decisions 2026-05-20):
+ *   default  — обычный логин без "remember me" чекбокса.
+ *   remember — логин с чекбоксом "Remember me for 7 days".
+ *   oauth    — Google/Discord OAuth callback (нет UI для чекбокса).
+ *
+ * При refresh-rotation TTL выбирается из auth_sessions.persistent (0/1).
  */
 
 import type { AuthSessionRow } from "../../../db/types";
 import { sha256Hex, hashIp, extractRequestInfo } from "./hash";
 
 const COOKIE_NAME = "__Host-moirai_refresh";
-const REFRESH_TTL_SECONDS = 30 * 24 * 3600;     // 30 дней
+const REFRESH_TTL_DEFAULT = 1 * 24 * 3600;       // 1 день
+const REFRESH_TTL_REMEMBER = 7 * 24 * 3600;      // 7 дней (remember-me + OAuth)
 const SECRET_BYTES = 32;
+
+export type SessionMode = "default" | "remember" | "oauth";
+
+function ttlForMode(mode: SessionMode): { seconds: number; persistent: 0 | 1 } {
+  if (mode === "default") return { seconds: REFRESH_TTL_DEFAULT, persistent: 0 };
+  return { seconds: REFRESH_TTL_REMEMBER, persistent: 1 };
+}
 
 export interface SessionVerifyResult {
   userId: string;
   sessionId: string;
+  /** 0 = default 1d; 1 = remember/oauth 7d. Сохранён для future refresh-rotation stage. */
+  persistent: 0 | 1;
 }
 
 // ============================================================
@@ -51,6 +69,7 @@ export async function createRefreshSession(
   env: Cloudflare.Env,
   userId: string,
   request: Request,
+  mode: SessionMode = "default",
 ): Promise<{ sessionId: string; cookieHeader: string }> {
   const sessionId = crypto.randomUUID();
   const secretBytes = crypto.getRandomValues(new Uint8Array(SECRET_BYTES));
@@ -61,18 +80,19 @@ export async function createRefreshSession(
   const ipHash = await hashIp(ip, env.IP_HASH_SALT);
 
   const now = Math.floor(Date.now() / 1000);
-  const expiresAt = now + REFRESH_TTL_SECONDS;
+  const { seconds: ttlSeconds, persistent } = ttlForMode(mode);
+  const expiresAt = now + ttlSeconds;
 
   await env.DB.prepare(
     `INSERT INTO auth_sessions
-       (id, user_id, token_hash, expires_at, created_at, last_seen_at, user_agent, ip_hash)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, user_id, token_hash, expires_at, created_at, last_seen_at, user_agent, ip_hash, persistent)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
-    .bind(sessionId, userId, tokenHash, expiresAt, now, now, ua, ipHash)
+    .bind(sessionId, userId, tokenHash, expiresAt, now, now, ua, ipHash, persistent)
     .run();
 
   const cookieValue = `${sessionId}.${secretToken}`;
-  const cookieHeader = buildSetCookieHeader(cookieValue, REFRESH_TTL_SECONDS);
+  const cookieHeader = buildSetCookieHeader(cookieValue, ttlSeconds);
 
   return { sessionId, cookieHeader };
 }
@@ -104,11 +124,11 @@ export async function verifyRefreshSession(
   const now = Math.floor(Date.now() / 1000);
 
   const row = await env.DB.prepare(
-    `SELECT user_id, token_hash, expires_at, revoked_at
+    `SELECT user_id, token_hash, expires_at, revoked_at, persistent
        FROM auth_sessions WHERE id = ?`,
   )
     .bind(sessionId)
-    .first<Pick<AuthSessionRow, "user_id" | "token_hash" | "expires_at" | "revoked_at">>();
+    .first<Pick<AuthSessionRow, "user_id" | "token_hash" | "expires_at" | "revoked_at" | "persistent">>();
 
   if (!row) return null;
   if (row.revoked_at !== null) return null;
@@ -125,7 +145,11 @@ export async function verifyRefreshSession(
     .bind(now, sessionId)
     .run();
 
-  return { userId: row.user_id, sessionId };
+  return {
+    userId: row.user_id,
+    sessionId,
+    persistent: row.persistent === 1 ? 1 : 0,
+  };
 }
 
 /** Soft-revoke одной сессии — UPDATE revoked_at = now. Row остаётся для audit. */

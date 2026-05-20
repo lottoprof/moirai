@@ -42,6 +42,8 @@ const LoginSchema = z.object({
   password: z.string().min(1).max(256),
   turnstileToken: z.string().min(1).max(2048),
   return_to: z.string().max(2048).optional(),
+  /** Stage 23: "Remember me for 7 days" чекбокс. Без него — 1 day TTL. */
+  remember_me: z.boolean().optional(),
 });
 
 const ACCESS_TTL_SECONDS = 15 * 60;     // 15 min — синхронно с DEFAULT_ACCESS_TTL в jwt.ts
@@ -65,7 +67,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
   const parsed = LoginSchema.safeParse(raw);
   if (!parsed.success) return jsonError("invalid_input", 400);
-  const { email, password, turnstileToken, return_to: returnTo } = parsed.data;
+  const { email, password, turnstileToken, return_to: returnTo, remember_me: rememberMe } = parsed.data;
 
   // Turnstile
   const turnstileOk = await verifyTurnstile(turnstileToken, ip, env);
@@ -103,7 +105,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   // Success: refresh session + access JWT + audit
-  const { sessionId, cookieHeader } = await createRefreshSession(env, user.id, request);
+  const { sessionId, cookieHeader } = await createRefreshSession(
+    env,
+    user.id,
+    request,
+    rememberMe ? "remember" : "default",
+  );
   await touchAuthMethod(env, method.id);
 
   // JWT не несёт role с migration 0003 (multi-role): user_id достаточно,

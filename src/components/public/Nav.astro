@@ -30,12 +30,16 @@ const labels = locale === "ru"
       aria: "Главная",
       signIn: "Войти",
       signUp: "Регистрация",
+      admin: "Админ →",
+      instructor: "Преподаватель →",
       dashboard: "Кабинет →",
     }
   : {
       aria: "Primary",
       signIn: "Sign in",
       signUp: "Sign up",
+      admin: "Admin →",
+      instructor: "Instructor →",
       dashboard: "Dashboard →",
     };
 
@@ -68,8 +72,19 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
     </div>
 
     {/* Authed state — hidden by default, JS показывает если /api/auth/me OK.
-        Из публичного сайта залогиненный пользователь возвращается в ЛК. */}
-    <a href={`/${locale}/dashboard`} class="nav__cta js-auth-authed" hidden>
+        Из публичного сайта залогиненный пользователь возвращается в свою
+        role-home zone (admin > instructor > student priority).
+        href + текст обновляются в скрипте после fetchMe(). data-атрибуты
+        несут локализованные дефолты — фолбэк если /api/auth/me не вернул roles. */}
+    <a
+      href={`/${locale}/dashboard`}
+      class="nav__cta js-auth-authed"
+      hidden
+      data-label-admin={labels.admin}
+      data-label-instructor={labels.instructor}
+      data-label-dashboard={labels.dashboard}
+      data-locale={locale}
+    >
       {labels.dashboard}
     </a>
   </div>
@@ -186,7 +201,15 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
     window.addEventListener("scroll", updateScroll, { passive: true });
   }
 
-  async function fetchMe(token: string | null): Promise<boolean> {
+  interface MeUser {
+    roles?: string[];
+    locale?: string;
+  }
+  interface MeResponse {
+    user?: MeUser;
+  }
+
+  async function fetchMe(token: string | null): Promise<MeUser | null> {
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch("/api/auth/me", {
@@ -194,7 +217,21 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
       headers,
       credentials: "same-origin",
     });
-    return res.ok;
+    if (!res.ok) return null;
+    try {
+      const data = (await res.json()) as MeResponse;
+      return data.user ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** admin > instructor > student priority — синхронно с roleHomeUrl на сервере. */
+  function pickRoleHome(roles: string[] | undefined, locale: string): { href: string; key: "admin" | "instructor" | "dashboard" } {
+    const set = new Set(roles ?? []);
+    if (set.has("admin")) return { href: "/admin/", key: "admin" };
+    if (set.has("instructor")) return { href: `/${locale}/instructor/`, key: "instructor" };
+    return { href: `/${locale}/dashboard/`, key: "dashboard" };
   }
 
   async function tryRefresh(): Promise<string | null> {
@@ -216,22 +253,30 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
 
   async function syncAuthUI() {
     let token = sessionStorage.getItem("moirai_access_token");
-    let authed = false;
+    let me: MeUser | null = null;
     if (token) {
-      authed = await fetchMe(token);
+      me = await fetchMe(token);
     }
-    if (!authed) {
+    if (!me) {
       // Может быть refresh cookie живой — попытка обновить access
       token = await tryRefresh();
-      if (token) authed = await fetchMe(token);
+      if (token) me = await fetchMe(token);
     }
 
     const unauthEls = document.querySelectorAll<HTMLElement>(".js-auth-unauth");
-    const authedEls = document.querySelectorAll<HTMLElement>(".js-auth-authed");
+    const authedEls = document.querySelectorAll<HTMLAnchorElement>(".js-auth-authed");
 
-    if (authed) {
+    if (me) {
       unauthEls.forEach((el) => { el.hidden = true; });
-      authedEls.forEach((el) => { el.hidden = false; });
+      authedEls.forEach((el) => {
+        const navLocale = el.dataset.locale ?? "en";
+        const { href, key } = pickRoleHome(me.roles, navLocale);
+        el.href = href;
+        const labelAttr = `label${key.charAt(0).toUpperCase()}${key.slice(1)}` as "labelAdmin" | "labelInstructor" | "labelDashboard";
+        const label = el.dataset[labelAttr];
+        if (label) el.textContent = label;
+        el.hidden = false;
+      });
     } else {
       // default state остаётся (unauth visible) — ничего не меняем
       sessionStorage.removeItem("moirai_access_token");
