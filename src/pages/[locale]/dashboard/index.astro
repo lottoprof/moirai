@@ -1,22 +1,23 @@
 ---
 /*
- * /{locale}/dashboard — overview личного кабинета студента.
+ * /{locale}/dashboard — overview ЛК студента.
  *
- * SSR + auth-guard через refresh cookie. Не залогинен → redirect на
- * /login?return_to=/{locale}/dashboard.
+ * SSR + auth-guard через requireRole('student'). Stage 14j: добавлена
+ * apply flow логика — если у user'a есть active application, view
+ * переключается на pre-payment / paid контекст.
  *
- * Архитектурно (decisions 2026-05-16: dashboard routing) — это
- * отдельный Astro роут с SSR, не SPA-shell. Per-route auth-guard,
- * per-route data-loading, islands только где нужна интерактивность
- * (на этой странице — нигде, чистый HTML).
+ * View states (FLOW-17, шаг 4 в apply-flow-spec.md):
+ *   awaiting_payment → большая Pre-payment card (cohort summary +
+ *                      countdown + Pay CTA + curriculum teaser locked)
+ *   paid / running   → существующий dashboard со списком модулей
+ *                      (Sprint 2: реальные данные из enrollments + R2)
+ *   no_application   → "Browse programmes" CTA
  *
- * STUB-ЭТАП: данные про progress / tier / modules / homework
- * захардкожены ниже с маркером `// STUB:`. Реальные D1-таблицы
- * (enrollments / modules / module_progress / homework_submissions)
- * появятся в Sprint 1 — тогда заменим stub на запросы через
- * `Astro.locals.runtime.env.DB`.
+ * STUB-ЭТАП paid: данные про progress / modules / homework пока
+ * захардкожены. Реальные D1-запросы Sprint 2.
  */
 
+import { getEntry } from "astro:content";
 import DashboardLayout from "../../../layouts/dashboard/Layout.astro";
 import DashboardHero from "../../../components/dashboard/DashboardHero.astro";
 import StatCard from "../../../components/dashboard/StatCard.astro";
@@ -24,6 +25,8 @@ import ContinueCard from "../../../components/dashboard/ContinueCard.astro";
 import ModuleCard from "../../../components/dashboard/ModuleCard.astro";
 import HomeworkCard from "../../../components/dashboard/HomeworkCard.astro";
 import { requireRole } from "../../../lib/server/guards";
+import { listApplicationsByUser } from "../../../lib/server/applications";
+import { getCohortWithSlot, parseDaysJson, normalizeDayPair, deriveTimeOfDay, computeDurationWeeks, type CohortWithSlot } from "../../../lib/server/cohorts";
 
 export const prerender = false;
 
@@ -35,96 +38,206 @@ if (locale !== "en" && locale !== "ru") {
 const userOrRes = await requireRole(Astro, "student");
 if (userOrRes instanceof Response) return userOrRes;
 const user = userOrRes;
+const env = Astro.locals.runtime.env;
+const ru = locale === "ru";
+const intlLocale = ru ? "ru-RU" : "en-US";
 
-// Greeting: first-name (или email-prefix если name пустой). Длинные
-// nick'и (lottoprof) разобьёт CSS `word-break: break-word` в Hero.
 const firstName = user.name?.trim().split(/\s+/)[0]
   ?? user.email.split("@")[0];
 
 const verifiedBadge = Astro.url.searchParams.get("verified") === "1";
+const welcomeBadge = Astro.url.searchParams.get("welcome") === "1";
 
 // ====================================================================
-// STUB: replace with D1 queries in Sprint 1
+// Apply flow integration: ищем primary application
+// ====================================================================
+
+const applications = await listApplicationsByUser(env, user.id);
+// Priority: awaiting_payment → paid → running → first match (любой active),
+// fallback: самая свежая (даже terminal)
+const activeApp =
+  applications.find((a) => a.status === "awaiting_payment") ??
+  applications.find((a) => a.status === "paid") ??
+  applications.find((a) => a.status === "running") ??
+  null;
+
+let primaryView: "awaiting_payment" | "paid" | "no_application" = "no_application";
+let cohort: CohortWithSlot | null = null;
+let programme: Awaited<ReturnType<typeof getEntry>> = null;
+
+if (activeApp) {
+  if (activeApp.status === "awaiting_payment") primaryView = "awaiting_payment";
+  else if (activeApp.status === "paid" || activeApp.status === "running") primaryView = "paid";
+
+  cohort = await getCohortWithSlot(env, activeApp.cohort_id);
+  programme = await getEntry("programmes", `${activeApp.programme_id}.${locale}`);
+}
+
+// ====================================================================
+// Date / weekday formatters
+// ====================================================================
+
+const WEEKDAY_REF_DAY: Record<string, number> = {
+  sun: 7, mon: 8, tue: 9, wed: 10, thu: 11, fri: 12, sat: 13,
+};
+const weekdayFmt = new Intl.DateTimeFormat(intlLocale, { weekday: "long" });
+function weekdayLabel(code: string): string {
+  const day = WEEKDAY_REF_DAY[code];
+  if (!day) return code;
+  return weekdayFmt.format(new Date(Date.UTC(2024, 0, day)));
+}
+const dateFmtLong = new Intl.DateTimeFormat(intlLocale, { month: "long", day: "numeric", year: "numeric" });
+function formatDate(unixSec: number): string {
+  return dateFmtLong.format(new Date(unixSec * 1000));
+}
+
+function daysUntil(unixSec: number): number {
+  const diff = unixSec - Math.floor(Date.now() / 1000);
+  return Math.ceil(diff / (24 * 3600));
+}
+
+function formatPrice(cents: number, currency: string): string {
+  if (cents === 0) return ru ? "по запросу" : "on request";
+  const value = Math.round(cents / 100);
+  const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : currency;
+  return `${symbol}${value}`;
+}
+
+// ====================================================================
+// Stub data — только для primaryView='paid' (Sprint 2 replace)
 // ====================================================================
 const stub = {
   progress: { completed: 3, total: 12 },
-  tier: {
-    label: locale === "ru" ? "Программа Beginner" : "Beginner Programme",
-    enrolledAtIso: "2026-05-15",
-  },
   homeworkAwaiting: 1,
   continueModule: {
     num: "04",
     track: "DIRECTING",
     title: "Visual Language",
-    meta: locale === "ru" ? "Текст + видео · требуется задание" : "Text + video · homework required",
+    meta: ru ? "Текст + видео · требуется задание" : "Text + video · homework required",
   },
   modules: [
-    { num: "01", track: "DIRECTING",     title: locale === "ru" ? "Взгляд режиссёра"     : "The Director's Eye",  status: "done"   as const },
-    { num: "02", track: "SCRIPTWRITING", title: locale === "ru" ? "Структура истории"    : "Story Structure",     status: "done"   as const },
-    { num: "03", track: "EDITING",       title: locale === "ru" ? "Монтажный кадр"       : "The Cut",             status: "done"   as const },
-    { num: "04", track: "DIRECTING",     title: locale === "ru" ? "Визуальный язык"      : "Visual Language",     status: "active" as const },
-    { num: "05", track: "PRODUCING",     title: locale === "ru" ? "Препродакшен"         : "Pre-Production",      status: "locked" as const },
-    { num: "06", track: "SCRIPTWRITING", title: locale === "ru" ? "Персонаж и конфликт"  : "Character & Conflict", status: "locked" as const },
+    { num: "01", track: "DIRECTING",     title: ru ? "Взгляд режиссёра"     : "The Director's Eye",  status: "done"   as const },
+    { num: "02", track: "SCRIPTWRITING", title: ru ? "Структура истории"    : "Story Structure",     status: "done"   as const },
+    { num: "03", track: "EDITING",       title: ru ? "Монтажный кадр"       : "The Cut",             status: "done"   as const },
+    { num: "04", track: "DIRECTING",     title: ru ? "Визуальный язык"      : "Visual Language",     status: "active" as const },
+    { num: "05", track: "PRODUCING",     title: ru ? "Препродакшен"         : "Pre-Production",      status: "locked" as const },
+    { num: "06", track: "SCRIPTWRITING", title: ru ? "Персонаж и конфликт"  : "Character & Conflict", status: "locked" as const },
   ],
   homework: [
-    { num: "02", track: "SCRIPTWRITING", title: locale === "ru" ? "Структура истории" : "Story Structure", variant: "review"  as const },
-    { num: "04", track: "DIRECTING",     title: locale === "ru" ? "Визуальный язык"   : "Visual Language", variant: "pending" as const },
+    { num: "02", track: "SCRIPTWRITING", title: ru ? "Структура истории" : "Story Structure", variant: "review"  as const },
+    { num: "04", track: "DIRECTING",     title: ru ? "Визуальный язык"   : "Visual Language", variant: "pending" as const },
   ],
 };
-// ====================================================================
 
-const t = locale === "ru"
+const t = ru
   ? {
       eyebrow: "Кабинет",
-      enrolled: "поступление",
-      progress: "Прогресс",
-      progressSub: (n: number) => `модул${n === 1 ? "ь" : "ей"} завершено`,
-      tier: "Ваш тариф",
-      tierSub: "ru · активен",
-      homework: "Задания",
-      homeworkSub: "на проверке",
-      continueLearning: "Продолжить",
-      allModules: "Все модули",
-      homeworkSection: "Задания",
-      statusDone: "✓ завершено",
-      statusActive: "→ в процессе",
-      statusLocked: "недоступно",
-      badgeReview: "На проверке",
-      badgePending: "Сдать →",
+      welcomeNote: "Заявка принята. Ваше место в когорте забронировано.",
       verifiedNote: "Email подтверждён. Добро пожаловать!",
+      // pre-payment
+      ppEyebrow: "Ваша когорта забронирована",
+      ppCountdownLabelD: (d: number) => `${d.toString()} ${d === 1 ? "день" : d < 5 ? "дня" : "дней"} до старта`,
+      ppCountdownToday: "Старт сегодня",
+      ppCountdownStarted: "Курс уже идёт",
+      ppScheduleLabel: "Расписание",
+      ppStartsLabel: "Старт",
+      ppDurationLabel: "Длительность",
+      ppWeeksLabel: (n: number) => `${n.toString()} ${n === 1 ? "неделя" : n < 5 ? "недели" : "недель"}`,
+      ppPriceLabel: "Стоимость",
+      ppTimeMorning: "утро",
+      ppTimeEvening: "вечер",
+      ppPayCta: "Оплатить и начать →",
+      ppCurriculumTitle: "Что внутри",
+      ppCurriculumLocked: "Доступ к материалам откроется после оплаты",
+      ppPasswordBanner: "Сейчас вход — через cookie этого браузера. Хотите задать пароль, чтобы заходить с других устройств?",
+      ppPasswordCta: "Задать пароль в настройках",
+      // paid (stub)
+      paidEnrolled: "поступление",
+      paidProgress: "Прогресс",
+      paidProgressSub: (n: number) => `модул${n === 1 ? "ь" : "ей"} завершено`,
+      paidHomework: "Задания",
+      paidHomeworkSub: "на проверке",
+      paidContinueLearning: "Продолжить",
+      paidAllModules: "Все модули",
+      paidHomeworkSection: "Задания",
+      paidStatusDone: "✓ завершено",
+      paidStatusActive: "→ в процессе",
+      paidStatusLocked: "недоступно",
+      paidBadgeReview: "На проверке",
+      paidBadgePending: "Сдать →",
+      // no_application
+      noAppTitle: "Ещё не выбрали программу.",
+      noAppLede: "Посмотрите программы и выберите когорту — мы сразу зачислим место.",
+      noAppCta: "Выбрать когорту →",
       seo: { title: "Личный кабинет — Moirai", description: "Личный кабинет студента Moirai." },
     }
   : {
       eyebrow: "Dashboard",
-      enrolled: "enrolled",
-      progress: "Progress",
-      progressSub: (n: number) => `module${n === 1 ? "" : "s"} complete`,
-      tier: "Your tier",
-      tierSub: "en · active",
-      homework: "Homework",
-      homeworkSub: "awaiting feedback",
-      continueLearning: "Continue learning",
-      allModules: "All modules",
-      homeworkSection: "Homework",
-      statusDone: "✓ complete",
-      statusActive: "→ in progress",
-      statusLocked: "locked",
-      badgeReview: "Under review",
-      badgePending: "Submit →",
+      welcomeNote: "Application received. Your spot is reserved.",
       verifiedNote: "Email verified. Welcome!",
+      ppEyebrow: "Your cohort is reserved",
+      ppCountdownLabelD: (d: number) => `${d.toString()} ${d === 1 ? "day" : "days"} until start`,
+      ppCountdownToday: "Starts today",
+      ppCountdownStarted: "Course is in progress",
+      ppScheduleLabel: "Schedule",
+      ppStartsLabel: "Starts",
+      ppDurationLabel: "Duration",
+      ppWeeksLabel: (n: number) => `${n.toString()} ${n === 1 ? "week" : "weeks"}`,
+      ppPriceLabel: "Price",
+      ppTimeMorning: "morning",
+      ppTimeEvening: "evening",
+      ppPayCta: "Pay & start →",
+      ppCurriculumTitle: "What's inside",
+      ppCurriculumLocked: "Materials unlock after payment",
+      ppPasswordBanner: "You're signed in via this browser's cookie. Set a password to sign in from other devices.",
+      ppPasswordCta: "Set password in account settings",
+      paidEnrolled: "enrolled",
+      paidProgress: "Progress",
+      paidProgressSub: (n: number) => `module${n === 1 ? "" : "s"} complete`,
+      paidHomework: "Homework",
+      paidHomeworkSub: "awaiting feedback",
+      paidContinueLearning: "Continue learning",
+      paidAllModules: "All modules",
+      paidHomeworkSection: "Homework",
+      paidStatusDone: "✓ complete",
+      paidStatusActive: "→ in progress",
+      paidStatusLocked: "locked",
+      paidBadgeReview: "Under review",
+      paidBadgePending: "Submit →",
+      noAppTitle: "No programme yet.",
+      noAppLede: "Browse programmes and pick a cohort — we'll reserve your spot right away.",
+      noAppCta: "Choose a cohort →",
       seo: { title: "Dashboard — Moirai", description: "Your Moirai student dashboard." },
     };
 
-const enrolledFormatted = new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
-  month: "long",
-  day: "numeric",
-  year: "numeric",
-}).format(new Date(stub.tier.enrolledAtIso));
+// Tier line для DashboardHero — зависит от primary application
+let tierLine = "";
+if (primaryView === "awaiting_payment" && cohort && programme) {
+  tierLine = `${programme.data.title} · ${t.ppEyebrow.toLowerCase()}`;
+} else if (primaryView === "paid" && programme) {
+  const enrolledFormatted = activeApp ? formatDate(activeApp.created_at) : "";
+  tierLine = `${programme.data.title} · ${t.paidEnrolled} ${enrolledFormatted}`;
+}
 
-const tierLine = `${stub.tier.label} · ${t.enrolled} ${enrolledFormatted}`;
+// Pre-payment computed values
+const ppCountdownDays = cohort ? daysUntil(cohort.start_date) : 0;
+let ppCountdownText = "";
+if (cohort) {
+  if (ppCountdownDays > 0) ppCountdownText = t.ppCountdownLabelD(ppCountdownDays);
+  else if (ppCountdownDays === 0) ppCountdownText = t.ppCountdownToday;
+  else ppCountdownText = t.ppCountdownStarted;
+}
 
-const continueEyebrow = `${locale === "ru" ? "МОДУЛЬ" : "MODULE"} ${stub.continueModule.num} · ${stub.continueModule.track}`;
+const ppDays = cohort ? normalizeDayPair(parseDaysJson(cohort.slot.days_json)) : [];
+const ppDaysLabel = ppDays.map(weekdayLabel).join(" + ");
+const ppTimeOfDay = cohort ? deriveTimeOfDay(cohort.slot.time_et) : "morning";
+const ppTimeLabel = ppTimeOfDay === "morning" ? t.ppTimeMorning : t.ppTimeEvening;
+const ppDurationWeeks = programme && programme.data.lessons_total_hint > 0
+  ? computeDurationWeeks(programme.data.lessons_total_hint, 2)
+  : 0;
+const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.data.price_currency) : "";
+
+const continueEyebrow = `${ru ? "МОДУЛЬ" : "MODULE"} ${stub.continueModule.num} · ${stub.continueModule.track}`;
 ---
 
 <DashboardLayout
@@ -136,76 +249,142 @@ const continueEyebrow = `${locale === "ru" ? "МОДУЛЬ" : "MODULE"} ${stub.c
   <DashboardHero eyebrow={t.eyebrow} name={firstName} tierLine={tierLine} />
 
   <div class="dashboard-content">
-    {verifiedBadge && (
+    {welcomeBadge && (
+      <p class="dashboard-content__notice" role="status">{t.welcomeNote}</p>
+    )}
+    {verifiedBadge && !welcomeBadge && (
       <p class="dashboard-content__notice" role="status">{t.verifiedNote}</p>
     )}
 
-    <section class="dashboard-content__stats" aria-label={t.eyebrow}>
-      <StatCard
-        label={t.progress}
-        value={[stub.progress.completed, String(stub.progress.total)]}
-        sub={t.progressSub(stub.progress.completed)}
-        progress={stub.progress.completed / stub.progress.total}
-        progressLabel={`${t.progress}: ${stub.progress.completed} / ${stub.progress.total}`}
-      />
-      <StatCard
-        label={t.tier}
-        value={stub.tier.label.split(" ")[0]}
-        sub={t.tierSub}
-        valueSmall
-      />
-      <StatCard
-        label={t.homework}
-        value={[stub.homeworkAwaiting, ""]}
-        sub={t.homeworkSub}
-      />
-    </section>
+    {primaryView === "awaiting_payment" && cohort && programme && activeApp && (
+      <>
+        <section class="pp-hero" aria-label="Pre-payment summary">
+          <p class="pp-hero__eyebrow">{t.ppEyebrow}</p>
+          <h2 class="pp-hero__title">{programme.data.title}</h2>
+          <p class="pp-hero__countdown">{ppCountdownText}</p>
 
-    <section aria-labelledby="continue-label">
-      <p id="continue-label" class="dashboard-content__section-label">{t.continueLearning}</p>
-      <ContinueCard
-        eyebrowText={continueEyebrow}
-        title={stub.continueModule.title}
-        meta={stub.continueModule.meta}
-        href={`/${locale}/dashboard`}
-        ariaLabel={`${t.continueLearning}: ${stub.continueModule.title}`}
-      />
-    </section>
+          <dl class="pp-hero__meta">
+            <div>
+              <dt>{t.ppScheduleLabel}</dt>
+              <dd>{ppDaysLabel} · {ppTimeLabel} · <span class="pp-hero__time-et">{cohort.slot.time_et} ET</span></dd>
+            </div>
+            <div>
+              <dt>{t.ppStartsLabel}</dt>
+              <dd>{formatDate(cohort.start_date)}</dd>
+            </div>
+            {ppDurationWeeks > 0 && (
+              <div>
+                <dt>{t.ppDurationLabel}</dt>
+                <dd>{t.ppWeeksLabel(ppDurationWeeks)}</dd>
+              </div>
+            )}
+            <div>
+              <dt>{t.ppPriceLabel}</dt>
+              <dd class="pp-hero__price">{ppPrice}</dd>
+            </div>
+          </dl>
 
-    <section aria-labelledby="modules-label">
-      <p id="modules-label" class="dashboard-content__section-label">{t.allModules}</p>
-      <div class="dashboard-content__modules">
-        {stub.modules.map((m) => (
-          <ModuleCard
-            num={m.num}
-            track={m.track}
-            title={m.title}
-            status={m.status}
-            statusLabel={
-              m.status === "done" ? t.statusDone
-              : m.status === "active" ? t.statusActive
-              : t.statusLocked
-            }
-            href={m.status !== "locked" ? `/${locale}/dashboard` : undefined}
+          <a class="pp-hero__cta" href={`/${locale}/checkout?application=${activeApp.id}`}>{t.ppPayCta}</a>
+        </section>
+
+        <section class="pp-curriculum" aria-labelledby="pp-curriculum-title">
+          <header class="pp-curriculum__head">
+            <h3 id="pp-curriculum-title" class="dashboard-content__section-label">{t.ppCurriculumTitle}</h3>
+            <p class="pp-curriculum__locked-note">{t.ppCurriculumLocked}</p>
+          </header>
+          <div class="pp-curriculum__list">
+            {programme.data.modules.slice(0, 6).map((modSlug: string, i: number) => (
+              <div class="pp-module-stub">
+                <span class="pp-module-stub__num">{String(i + 1).padStart(2, "0")}</span>
+                <span class="pp-module-stub__title">{modSlug}</span>
+                <span class="pp-module-stub__lock" aria-hidden="true">🔒</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <p class="pp-password-banner">
+          {t.ppPasswordBanner}
+          {" "}
+          <a href={`/${locale}/account`}>{t.ppPasswordCta} →</a>
+        </p>
+      </>
+    )}
+
+    {primaryView === "paid" && (
+      <>
+        <section class="dashboard-content__stats" aria-label={t.eyebrow}>
+          <StatCard
+            label={t.paidProgress}
+            value={[stub.progress.completed, String(stub.progress.total)]}
+            sub={t.paidProgressSub(stub.progress.completed)}
+            progress={stub.progress.completed / stub.progress.total}
+            progressLabel={`${t.paidProgress}: ${stub.progress.completed} / ${stub.progress.total}`}
           />
-        ))}
-      </div>
-    </section>
+          <StatCard
+            label={programme?.data.title ?? "Programme"}
+            value={programme?.data.title.split(" ")[0] ?? "—"}
+            sub={`${locale} · active`}
+            valueSmall
+          />
+          <StatCard
+            label={t.paidHomework}
+            value={[stub.homeworkAwaiting, ""]}
+            sub={t.paidHomeworkSub}
+          />
+        </section>
 
-    <section aria-labelledby="homework-label">
-      <p id="homework-label" class="dashboard-content__section-label">{t.homeworkSection}</p>
-      <div class="dashboard-content__homework">
-        {stub.homework.map((h) => (
-          <HomeworkCard
-            moduleLabel={`${locale === "ru" ? "Модуль" : "Module"} ${h.num} · ${h.track}`}
-            title={h.title}
-            badgeLabel={h.variant === "review" ? t.badgeReview : t.badgePending}
-            badgeVariant={h.variant}
+        <section aria-labelledby="continue-label">
+          <p id="continue-label" class="dashboard-content__section-label">{t.paidContinueLearning}</p>
+          <ContinueCard
+            eyebrowText={continueEyebrow}
+            title={stub.continueModule.title}
+            meta={stub.continueModule.meta}
             href={`/${locale}/dashboard`}
+            ariaLabel={`${t.paidContinueLearning}: ${stub.continueModule.title}`}
           />
-        ))}
-      </div>
-    </section>
+        </section>
+
+        <section aria-labelledby="modules-label">
+          <p id="modules-label" class="dashboard-content__section-label">{t.paidAllModules}</p>
+          <div class="dashboard-content__modules">
+            {stub.modules.map((m) => (
+              <ModuleCard
+                num={m.num}
+                track={m.track}
+                title={m.title}
+                status={m.status}
+                statusLabel={m.status === "done" ? t.paidStatusDone : m.status === "active" ? t.paidStatusActive : t.paidStatusLocked}
+                href={m.status !== "locked" ? `/${locale}/dashboard` : undefined}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="homework-label">
+          <p id="homework-label" class="dashboard-content__section-label">{t.paidHomeworkSection}</p>
+          <div class="dashboard-content__homework">
+            {stub.homework.map((h) => (
+              <HomeworkCard
+                moduleLabel={`${ru ? "Модуль" : "Module"} ${h.num} · ${h.track}`}
+                title={h.title}
+                badgeLabel={h.variant === "review" ? t.paidBadgeReview : t.paidBadgePending}
+                badgeVariant={h.variant}
+                href={`/${locale}/dashboard`}
+              />
+            ))}
+          </div>
+        </section>
+      </>
+    )}
+
+    {primaryView === "no_application" && (
+      <section class="no-application">
+        <h2 class="no-application__title">{t.noAppTitle}</h2>
+        <p class="no-application__lede">{t.noAppLede}</p>
+        <a class="no-application__cta" href={`/${locale}/apply`}>{t.noAppCta}</a>
+      </section>
+    )}
   </div>
 </DashboardLayout>
 
@@ -218,7 +397,6 @@ const continueEyebrow = `${locale === "ru" ? "МОДУЛЬ" : "MODULE"} ${stub.c
     max-width: var(--container-max);
     margin: 0 auto;
   }
-
   .dashboard-content__notice {
     background: var(--amber-faint);
     border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
@@ -228,13 +406,11 @@ const continueEyebrow = `${locale === "ru" ? "МОДУЛЬ" : "MODULE"} ${stub.c
     font-size: var(--type-body-sm);
     text-align: center;
   }
-
   .dashboard-content__stats {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: var(--space-sm);
   }
-
   .dashboard-content__section-label {
     font-family: var(--font-body);
     font-size: var(--type-micro-sm);
@@ -244,28 +420,184 @@ const continueEyebrow = `${locale === "ru" ? "МОДУЛЬ" : "MODULE"} ${stub.c
     color: var(--text-faint);
     margin-bottom: var(--space-md);
   }
-
   .dashboard-content__modules {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: var(--space-xs);
   }
-
   .dashboard-content__homework {
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
   }
 
+  /* Pre-payment hero (Stage 14j) */
+  .pp-hero {
+    background: var(--bg-elevated);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+    border-radius: 4px;
+    padding: var(--space-2xl);
+  }
+  .pp-hero__eyebrow {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-accent);
+    margin: 0 0 var(--space-sm);
+  }
+  .pp-hero__title {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    margin: 0 0 var(--space-md);
+    color: var(--text);
+  }
+  .pp-hero__countdown {
+    font-family: var(--font-display);
+    font-size: clamp(20px, 2.5vw, 28px);
+    font-weight: 300;
+    color: var(--text-accent);
+    margin: 0 0 var(--space-xl);
+  }
+  .pp-hero__meta {
+    margin: 0 0 var(--space-xl);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--space-md);
+  }
+  .pp-hero__meta > div {
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-sm);
+  }
+  .pp-hero__meta dt {
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: var(--space-2xs);
+  }
+  .pp-hero__meta dd {
+    font-size: var(--type-body-md);
+    color: var(--text);
+    margin: 0;
+  }
+  .pp-hero__price {
+    color: var(--text-accent);
+    font-family: var(--font-display);
+    font-size: var(--type-body-lg);
+  }
+  .pp-hero__time-et {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: var(--type-body-sm);
+    color: var(--text-faint);
+  }
+  .pp-hero__cta {
+    display: inline-block;
+    padding: 14px 28px;
+    background: var(--amber);
+    color: var(--ink);
+    text-decoration: none;
+    font-size: var(--type-body-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    border-radius: 2px;
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .pp-hero__cta:hover {
+    background: var(--amber-light);
+  }
+
+  .pp-curriculum__head {
+    margin-bottom: var(--space-md);
+  }
+  .pp-curriculum__locked-note {
+    color: var(--text-faint);
+    font-size: var(--type-body-sm);
+    margin: 0;
+  }
+  .pp-curriculum__list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-xs);
+  }
+  .pp-module-stub {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-faint);
+    background: var(--bg);
+  }
+  .pp-module-stub__num {
+    font-family: var(--font-display);
+    font-size: var(--type-body-lg);
+    color: var(--text-faint);
+    flex-shrink: 0;
+  }
+  .pp-module-stub__title {
+    flex: 1;
+    font-size: var(--type-body-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pp-password-banner {
+    font-size: var(--type-body-sm);
+    color: var(--text-muted);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px dashed var(--border-strong);
+    border-radius: 2px;
+    margin: 0;
+  }
+  .pp-password-banner a {
+    color: var(--amber);
+    text-decoration: none;
+    border-bottom: 1px solid currentColor;
+  }
+  .pp-password-banner a:hover {
+    color: var(--amber-light);
+  }
+
+  /* No application */
+  .no-application {
+    text-align: center;
+    padding: var(--space-3xl) var(--space-xl);
+  }
+  .no-application__title {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 400;
+    margin: 0 0 var(--space-md);
+  }
+  .no-application__lede {
+    color: var(--text-muted);
+    font-size: var(--type-body-lg);
+    margin: 0 0 var(--space-xl);
+  }
+  .no-application__cta {
+    display: inline-block;
+    padding: 14px 28px;
+    background: var(--amber);
+    color: var(--ink);
+    text-decoration: none;
+    font-size: var(--type-body-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    border-radius: 2px;
+  }
+
   @media (max-width: 640px) {
-    .dashboard-content {
-      gap: var(--space-xl);
-    }
-    .dashboard-content__stats {
-      grid-template-columns: 1fr;
-    }
-    .dashboard-content__modules {
-      grid-template-columns: 1fr;
-    }
+    .dashboard-content { gap: var(--space-xl); }
+    .dashboard-content__stats { grid-template-columns: 1fr; }
+    .dashboard-content__modules { grid-template-columns: 1fr; }
+    .pp-curriculum__list { grid-template-columns: 1fr; }
   }
 </style>
