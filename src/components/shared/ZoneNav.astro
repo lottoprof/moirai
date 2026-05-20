@@ -1,0 +1,165 @@
+---
+/*
+ * <ZoneNav /> — общий top-nav для protected zones (admin / instructor /
+ * student dashboard). Раньше AdminNav и InstructorNav имели идентичную
+ * структуру и стили — drift'или независимо. Stage 24: общий компонент.
+ *
+ * Props:
+ *   brandHref / brandAriaLabel — лого слева (на overview зоны).
+ *   siteHref / siteLabel       — ссылка "View site" / "На сайт".
+ *   ariaLabel                  — <nav aria-label>, локализованный.
+ *   items                      — основной ряд nav-items (key/label/href).
+ *   currentKey                 — active item.
+ *   otherZones                 — zone-switcher'ы справа (multi-role).
+ *
+ * Все цвета/шрифты — из tokens.css. Стили scoped и shared между
+ * Admin/Instructor — единый источник истины.
+ *
+ * Не используется на public site (там Nav.astro: scroll-fade + auth UI).
+ */
+
+import Logo from "./Logo.astro";
+
+interface NavItem {
+  key: string;
+  label: string;
+  href: string;
+}
+
+interface OtherZone {
+  href: string;
+  label: string;
+}
+
+interface Props {
+  brandHref: string;
+  brandAriaLabel: string;
+  siteHref: string;
+  siteLabel: string;
+  ariaLabel: string;
+  items: readonly NavItem[];
+  currentKey: string;
+  otherZones?: OtherZone[];
+}
+
+const {
+  brandHref,
+  brandAriaLabel,
+  siteHref,
+  siteLabel,
+  ariaLabel,
+  items,
+  currentKey,
+  otherZones = [],
+} = Astro.props;
+---
+
+<nav class="zone-nav" aria-label={ariaLabel}>
+  <div class="zone-nav__brand">
+    <a href={brandHref} class="zone-nav__logo" aria-label={brandAriaLabel}><Logo height={26} /></a>
+    <a href={siteHref} class="zone-nav__site">{siteLabel} <span aria-hidden="true">→</span></a>
+  </div>
+  <ul class="zone-nav__list" role="list">
+    {items.map((item) => (
+      <li class="zone-nav__item">
+        <a
+          href={item.href}
+          class:list={["zone-nav__link", { "zone-nav__link--active": item.key === currentKey }]}
+          aria-current={item.key === currentKey ? "page" : undefined}
+        >{item.label}</a>
+      </li>
+    ))}
+    {otherZones.map((z) => (
+      <li class="zone-nav__item">
+        <a href={z.href} class="zone-nav__link zone-nav__link--switch">{z.label}</a>
+      </li>
+    ))}
+  </ul>
+</nav>
+
+<style>
+  .zone-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-lg) var(--container-pad);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .zone-nav__brand {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-md);
+  }
+
+  .zone-nav__logo {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 300;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text);
+    text-decoration: none;
+    opacity: 0.95;
+  }
+
+  .zone-nav__site {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .zone-nav__site:hover { color: var(--text-muted); }
+
+  .zone-nav__list {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .zone-nav__list::-webkit-scrollbar { display: none; }
+
+  .zone-nav__item { flex-shrink: 0; }
+
+  .zone-nav__link {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 4px 2px;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .zone-nav__link:hover { color: var(--text); }
+  .zone-nav__link--active { color: var(--text-accent); }
+
+  .zone-nav__link--switch {
+    color: var(--text-faint);
+    font-size: var(--type-micro-sm);
+    padding-left: var(--space-sm);
+    border-left: 1px solid var(--border);
+    margin-left: var(--space-xs);
+  }
+  .zone-nav__link--switch:hover { color: var(--text-accent); }
+
+  @media (max-width: 640px) {
+    .zone-nav {
+      padding: var(--space-md) var(--space-md);
+      gap: var(--space-md);
+    }
+    .zone-nav__list { gap: var(--space-md); }
+    .zone-nav__link { letter-spacing: var(--tracking-wide); }
+  }
+</style>
