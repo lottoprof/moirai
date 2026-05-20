@@ -45,41 +45,48 @@
 
 ### A. Регистрация vs Apply: точка входа
 
-- [ ] A1. Apply доступен до регистрации (anonymous) или только залогиненным?
-- [ ] A2. Если anonymous — Apply создаёт user аккаунт автоматически или отдельный шаг?
-- [ ] A3. Magic-link / OAuth / password — где подключается (до Apply / после / без аккаунта)?
+- [x] A1. Apply доступен до регистрации (anonymous) или только залогиненным? → **anonymous** (FLOW-5: сначала слоты, потом email; FLOW-6: дашборд до оплаты)
+- [x] A2. Если anonymous — Apply создаёт user аккаунт автоматически или отдельный шаг? → **автоматически** при submit'е contact-формы (шаг 3 флоу)
+- [x] A3. Magic-link / OAuth / password — где подключается? → **magic-link** _предложение, требует подтверждения_
 - [ ] A4. Повторный Apply через тот же email — разрешён?
 
-### B. Apply form — поля
+### B. Сетка слотов
 
-- [ ] B1. Обязательные поля: email, имя, программа, slot — что ещё?
-- [ ] B2. Опциональные: телефон / страна / опыт / мотивация / source?
-- [ ] B3. Turnstile — да?
-- [ ] B4. Промокод/реферал — сразу или Sprint 2?
+UX-порядок: слот выбирается **первым** (FLOW-5), потому что определяет
+дальнейший шаг (когорта + старт + контекст для контакта).
 
-### C. Сетка слотов
+- [x] B1. Гранулярность: "день+время" или фиксированная пара дней? → **фиксированная пара дней** (FLOW-4: 2 раза в неделю)
+- [x] B2. Утро/вечер — конкретные часы или диапазон? → **2 раза в сутки утро/вечер** (FLOW-4), конкретные часы _уточнить_
+- [ ] B3. Часовой пояс — фиксированный ET или конвертация под клиента?
+- [ ] B4. UI: матрица 7×2 или предустановленный shortlist?
+- [x] B5. Можно выбрать несколько слотов (preference order) или один? → **один** _предложение (1 slot = 1 cohort), требует подтверждения_
+- [ ] B6. Откуда ограничиваются: availability инструктора или фикс пресет?
+- [ ] B7. Что показываем по местам: "7/10 мест" / просто "available" / без счётчика?
+- [ ] B8. Если все слоты заняты — waitlist / "next cohort" / disabled?
 
-- [ ] C1. Гранулярность: "день+время" или фиксированная пара дней?
-- [ ] C2. Утро/вечер — конкретные часы (09:00 / 19:00 ET) или диапазон?
-- [ ] C3. Часовой пояс — фиксированный ET или конвертация под клиента?
-- [ ] C4. UI: матрица 7×2 или предустановленный shortlist?
-- [ ] C5. Можно выбрать несколько слотов (preference order) или один?
-- [ ] C6. Откуда ограничиваются: availability инструктора или фикс пресет?
+### C. Apply form — поля (после выбора слота)
+
+- [x] C1. Обязательные: email, slot уже выбран — нужно ли **имя** обязательным?
+- [ ] C2. Опциональные: телефон / страна / опыт / мотивация / source?
+- [x] C3. Turnstile — да (как на login/register) _предложение, требует подтверждения_
+- [ ] C4. Промокод/реферал — сразу или Sprint 2?
 
 ### D. Формирование группы
 
-- [ ] D1. Минимум 1 человек — стартуем сразу или окно ожидания N дней?
+- [x] D1. Минимум 1 человек — стартуем сразу или окно ожидания N дней? → **стартуем по фиксированной дате независимо от размера** (FLOW-3)
 - [ ] D2. Максимум 10 — что если 11-й хочет тот же слот (waitlist / next cohort)?
-- [ ] D3. Когда стартует cohort: фиксированные даты / динамически / вручную админом?
+- [x] D3. Когда стартует cohort? → **фиксированные даты** (FLOW-3 + countdown в дашборде, нужны конкретные даты в админке)
 - [ ] D4. Один клиент = одна группа или несколько одновременно?
 - [ ] D5. Cohort = группа или группа = подгруппа внутри cohort?
+- [ ] D6. Сколько дней дашборд живёт без оплаты (auto-expire application за N дней до старта)?
 
 ### E. Оплата
 
-- [ ] E1. Apply → сразу к оплате или Apply бесплатно, оплата после discovery-call?
+- [x] E1. Apply → сразу к оплате или Apply бесплатно? → **Apply бесплатно**, оплата из дашборда (FLOW-1, FLOW-2)
 - [ ] E2. Discovery-call — для всех или только individual?
-- [ ] E3. Stripe Checkout (redirect) vs Elements (embedded)?
+- [x] E3. Stripe Checkout (redirect) vs Elements (embedded)? → **Stripe Checkout (redirect)** _предложение для Sprint 1, требует подтверждения_
 - [ ] E4. Если cohort не сформировалась — refund или авто-перенос?
+- [x] E5. Что фиксируется при оплате как offer acceptance? → **audit_log event=`offer_accepted`** с user_id, ip_hash, ua, terms_version, refund_version, privacy_version, programme_id, cohort_id, amount, currency, stripe_payment_id (FLOW-2)
 
 ### F. Коммуникации после Apply
 
@@ -104,10 +111,17 @@
 
 ### I. Data model
 
-- [ ] I1. `applications` отдельная или часть `enrollments` со статусом pending?
-- [ ] I2. User создаётся при Apply (anonymous) или связывается потом?
-- [ ] I3. Slots — отдельная таблица или JSON в applications?
-- [ ] I4. Cohorts — связь с applications/enrollments?
+- [x] I1. `applications` отдельная или часть `enrollments` со статусом pending? → **отдельная** _предложение, требует подтверждения_
+- [x] I2. User создаётся при Apply (anonymous) или связывается потом? → **создаётся при Apply** (см. A1/A2)
+- [x] I3. Slots — отдельная таблица или JSON в applications? → **отдельная `slots`** + конфигурация админа (programme_id, days, time_of_day, timezone, instructor_id, max_students) _предложение_
+- [x] I4. Cohorts — связь с applications/enrollments? → **`cohorts`** новая (id, programme_id, slot_id, start_date, status: forming/open/running/completed); applications.cohort_id FK _предложение_
+
+Полная модель (предложение, требует подтверждения):
+
+- `slots(id, programme_id, day_pair, time_of_day, timezone, instructor_id, max_students)` — конфиг админа
+- `cohorts(id, programme_id, slot_id, start_date, status)` — конкретный запуск, status: forming/open/running/completed
+- `applications(id, user_id, programme_id, cohort_id, status, created_at)` — статусы: submitted → dashboard_active → paid (или expired / cancelled)
+- При оплате `applications.status='paid'` создаётся `enrollments` row (уже существующая таблица в схеме)
 
 ### J. i18n
 
@@ -131,15 +145,23 @@
 | FLOW-5 | Сначала клиент видит слоты → выбирает → потом email | lottoprof 2026-05-20 |
 | FLOW-6 | Apply имеет промежуточную ценность: дашборд с описанием + countdown пока не оплатил | lottoprof 2026-05-20 |
 
-## Открытые развилки (нужны ответы для плана)
+## Статус по блокам
 
-Минимум для старта реализации:
+| Блок | Закрыто | Открыто | Готовность |
+|---|---|---|---|
+| A. Точка входа | A1, A2, A3*| A4 | 3/4 |
+| B. Слоты | B1, B2, B5* | B3, B4, B6, B7, B8 | 3/8 |
+| C. Apply form | C1*, C3* | C2, C4 | 2/4 |
+| D. Группа | D1, D3 | D2, D4, D5, D6 | 2/6 |
+| E. Оплата | E1, E3*, E5 | E2, E4 | 3/5 |
+| F. Коммуникации | — | F1, F2, F3, F4 | 0/4 |
+| G. Admin/Instructor | — | G1, G2, G3 | 0/3 |
+| H. Edge-кейсы | — | H1, H2, H3, H4, H5 | 0/5 |
+| I. Data model | I1*, I2, I3*, I4* | — | 4/4 |
+| J. i18n | — | J1 | 0/1 |
+| K. Legal | — | K1, K2, K3, K4 | 0/4 |
 
-1. **A1-A3**: anonymous + magic-link vs registered + password
-2. **C1-C4**: формат слотов в UI
-3. **D1, D3**: окно ожидания + источник дат старта
-4. **E1, E3**: Apply → checkout flow + Stripe вариант
-5. **G1, G3**: admin applications view + статусы
-6. **I1-I4**: data model
+`*` — требует подтверждения (мои предложения).
 
-Остальные блоки (B, F, H, J, K) можно решить после структуры.
+**Минимум для старта плана**: A4 + B (большинство) + D (большинство) +
+E2/E4 + G1/G3. F/H/J/K можно решать инкрементально по ходу.
