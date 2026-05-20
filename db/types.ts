@@ -78,6 +78,7 @@ export type AuditEvent =
   | "session_revoked"
   | "method_unlink"
   | "user_created_by_admin"
+  | "user_updated_by_admin"
   | "user_deactivated"
   | "user_reactivated"
   | "user_anonymized"

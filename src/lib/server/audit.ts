@@ -15,29 +15,13 @@
 
 import { extractRequestInfo, hashIp } from "./hash";
 
-export type AuditEvent =
-  | "register"
-  | "login"
-  | "logout"
-  | "oauth_link"
-  | "password_set"
-  | "email_verify"
-  | "password_reset"
-  | "login_failed"
-  | "session_revoked"
-  | "method_unlink"
-  // admin-инициированные события (Stage 21+)
-  | "user_created_by_admin"
-  | "user_updated_by_admin"
-  | "user_deactivated"
-  | "user_reactivated"
-  | "user_anonymized"
-  | "role_granted"
-  | "role_revoked"
-  | "enrollment_granted"
-  | "enrollment_status_changed"
-  | "enrollment_module_added"
-  | "enrollment_module_removed";
+/**
+ * Re-export from `db/types.ts` — single source of truth for audit events.
+ * Расширения: добавь сначала в `db/types.ts` AuditEvent, потом миграция
+ * (если CHECK constraint когда-нибудь появится).
+ */
+export type { AuditEvent } from "../../../db/types";
+import type { AuditEvent } from "../../../db/types";
 
 export type AuditMethod = "password" | "google" | "discord" | null;
 

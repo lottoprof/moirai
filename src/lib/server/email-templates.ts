@@ -18,7 +18,7 @@
 
 import type { Locale } from "../../../db/types";
 
-export type EmailKind = "verify" | "password_reset";
+export type EmailKind = "verify" | "password_reset" | "apply_welcome";
 
 const messages: Record<string, string | undefined> = {
   // === VERIFY (новая регистрация) ===
@@ -58,6 +58,25 @@ const messages: Record<string, string | undefined> = {
   "ru:password_reset:link_hint": "Или скопируйте эту ссылку в браузер:",
   "ru:password_reset:expires":   "Ссылка действительна 15 минут.",
   "ru:password_reset:ignore":    "После смены пароля все активные сессии будут закрыты — потребуется заново войти на всех устройствах. Если вы не запрашивали сброс — проигнорируйте это письмо.",
+
+  // === APPLY WELCOME (после Apply submit, Stage 14) ===
+  "en:apply_welcome:subject":   "Welcome to Moirai — your cohort is reserved",
+  "en:apply_welcome:heading":   "Your cohort is reserved.",
+  "en:apply_welcome:welcome":   "Thanks for applying.",
+  "en:apply_welcome:body":      "Your spot is reserved. Open your dashboard to see programme details, schedule, and the next step — payment is a separate action you can take when you're ready.",
+  "en:apply_welcome:button":    "Open dashboard",
+  "en:apply_welcome:link_hint": "Or copy this link to your browser:",
+  "en:apply_welcome:expires":   "If you sign out and forget your password, visit moiraionline.pro/login, type your email and request a sign-in link — we'll email a fresh one each time.",
+  "en:apply_welcome:ignore":    "If you didn't apply for a cohort — let us know at hello@moiraionline.pro.",
+
+  "ru:apply_welcome:subject":   "Добро пожаловать в Moirai — место в когорте забронировано",
+  "ru:apply_welcome:heading":   "Место в когорте забронировано.",
+  "ru:apply_welcome:welcome":   "Спасибо за заявку.",
+  "ru:apply_welcome:body":      "Ваше место зарезервировано. Откройте кабинет, чтобы посмотреть детали программы, расписание и следующий шаг — оплата отдельным действием, когда будете готовы.",
+  "ru:apply_welcome:button":    "Открыть кабинет",
+  "ru:apply_welcome:link_hint": "Или скопируйте эту ссылку в браузер:",
+  "ru:apply_welcome:expires":   "Если выйдете и забудете пароль — зайдите на moiraionline.pro/login, введите email и запросите ссылку для входа. Мы пришлём свежую при каждом запросе.",
+  "ru:apply_welcome:ignore":    "Если вы не подавали заявку — напишите нам на hello@moiraionline.pro.",
 
   // === COMMON ===
   "en:common:footer":  "Moirai — Online Filmmaking Program",
