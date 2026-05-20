@@ -1,0 +1,107 @@
+---
+/*
+ * /{locale}/faq — standalone FAQ страница.
+ *
+ * Источник данных — те же `home.faqs[]` из коллекции pages, что
+ * показывается на главной. Дублирование осознанное: главная держит
+ * top FAQ для конверсии, /faq — индексируемая standalone-страница
+ * с тем же контентом + dedicated SEO + Schema.org FAQPage.
+ *
+ * Позже можно расширить standalone-FAQ дополнительными вопросами,
+ * которые не должны быть на главной (billing detail, refund process,
+ * tech requirements и т.п.) — добавив отдельную faqs-секцию в
+ * коллекцию.
+ *
+ * SSG (prerender = true) — статика для CDN, минимальная стоимость
+ * рендера, ускоряет SEO indexation.
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../layouts/public/Layout.astro";
+import Faq from "../../components/public/Faq.astro";
+import FaqSchema from "../../components/schema/FaqSchema.astro";
+
+export const prerender = true;
+
+export function getStaticPaths() {
+  return [
+    { params: { locale: "en" } },
+    { params: { locale: "ru" } },
+  ];
+}
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  throw new Error(`Unexpected locale: ${String(locale)}`);
+}
+const typedLocale: "en" | "ru" = locale;
+
+const home = await getEntry("pages", `home.${typedLocale}`);
+if (!home) {
+  throw new Error(`home.${typedLocale} not found in pages collection`);
+}
+
+const faqs: { q: string; a: string }[] = home.data.faqs ?? [];
+
+const t = typedLocale === "ru"
+  ? {
+      eyebrow: "Вопросы и ответы",
+      title: "Часто задаваемые вопросы.",
+      lede: "Если ответ на ваш вопрос здесь не нашёлся — напишите нам, и мы добавим его.",
+      faqHeading: "Вопросы и ответы",
+      seo: {
+        title: "FAQ — частые вопросы | Moirai",
+        description: "Ответы на частые вопросы о курсе кинорежиссуры Moirai: формат, длительность, оборудование, сертификация и фестивальная подача.",
+      },
+    }
+  : {
+      eyebrow: "FAQ",
+      title: "Frequently asked questions.",
+      lede: "If your question isn't answered below — reach out and we'll add it.",
+      faqHeading: "Common questions",
+      seo: {
+        title: "FAQ — Frequently Asked Questions | Moirai",
+        description: "Answers to common questions about Moirai's online filmmaking course: format, duration, equipment, certification, and festival submission.",
+      },
+    };
+---
+
+<Layout locale={typedLocale} seo={{ title: t.seo.title, description: t.seo.description }}>
+  <Fragment slot="schema">
+    <FaqSchema items={faqs} />
+  </Fragment>
+
+  <section class="faq-page" aria-labelledby="faq-title">
+    <header class="faq-page__head">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1 id="faq-title" class="h1">{t.title}</h1>
+      <p class="text-muted">{t.lede}</p>
+    </header>
+
+    {faqs.length > 0 && (
+      <Faq title={t.faqHeading} items={faqs} />
+    )}
+  </section>
+</Layout>
+
+<style>
+  .faq-page {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  .faq-page__head {
+    max-width: 720px;
+    margin: 0 auto var(--space-2xl);
+    text-align: center;
+  }
+
+  .faq-page__head .eyebrow {
+    margin-bottom: var(--space-md);
+  }
+
+  .faq-page__head .h1 {
+    margin-bottom: var(--space-md);
+  }
+</style>
