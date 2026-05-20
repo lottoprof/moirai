@@ -1,0 +1,570 @@
+---
+/*
+ * /[locale]/apply — slot picker, шаг 2 в Apply flow (см. apply-flow-spec.md).
+ *
+ * SSR (нужен live count и текущие даты).
+ *
+ * URL state:
+ *   ?p=beginner,intermediate   — multi-select programme filter
+ *   ?d=mon-thu | tue-fri       — day pair single-select
+ *   ?t=morning | evening       — time of day single-select
+ *   ?h=30 | 90 | 365           — horizon in days (default 90)
+ *
+ * Без JS на этой странице — фильтры = anchor-links с computed URL.
+ * Это работает с reduced-motion / no-JS / share-link сценариями.
+ *
+ * FLOW-12: list view сгруппированный по programme
+ * FLOW-13: hybrid spot display (available / N left / individual_bonus)
+ * FLOW-14: фильтры обязательны (programme · day_pair · time · period)
+ * FLOW-26: time только ET, без TZ-конвертации
+ * FLOW-29: только published programmes (filter в Astro)
+ * FLOW-30: weekday labels через Intl.DateTimeFormat per locale
+ */
+
+import { getCollection, type CollectionEntry } from "astro:content";
+import Layout from "../../../layouts/public/Layout.astro";
+import {
+  listActiveCohorts,
+  parseDaysJson,
+  normalizeDayPair,
+  deriveTimeOfDay,
+  computeSpotDisplay,
+  type CohortWithSlot,
+} from "../../../lib/server/cohorts";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/apply");
+}
+const typedLocale: "en" | "ru" = locale;
+
+const intlLocale = typedLocale === "ru" ? "ru-RU" : "en-US";
+
+// ============================================================
+// Parse URL state
+// ============================================================
+
+const params = Astro.url.searchParams;
+const filterProgrammes = (params.get("p") ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter((s) => s.length > 0);
+const filterDayPair = params.get("d");         // 'mon-thu' | 'tue-fri' | null
+const filterTime = params.get("t");            // 'morning' | 'evening' | null
+const filterHorizonRaw = parseInt(params.get("h") ?? "90", 10);
+const filterHorizon = [30, 90, 365].includes(filterHorizonRaw) ? filterHorizonRaw : 90;
+
+const dayPairOptions: Record<string, string[]> = {
+  "mon-thu": ["mon", "thu"],
+  "tue-fri": ["tue", "fri"],
+};
+
+// ============================================================
+// Programmes (published only, FLOW-29)
+// ============================================================
+
+type ProgrammeEntry = CollectionEntry<"programmes">;
+const allProgrammes = await getCollection("programmes");
+const publishedProgrammes = allProgrammes
+  .filter((p: ProgrammeEntry) => p.id.endsWith(`.${typedLocale}`))
+  .filter((p: ProgrammeEntry) => p.data.published !== false);
+const programmeMeta = new Map<string, ProgrammeEntry["data"]>(
+  publishedProgrammes.map((p: ProgrammeEntry) => [p.id.replace(`.${typedLocale}`, ""), p.data]),
+);
+const publishedSlugs = Array.from(programmeMeta.keys());
+const programmeOrder = ["beginner", "intermediate", "bundle"]
+  .filter((s) => publishedSlugs.includes(s));
+
+// Active programme filter (intersection с published)
+const activeProgrammeFilter = filterProgrammes.length > 0
+  ? filterProgrammes.filter((id) => publishedSlugs.includes(id))
+  : publishedSlugs;
+
+// ============================================================
+// Query cohorts
+// ============================================================
+
+const env = Astro.locals.runtime.env;
+const cohorts: CohortWithSlot[] = await listActiveCohorts(env, {
+  programmeIds: activeProgrammeFilter,
+  dayPairs: filterDayPair && dayPairOptions[filterDayPair]
+    ? [dayPairOptions[filterDayPair]]
+    : undefined,
+  timeOfDay: filterTime === "morning" || filterTime === "evening" ? filterTime : undefined,
+  withinDays: filterHorizon,
+});
+
+// Group by programme
+const byProgramme = new Map<string, CohortWithSlot[]>();
+for (const c of cohorts) {
+  if (!byProgramme.has(c.programme_id)) byProgramme.set(c.programme_id, []);
+  byProgramme.get(c.programme_id)!.push(c);
+}
+
+// CF edge cache
+Astro.response.headers.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=3600");
+
+// ============================================================
+// i18n
+// ============================================================
+
+const ru = typedLocale === "ru";
+const t = ru
+  ? {
+      eyebrow: "Запись на курс",
+      title: "Выберите когорту.",
+      lede: "Каждая когорта — это группа до 10 человек, две сессии в неделю с практикующими режиссёрами из Нью-Йорка.",
+      filterAll: "Все",
+      filterProgrammeAll: "Все программы",
+      filterDayAll: "Любые дни",
+      filterTimeAll: "Любое время",
+      filterTimeMorning: "Утро",
+      filterTimeEvening: "Вечер",
+      filterHorizon30: "30 дней",
+      filterHorizon90: "3 месяца",
+      filterHorizon365: "Год",
+      empty: "Под выбранные фильтры нет когорт. Сбросьте фильтры или увеличьте горизонт.",
+      emptyReset: "Сбросить фильтры",
+      starts: "Старт",
+      ends: "Окончание",
+      apply: "Записаться",
+      instructor: "Инструктор",
+      instructorTba: "TBA",
+      spotsAvailable: "Открыта запись",
+      spotsLeft: (n: number) => `${n.toString()} ${n === 1 ? "место" : n < 5 ? "места" : "мест"} осталось`,
+      individualBonus: "1:1 по цене группы — индивидуальная программа",
+      seo: {
+        title: "Запись на курс — выберите когорту | Moirai",
+        description: "Выберите слот: программа, дни, время. Группы до 10 человек, две сессии в неделю с режиссёрами из Нью-Йорка.",
+        noindex: false,
+      },
+    }
+  : {
+      eyebrow: "Apply",
+      title: "Choose your cohort.",
+      lede: "Each cohort is a group of up to 10 students, two sessions a week with working New York directors.",
+      filterAll: "All",
+      filterProgrammeAll: "All programmes",
+      filterDayAll: "Any day",
+      filterTimeAll: "Any time",
+      filterTimeMorning: "Morning",
+      filterTimeEvening: "Evening",
+      filterHorizon30: "30 days",
+      filterHorizon90: "3 months",
+      filterHorizon365: "Year",
+      empty: "No cohorts match these filters. Reset filters or widen the horizon.",
+      emptyReset: "Reset filters",
+      starts: "Starts",
+      ends: "Ends",
+      apply: "Apply",
+      instructor: "Instructor",
+      instructorTba: "TBA",
+      spotsAvailable: "Available",
+      spotsLeft: (n: number) => `${n.toString()} ${n === 1 ? "spot" : "spots"} left`,
+      individualBonus: "1:1 at group price — individual programme",
+      seo: {
+        title: "Apply — choose your cohort | Moirai",
+        description: "Pick a slot: programme, days, time. Cohorts of up to 10, two sessions a week with New York directors.",
+        noindex: false,
+      },
+    };
+
+// ============================================================
+// Date / weekday formatters
+// ============================================================
+
+const WEEKDAY_REF_DAY: Record<string, number> = {
+  sun: 7, mon: 8, tue: 9, wed: 10, thu: 11, fri: 12, sat: 13,
+};
+const weekdayFmt = new Intl.DateTimeFormat(intlLocale, { weekday: "short" });
+function weekdayLabel(code: string): string {
+  const day = WEEKDAY_REF_DAY[code];
+  if (!day) return code;
+  return weekdayFmt.format(new Date(Date.UTC(2024, 0, day)));
+}
+
+const dateFmt = new Intl.DateTimeFormat(intlLocale, { month: "short", day: "numeric" });
+const dateFmtLong = new Intl.DateTimeFormat(intlLocale, { month: "short", day: "numeric", year: "numeric" });
+
+function formatDate(unixSec: number, long = false): string {
+  return (long ? dateFmtLong : dateFmt).format(new Date(unixSec * 1000));
+}
+
+// ============================================================
+// Filter chip URL builders
+// ============================================================
+
+function buildUrl(overrides: Record<string, string | null>): string {
+  const sp = new URLSearchParams(params);
+  for (const [k, v] of Object.entries(overrides)) {
+    if (v === null) sp.delete(k);
+    else sp.set(k, v);
+  }
+  const s = sp.toString();
+  return s ? `?${s}` : Astro.url.pathname;
+}
+
+function programmeChipUrl(slug: string): string {
+  const current = new Set(filterProgrammes);
+  if (current.has(slug)) current.delete(slug);
+  else current.add(slug);
+  const list = Array.from(current).filter((s) => publishedSlugs.includes(s));
+  return buildUrl({ p: list.length > 0 ? list.join(",") : null });
+}
+
+const programmeChipActive = (slug: string) => filterProgrammes.includes(slug);
+const allProgrammesActive = filterProgrammes.length === 0;
+const dayChipActive = (pair: string | null) =>
+  pair === null ? filterDayPair === null : filterDayPair === pair;
+const timeChipActive = (val: string | null) =>
+  val === null ? filterTime === null : filterTime === val;
+const horizonChipActive = (val: number) => filterHorizon === val;
+
+// ============================================================
+// Per-cohort label helpers
+// ============================================================
+
+function cohortDaysLabel(daysJson: string): string {
+  const days = normalizeDayPair(parseDaysJson(daysJson));
+  return days.map(weekdayLabel).join(ru ? "+" : "+");
+}
+
+function spotBadge(c: CohortWithSlot): { text: string; variant: "available" | "spots_left" | "individual_bonus" } {
+  const display = computeSpotDisplay(c.slot.max_students, c.apply_count);
+  if (display.kind === "individual_bonus") {
+    return { text: t.individualBonus, variant: "individual_bonus" };
+  }
+  if (display.kind === "spots_left") {
+    return { text: t.spotsLeft(display.spotsLeft), variant: "spots_left" };
+  }
+  return { text: t.spotsAvailable, variant: "available" };
+}
+
+const isEmpty = cohorts.length === 0;
+---
+
+<Layout locale={typedLocale} seo={t.seo}>
+  <section class="apply-hero">
+    <p class="eyebrow">{t.eyebrow}</p>
+    <h1 class="apply-hero__title">{t.title}</h1>
+    <p class="apply-hero__lede">{t.lede}</p>
+  </section>
+
+  <section class="apply-filters" aria-label="Filters">
+    <div class="apply-filters__row">
+      <a
+        href={buildUrl({ p: null })}
+        class:list={["chip", { "chip--active": allProgrammesActive }]}
+      >{t.filterProgrammeAll}</a>
+      {programmeOrder.map((slug) => {
+        const meta = programmeMeta.get(slug);
+        if (!meta) return null;
+        return (
+          <a
+            href={programmeChipUrl(slug)}
+            class:list={["chip", { "chip--active": programmeChipActive(slug) }]}
+          >{meta.title}</a>
+        );
+      })}
+    </div>
+
+    <div class="apply-filters__row">
+      <a href={buildUrl({ d: null })} class:list={["chip", { "chip--active": dayChipActive(null) }]}>{t.filterDayAll}</a>
+      <a href={buildUrl({ d: "mon-thu" })} class:list={["chip", { "chip--active": dayChipActive("mon-thu") }]}>{weekdayLabel("mon")}+{weekdayLabel("thu")}</a>
+      <a href={buildUrl({ d: "tue-fri" })} class:list={["chip", { "chip--active": dayChipActive("tue-fri") }]}>{weekdayLabel("tue")}+{weekdayLabel("fri")}</a>
+    </div>
+
+    <div class="apply-filters__row">
+      <a href={buildUrl({ t: null })} class:list={["chip", { "chip--active": timeChipActive(null) }]}>{t.filterTimeAll}</a>
+      <a href={buildUrl({ t: "morning" })} class:list={["chip", { "chip--active": timeChipActive("morning") }]}>{t.filterTimeMorning}</a>
+      <a href={buildUrl({ t: "evening" })} class:list={["chip", { "chip--active": timeChipActive("evening") }]}>{t.filterTimeEvening}</a>
+    </div>
+
+    <div class="apply-filters__row">
+      <a href={buildUrl({ h: "30" })} class:list={["chip", { "chip--active": horizonChipActive(30) }]}>{t.filterHorizon30}</a>
+      <a href={buildUrl({ h: "90" })} class:list={["chip", { "chip--active": horizonChipActive(90) }]}>{t.filterHorizon90}</a>
+      <a href={buildUrl({ h: "365" })} class:list={["chip", { "chip--active": horizonChipActive(365) }]}>{t.filterHorizon365}</a>
+    </div>
+  </section>
+
+  <section class="apply-results" aria-label="Cohort list">
+    {isEmpty ? (
+      <div class="apply-empty">
+        <p>{t.empty}</p>
+        <a href={Astro.url.pathname} class="apply-empty__reset">{t.emptyReset}</a>
+      </div>
+    ) : (
+      programmeOrder.map((slug) => {
+        const list = byProgramme.get(slug);
+        if (!list || list.length === 0) return null;
+        const meta = programmeMeta.get(slug);
+        if (!meta) return null;
+        return (
+          <div class="apply-group">
+            <header class="apply-group__head">
+              <h2 class="apply-group__title">{meta.title}</h2>
+              <p class="apply-group__summary">{meta.summary}</p>
+            </header>
+            <ul class="apply-cohort-list" role="list">
+              {list.map((c) => {
+                const badge = spotBadge(c);
+                const daysLabel = cohortDaysLabel(c.slot.days_json);
+                const timeOfDay = deriveTimeOfDay(c.slot.time_et);
+                const timeLabel = timeOfDay === "morning" ? t.filterTimeMorning : t.filterTimeEvening;
+                return (
+                  <li>
+                    <a class="apply-cohort-card" href={`/${typedLocale}/apply/contact?cohort=${c.id}`}>
+                      <div class="apply-cohort-card__main">
+                        <p class="apply-cohort-card__schedule">
+                          <strong>{daysLabel}</strong>
+                          {" · "}
+                          {timeLabel.toLowerCase()}
+                          {" · "}
+                          <span class="apply-cohort-card__time-et">{c.slot.time_et} ET</span>
+                        </p>
+                        <p class="apply-cohort-card__dates">
+                          {t.starts}: <strong>{formatDate(c.start_date, true)}</strong>
+                          {" · "}
+                          {t.ends}: {formatDate(c.end_date)}
+                        </p>
+                      </div>
+                      <div class="apply-cohort-card__side">
+                        <span class:list={["apply-cohort-card__badge", `apply-cohort-card__badge--${badge.variant}`]}>
+                          {badge.text}
+                        </span>
+                        <span class="apply-cohort-card__cta" aria-hidden="true">{t.apply} →</span>
+                      </div>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })
+    )}
+  </section>
+</Layout>
+
+<style>
+  .apply-hero {
+    padding: var(--space-3xl) var(--container-pad) var(--space-xl);
+    max-width: 760px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .apply-hero .eyebrow {
+    margin-bottom: var(--space-md);
+  }
+  .apply-hero__title {
+    font-family: var(--font-display);
+    font-size: clamp(36px, 5vw, 56px);
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    margin: 0 0 var(--space-md);
+    color: var(--text);
+  }
+  .apply-hero__lede {
+    color: var(--text-muted);
+    font-size: var(--type-body-lg);
+    line-height: var(--leading-relaxed);
+  }
+
+  .apply-filters {
+    padding: var(--space-md) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .apply-filters__row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2xs);
+    align-items: center;
+  }
+
+  .chip {
+    display: inline-block;
+    padding: 6px 12px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    text-decoration: none;
+    transition:
+      color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+  .chip:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+  .chip--active {
+    color: var(--ink);
+    background: var(--amber);
+    border-color: var(--amber);
+  }
+  .chip--active:hover {
+    color: var(--ink);
+    background: var(--amber-light);
+    border-color: var(--amber-light);
+  }
+
+  .apply-results {
+    padding: var(--space-2xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  .apply-empty {
+    text-align: center;
+    padding: var(--space-3xl) var(--space-xl);
+    color: var(--text-muted);
+  }
+  .apply-empty__reset {
+    display: inline-block;
+    margin-top: var(--space-md);
+    color: var(--amber);
+    border-bottom: 1px solid var(--amber);
+    padding-bottom: 2px;
+    font-weight: 500;
+  }
+
+  .apply-group {
+    margin-bottom: var(--space-2xl);
+  }
+  .apply-group__head {
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid var(--border);
+  }
+  .apply-group__title {
+    font-family: var(--font-display);
+    font-size: clamp(24px, 3vw, 32px);
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    margin: 0 0 var(--space-2xs);
+    color: var(--text);
+  }
+  .apply-group__summary {
+    color: var(--text-muted);
+    font-size: var(--type-body-md);
+    line-height: var(--leading-normal);
+    margin: 0;
+    max-width: 720px;
+  }
+
+  .apply-cohort-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .apply-cohort-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+  }
+  .apply-cohort-card:hover {
+    border-color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 5%, var(--bg-elevated));
+  }
+  .apply-cohort-card__main {
+    flex: 1;
+    min-width: 0;
+  }
+  .apply-cohort-card__schedule {
+    margin: 0 0 var(--space-2xs);
+    font-size: var(--type-body-md);
+    color: var(--text);
+  }
+  .apply-cohort-card__schedule strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .apply-cohort-card__time-et {
+    color: var(--text-faint);
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: var(--type-body-sm);
+  }
+  .apply-cohort-card__dates {
+    margin: 0;
+    font-size: var(--type-body-sm);
+    color: var(--text-muted);
+  }
+
+  .apply-cohort-card__side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-xs);
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .apply-cohort-card__badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .apply-cohort-card__badge--available {
+    color: var(--text-faint);
+    border: 1px solid var(--border-strong);
+  }
+  .apply-cohort-card__badge--spots_left {
+    color: var(--text-accent);
+    background: var(--amber-faint);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  }
+  .apply-cohort-card__badge--individual_bonus {
+    color: var(--ink);
+    background: var(--amber);
+    border: 1px solid var(--amber);
+  }
+  .apply-cohort-card__cta {
+    color: var(--amber);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 640px) {
+    .apply-cohort-card {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-sm);
+    }
+    .apply-cohort-card__side {
+      align-items: flex-start;
+      text-align: left;
+    }
+  }
+</style>
