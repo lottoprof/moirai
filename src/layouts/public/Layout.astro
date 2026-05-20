@@ -38,7 +38,7 @@ const pathname = Astro.url.pathname;
  * inactive отвлекал бы пользователя от целевого действия.
  */
 const hideAnnouncementBar =
-  /^\/(en|ru)\/(login|register|password-reset|verify-email|verify-email-pending|apply|inactive)\b/.test(pathname);
+  /^\/(en|ru)\/(login|register|password-reset|verify-email|verify-email-pending|apply|checkout|inactive)\b/.test(pathname);
 ---
 
 <!doctype html>

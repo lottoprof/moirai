@@ -1,0 +1,581 @@
+---
+/*
+ * /[locale]/checkout — шаг 5 в Apply flow (см. apply-flow-spec.md).
+ *
+ * Pre-payment confirmation:
+ *   - Auth-guard: redirect /login если нет session
+ *   - Application существует + status='awaiting_payment' + принадлежит юзеру
+ *   - Order summary (programme, cohort, amount)
+ *   - Password setup (если ещё не задан — FLOW-18)
+ *   - Terms+Refund+Privacy чекбокс — required (FLOW-18)
+ *   - Age ≥18 чекбокс — required (FLOW-31, K3)
+ *   - Marketing opt-in чекбокс — optional, UNCHECKED by default (FLOW-31, K2)
+ *   - Pay button disabled пока обязательные req не выполнены
+ *   - Submit → POST /api/checkout/initiate → redirect на provider checkout page
+ *
+ * Без AnnouncementBar (path /checkout в hide regex — добавим в Layout).
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../layouts/public/Layout.astro";
+import Btn from "../../components/public/Btn.astro";
+import { verifyRefreshSession } from "../../lib/server/session";
+import { findUserById, findAuthMethod } from "../../lib/server/user-ops";
+import { findApplicationById } from "../../lib/server/applications";
+import { getCohortWithSlot, parseDaysJson, normalizeDayPair, deriveTimeOfDay, computeDurationWeeks } from "../../lib/server/cohorts";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/checkout");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+const intlLocale = ru ? "ru-RU" : "en-US";
+
+const env = Astro.locals.runtime.env;
+
+// 1. Auth-guard
+const session = await verifyRefreshSession(env, Astro.request);
+if (!session) {
+  return Astro.redirect(`/${typedLocale}/login?return_to=${encodeURIComponent(Astro.url.pathname + Astro.url.search)}`);
+}
+const user = await findUserById(env, session.userId);
+if (!user) {
+  return Astro.redirect(`/${typedLocale}/login`);
+}
+
+// 2. Application lookup
+const applicationId = Astro.url.searchParams.get("application");
+if (!applicationId) {
+  return Astro.redirect(`/${typedLocale}/dashboard`);
+}
+const application = await findApplicationById(env, applicationId);
+if (!application || application.user_id !== user.id) {
+  return Astro.redirect(`/${typedLocale}/dashboard`);
+}
+if (application.status !== "awaiting_payment") {
+  // Уже paid / cancelled / refunded — на dashboard, там подскажет статус
+  return Astro.redirect(`/${typedLocale}/dashboard`);
+}
+
+// 3. Cohort + programme
+const cohort = await getCohortWithSlot(env, application.cohort_id);
+if (!cohort) {
+  return Astro.redirect(`/${typedLocale}/dashboard`);
+}
+const programme = await getEntry("programmes", `${application.programme_id}.${typedLocale}`);
+if (!programme) {
+  return Astro.redirect(`/${typedLocale}/dashboard`);
+}
+
+// 4. Has password? (если есть — поля password скрываем)
+const passwordMethod = await findAuthMethod(env, user.id, "password");
+const needsPassword = !passwordMethod?.secret_hash;
+
+// 5. Date / weekday formatters
+const WEEKDAY_REF_DAY: Record<string, number> = {
+  sun: 7, mon: 8, tue: 9, wed: 10, thu: 11, fri: 12, sat: 13,
+};
+const weekdayFmt = new Intl.DateTimeFormat(intlLocale, { weekday: "long" });
+function weekdayLabel(code: string): string {
+  const day = WEEKDAY_REF_DAY[code];
+  if (!day) return code;
+  return weekdayFmt.format(new Date(Date.UTC(2024, 0, day)));
+}
+const dateFmtLong = new Intl.DateTimeFormat(intlLocale, { month: "long", day: "numeric", year: "numeric" });
+function formatDate(unixSec: number): string {
+  return dateFmtLong.format(new Date(unixSec * 1000));
+}
+function formatPrice(cents: number, currency: string): string {
+  const value = (cents / 100).toFixed(2);
+  const symbol = currency === "EUR" ? "€" : currency === "USD" ? "$" : currency;
+  return `${symbol}${value}`;
+}
+
+const days = normalizeDayPair(parseDaysJson(cohort.slot.days_json));
+const daysLabel = days.map(weekdayLabel).join(" + ");
+const timeOfDay = deriveTimeOfDay(cohort.slot.time_et);
+const durationWeeks = programme.data.lessons_total_hint > 0
+  ? computeDurationWeeks(programme.data.lessons_total_hint, 2)
+  : 0;
+const totalCents = programme.data.price_amount;
+const currency = programme.data.price_currency;
+
+// Refund summary (FLOW-9a tier preview)
+const DAY_SEC = 24 * 3600;
+const T = cohort.start_date;
+const T14 = T - 14 * DAY_SEC;
+const T7 = T - 7 * DAY_SEC;
+
+const t = ru
+  ? {
+      eyebrow: "Завершение оформления",
+      title: "Последний шаг.",
+      lede: "Подтвердите данные, согласие, и переходите к оплате.",
+      summaryTitle: "Заказ",
+      schedule: "Расписание",
+      starts: "Старт",
+      duration: "Длительность",
+      durationWeeks: (n: number) => `${n.toString()} ${n === 1 ? "неделя" : n < 5 ? "недели" : "недель"}`,
+      timeMorning: "утро",
+      timeEvening: "вечер",
+      total: "К оплате",
+      passwordTitle: "Задайте пароль",
+      passwordLede: "Чтобы заходить с других устройств. Минимум 10 символов.",
+      passwordLabel: "Новый пароль",
+      passwordConfirmLabel: "Повторите пароль",
+      consentTitle: "Согласия",
+      consentTerms: (links: { terms: string; refund: string; privacy: string }) =>
+        `Я принимаю <a href="${links.terms}" target="_blank">Пользовательское соглашение</a>, <a href="${links.refund}" target="_blank">Политику возврата</a> и <a href="${links.privacy}" target="_blank">Политику конфиденциальности</a>.`,
+      consentAge: "Мне исполнилось 18 лет (или 16+ с согласием родителей).",
+      consentMarketing: "Хочу получать редкие письма о новых программах и фильмах студентов (можно отписаться в любой момент).",
+      payCta: "Оплатить",
+      paying: "Перенаправление на оплату...",
+      backLink: "← Назад в кабинет",
+      refundTitle: "Условия возврата",
+      refundLine1: (date: string) => `До <strong>${date}</strong> — 100% возврат`,
+      refundLine2: (a: string, b: string) => `С ${a} по ${b} — 50% возврат`,
+      refundLine3: (a: string, b: string) => `С ${a} по ${b} — перенос на следующую когорту`,
+      refundLine4: (date: string) => `После старта (${date}) — возврат не предусмотрен`,
+      errors: {
+        password_too_short: "Пароль должен быть минимум 10 символов.",
+        password_too_long: "Пароль слишком длинный (макс 128).",
+        password_too_common: "Слишком простой пароль. Выберите менее очевидный.",
+        password_mismatch: "Пароли не совпадают.",
+        consent_required: "Необходимо принять условия.",
+        age_required: "Необходимо подтвердить возраст.",
+        cohort_unavailable: "Когорта больше недоступна. Свяжитесь с поддержкой.",
+        provider_failed: "Не удалось создать платёжную сессию. Попробуйте ещё раз.",
+        generic: "Что-то пошло не так. Попробуйте ещё раз.",
+      } as Record<string, string>,
+      seo: {
+        title: "Оплата — Moirai",
+        description: "Завершите оформление и оплатите курс.",
+        noindex: true,
+      },
+    }
+  : {
+      eyebrow: "Complete checkout",
+      title: "Last step.",
+      lede: "Confirm details, consents, then proceed to payment.",
+      summaryTitle: "Order",
+      schedule: "Schedule",
+      starts: "Starts",
+      duration: "Duration",
+      durationWeeks: (n: number) => `${n.toString()} ${n === 1 ? "week" : "weeks"}`,
+      timeMorning: "morning",
+      timeEvening: "evening",
+      total: "Total",
+      passwordTitle: "Set a password",
+      passwordLede: "So you can sign in from other devices. Min 10 characters.",
+      passwordLabel: "New password",
+      passwordConfirmLabel: "Confirm password",
+      consentTitle: "Agreements",
+      consentTerms: (links: { terms: string; refund: string; privacy: string }) =>
+        `I accept the <a href="${links.terms}" target="_blank">Terms of Service</a>, <a href="${links.refund}" target="_blank">Refund Policy</a>, and <a href="${links.privacy}" target="_blank">Privacy Policy</a>.`,
+      consentAge: "I am at least 18 years old (or 16+ with parental consent).",
+      consentMarketing: "Send me occasional updates about new programmes and student films (unsubscribe anytime).",
+      payCta: "Pay",
+      paying: "Redirecting to payment...",
+      backLink: "← Back to dashboard",
+      refundTitle: "Refund terms",
+      refundLine1: (date: string) => `Until <strong>${date}</strong> — 100% refund`,
+      refundLine2: (a: string, b: string) => `${a} to ${b} — 50% refund`,
+      refundLine3: (a: string, b: string) => `${a} to ${b} — credit toward next cohort`,
+      refundLine4: (date: string) => `After start (${date}) — no refund`,
+      errors: {
+        password_too_short: "Password must be at least 10 characters.",
+        password_too_long: "Password too long (max 128).",
+        password_too_common: "Password too common. Pick something less guessable.",
+        password_mismatch: "Passwords don't match.",
+        consent_required: "You must accept the agreements.",
+        age_required: "You must confirm your age.",
+        cohort_unavailable: "Cohort no longer available. Contact support.",
+        provider_failed: "Couldn't create payment session. Please try again.",
+        generic: "Something went wrong. Try again.",
+      } as Record<string, string>,
+      seo: {
+        title: "Checkout — Moirai",
+        description: "Complete checkout and pay.",
+        noindex: true,
+      },
+    };
+
+const errorParam = Astro.url.searchParams.get("error");
+const errorMessage = errorParam && t.errors[errorParam] ? t.errors[errorParam] : null;
+
+const timeLabel = timeOfDay === "morning" ? t.timeMorning : t.timeEvening;
+const totalLabel = formatPrice(totalCents, currency);
+---
+
+<Layout locale={typedLocale} seo={t.seo}>
+  <section class="checkout">
+    <p class="eyebrow">{t.eyebrow}</p>
+    <h1 class="checkout__title">{t.title}</h1>
+    <p class="checkout__lede">{t.lede}</p>
+
+    <a href={`/${typedLocale}/dashboard`} class="checkout__back">{t.backLink}</a>
+
+    {errorMessage && (
+      <div class="form__error" role="alert">{errorMessage}</div>
+    )}
+
+    <div class="checkout__layout">
+      <!-- Order summary -->
+      <aside class="checkout__summary" aria-labelledby="summary-title">
+        <h2 id="summary-title" class="checkout__summary-title">{t.summaryTitle}</h2>
+
+        <div class="checkout__summary-row">
+          <span class="checkout__summary-label">{programme.data.title}</span>
+        </div>
+        <div class="checkout__summary-row">
+          <span class="checkout__summary-label">{t.schedule}</span>
+          <span class="checkout__summary-value">{daysLabel} · {timeLabel} · {cohort.slot.time_et} ET</span>
+        </div>
+        <div class="checkout__summary-row">
+          <span class="checkout__summary-label">{t.starts}</span>
+          <span class="checkout__summary-value">{formatDate(cohort.start_date)}</span>
+        </div>
+        {durationWeeks > 0 && (
+          <div class="checkout__summary-row">
+            <span class="checkout__summary-label">{t.duration}</span>
+            <span class="checkout__summary-value">{t.durationWeeks(durationWeeks)}</span>
+          </div>
+        )}
+        <div class="checkout__summary-row checkout__summary-row--total">
+          <span class="checkout__summary-label">{t.total}</span>
+          <span class="checkout__summary-value checkout__total">{totalLabel}</span>
+        </div>
+
+        <details class="checkout__refund">
+          <summary>{t.refundTitle}</summary>
+          <ol class="checkout__refund-list">
+            <li set:html={t.refundLine1(formatDate(T14))} />
+            <li>{t.refundLine2(formatDate(T14), formatDate(T7))}</li>
+            <li>{t.refundLine3(formatDate(T7), formatDate(T))}</li>
+            <li set:html={t.refundLine4(formatDate(T))} />
+          </ol>
+        </details>
+      </aside>
+
+      <!-- Form -->
+      <form class="checkout__form" id="checkout-form" novalidate>
+        <input type="hidden" name="application_id" value={application.id} />
+
+        {needsPassword && (
+          <fieldset class="checkout__fieldset">
+            <legend class="checkout__fieldset-legend">{t.passwordTitle}</legend>
+            <p class="checkout__fieldset-lede">{t.passwordLede}</p>
+            <div class="form__field">
+              <label class="form__label" for="ck-password">{t.passwordLabel}</label>
+              <input
+                class="form__input"
+                type="password"
+                id="ck-password"
+                name="password"
+                autocomplete="new-password"
+                minlength="10"
+                maxlength="128"
+                required
+              />
+            </div>
+            <div class="form__field">
+              <label class="form__label" for="ck-password-confirm">{t.passwordConfirmLabel}</label>
+              <input
+                class="form__input"
+                type="password"
+                id="ck-password-confirm"
+                name="password_confirm"
+                autocomplete="new-password"
+                minlength="10"
+                maxlength="128"
+                required
+              />
+            </div>
+          </fieldset>
+        )}
+
+        <fieldset class="checkout__fieldset">
+          <legend class="checkout__fieldset-legend">{t.consentTitle}</legend>
+
+          <label class="form__checkbox checkout__consent">
+            <input type="checkbox" id="ck-terms" name="accept_terms" value="1" required />
+            <span set:html={t.consentTerms({
+              terms: `/${typedLocale}/legal/terms`,
+              refund: `/${typedLocale}/legal/refund`,
+              privacy: `/${typedLocale}/legal/privacy`,
+            })} />
+          </label>
+
+          <label class="form__checkbox checkout__consent">
+            <input type="checkbox" id="ck-age" name="age_confirmed" value="1" required />
+            <span>{t.consentAge}</span>
+          </label>
+
+          <label class="form__checkbox checkout__consent checkout__consent--marketing">
+            <input type="checkbox" id="ck-marketing" name="marketing_opt_in" value="1" />
+            <span>{t.consentMarketing}</span>
+          </label>
+        </fieldset>
+
+        <Btn type="submit" variant="primary" size="lg" arrow>{t.payCta} {totalLabel}</Btn>
+      </form>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .checkout {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .checkout .eyebrow {
+    margin-bottom: var(--space-md);
+  }
+  .checkout__title {
+    font-family: var(--font-display);
+    font-size: clamp(36px, 5vw, 56px);
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    margin: 0 0 var(--space-md);
+  }
+  .checkout__lede {
+    color: var(--text-muted);
+    font-size: var(--type-body-lg);
+    line-height: var(--leading-relaxed);
+    margin-bottom: var(--space-lg);
+    max-width: 640px;
+  }
+  .checkout__back {
+    display: inline-block;
+    margin-bottom: var(--space-2xl);
+    color: var(--text-muted);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    border-bottom: 1px solid transparent;
+    transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+  }
+  .checkout__back:hover {
+    color: var(--amber);
+    border-bottom-color: var(--amber);
+  }
+
+  .checkout__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+    gap: var(--space-2xl);
+    align-items: start;
+  }
+
+  .checkout__summary {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: var(--space-xl);
+    position: sticky;
+    top: var(--space-xl);
+  }
+  .checkout__summary-title {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 400;
+    margin: 0 0 var(--space-lg);
+    color: var(--text);
+  }
+  .checkout__summary-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border);
+    font-size: var(--type-body-sm);
+  }
+  .checkout__summary-row:last-of-type {
+    border-bottom: none;
+  }
+  .checkout__summary-row--total {
+    border-top: 1px solid var(--border-strong);
+    border-bottom: none;
+    padding-top: var(--space-md);
+    margin-top: var(--space-sm);
+    font-size: var(--type-body-md);
+  }
+  .checkout__summary-label {
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    font-size: var(--type-micro-md);
+  }
+  .checkout__summary-value {
+    color: var(--text);
+    text-align: right;
+  }
+  .checkout__total {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--text-accent);
+  }
+
+  .checkout__refund {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--border);
+    font-size: var(--type-body-sm);
+  }
+  .checkout__refund summary {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    font-size: var(--type-micro-md);
+  }
+  .checkout__refund summary:hover {
+    color: var(--text);
+  }
+  .checkout__refund-list {
+    margin: var(--space-sm) 0 0;
+    padding-left: var(--space-lg);
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .checkout__refund-list li {
+    margin-bottom: var(--space-2xs);
+  }
+
+  .checkout__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    max-width: 520px;
+  }
+  .checkout__fieldset {
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: var(--space-lg);
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+  .checkout__fieldset-legend {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    padding: 0 var(--space-xs);
+  }
+  .checkout__fieldset-lede {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    margin: 0;
+  }
+
+  .checkout__consent {
+    align-items: flex-start;
+    gap: var(--space-sm);
+    font-size: var(--type-body-sm);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .checkout__consent input {
+    margin-top: 3px;
+    flex-shrink: 0;
+  }
+  .checkout__consent--marketing {
+    color: var(--text-muted);
+  }
+  .checkout__consent a {
+    color: var(--amber);
+    border-bottom: 1px solid currentColor;
+  }
+  .checkout__consent a:hover {
+    color: var(--amber-light);
+  }
+
+  @media (max-width: 840px) {
+    .checkout__layout {
+      grid-template-columns: 1fr;
+    }
+    .checkout__summary {
+      position: static;
+    }
+  }
+</style>
+
+<script>
+  /*
+   * Checkout form handler:
+   *   - Validation: password match + min length + consent + age
+   *   - Submit → POST /api/checkout/initiate
+   *   - На success: redirect на provider checkout URL
+   *   - На error: query-string param ?error=<code>
+   */
+  const form = document.getElementById("checkout-form") as HTMLFormElement | null;
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!form.reportValidity()) return;
+
+      const fd = new FormData(form);
+      const application_id = fd.get("application_id");
+      const password = fd.get("password") as string | null;
+      const password_confirm = fd.get("password_confirm") as string | null;
+      const accept_terms = fd.get("accept_terms") === "1";
+      const age_confirmed = fd.get("age_confirmed") === "1";
+      const marketing_opt_in = fd.get("marketing_opt_in") === "1";
+
+      // Client-side password match check (если поле password есть)
+      if (password !== null && password !== password_confirm) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("error", "password_mismatch");
+        window.location.href = url.toString();
+        return;
+      }
+
+      const submitBtn = form.querySelector<HTMLButtonElement>("button[type=submit]");
+      if (submitBtn) submitBtn.disabled = true;
+
+      const res = await fetch("/api/checkout/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          application_id,
+          password: password ?? undefined,
+          accept_terms,
+          age_confirmed,
+          marketing_opt_in,
+        }),
+        credentials: "same-origin",
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as { url?: string };
+        if (data.url) {
+          window.location.href = data.url;
+          return;
+        }
+      }
+
+      let errCode = "generic";
+      try {
+        const body = (await res.json()) as { error?: string };
+        if (body.error) errCode = body.error;
+      } catch { /* ignore */ }
+
+      if (submitBtn) submitBtn.disabled = false;
+      const url = new URL(window.location.href);
+      url.searchParams.set("error", errCode);
+      window.location.href = url.toString();
+    });
+  }
+</script>
