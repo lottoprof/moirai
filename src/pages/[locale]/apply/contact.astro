@@ -1,0 +1,459 @@
+---
+/*
+ * /[locale]/apply/contact — шаг 3 в Apply flow (см. apply-flow-spec.md §3).
+ *
+ * Принимает ?cohort=<id>, показывает summary выбранной cohort'ы и форму
+ * email + name. На submit POST /api/apply создаёт user + application +
+ * immediate session (FLOW-16) + welcome email, редиректит на /dashboard.
+ *
+ * Auth-aware (FLOW-25):
+ *   - Залогинен + уже active application на эту programme → redirect
+ *     прямо на /dashboard (показываем существующую запись, не создаём дубль)
+ *   - Залогинен + нет active application → submit просто INSERT application
+ *     (без INSERT user)
+ *   - Не залогинен → INSERT user + INSERT application + createRefreshSession
+ *
+ * Country auto-detect (FLOW-27): из Cloudflare header `cf-ipcountry`.
+ * Поле readonly, optional — client может оставить как есть или оставить empty.
+ *
+ * Без AnnouncementBar (Layout hides по pathname regex — /apply/*).
+ */
+
+import Layout from "../../../layouts/public/Layout.astro";
+import Btn from "../../../components/public/Btn.astro";
+import TurnstileWidget from "../../../components/public/TurnstileWidget.astro";
+import { getEntry } from "astro:content";
+import {
+  getCohortWithSlot,
+  parseDaysJson,
+  normalizeDayPair,
+  deriveTimeOfDay,
+  computeDurationWeeks,
+} from "../../../lib/server/cohorts";
+import { findActiveApplicationByUserProgramme } from "../../../lib/server/applications";
+import { verifyRefreshSession } from "../../../lib/server/session";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/apply");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+const intlLocale = ru ? "ru-RU" : "en-US";
+
+const cohortId = Astro.url.searchParams.get("cohort");
+if (!cohortId) {
+  return Astro.redirect(`/${typedLocale}/apply`);
+}
+
+const env = Astro.locals.runtime.env;
+const cohort = await getCohortWithSlot(env, cohortId);
+if (!cohort) {
+  return Astro.redirect(`/${typedLocale}/apply`);
+}
+if (cohort.status !== "open") {
+  return Astro.redirect(`/${typedLocale}/apply`);
+}
+
+// Programme metadata
+const programme = await getEntry("programmes", `${cohort.programme_id}.${typedLocale}`);
+if (!programme) {
+  return Astro.redirect(`/${typedLocale}/apply`);
+}
+
+// Auth check: если уже active application на эту programme → /dashboard
+const session = await verifyRefreshSession(env, Astro.request);
+if (session) {
+  const existing = await findActiveApplicationByUserProgramme(env, session.userId, cohort.programme_id);
+  if (existing) {
+    return Astro.redirect(`/${typedLocale}/dashboard`);
+  }
+}
+
+// Country auto-detect (CF edge header)
+const cfCountry = Astro.request.headers.get("cf-ipcountry");
+const countryDefault = cfCountry && /^[A-Z]{2}$/.test(cfCountry) ? cfCountry : "";
+
+// Date / weekday labels
+const WEEKDAY_REF_DAY: Record<string, number> = {
+  sun: 7, mon: 8, tue: 9, wed: 10, thu: 11, fri: 12, sat: 13,
+};
+const weekdayFmt = new Intl.DateTimeFormat(intlLocale, { weekday: "long" });
+function weekdayLabel(code: string): string {
+  const day = WEEKDAY_REF_DAY[code];
+  if (!day) return code;
+  return weekdayFmt.format(new Date(Date.UTC(2024, 0, day)));
+}
+const dateFmtLong = new Intl.DateTimeFormat(intlLocale, { month: "long", day: "numeric", year: "numeric" });
+function formatDate(unixSec: number): string {
+  return dateFmtLong.format(new Date(unixSec * 1000));
+}
+
+const days = normalizeDayPair(parseDaysJson(cohort.slot.days_json));
+const daysLabel = days.map(weekdayLabel).join(" + ");
+const timeOfDay = deriveTimeOfDay(cohort.slot.time_et);
+const lessonsTotal = programme.data.lessons_total_hint;
+const durationWeeks = lessonsTotal > 0 ? computeDurationWeeks(lessonsTotal, 2) : 0;
+
+const t = ru
+  ? {
+      eyebrow: "Шаг 2 из 2",
+      back: "← Назад к слотам",
+      title: "Почти готово.",
+      lede: "Подтвердите слот и оставьте контакты. Сразу попадёте в личный кабинет.",
+      summary: "Ваш слот",
+      schedule: "Расписание",
+      startsLabel: "Старт",
+      durationLabel: "Длительность",
+      weeksLabel: (n: number) => `${n.toString()} ${n === 1 ? "неделя" : n < 5 ? "недели" : "недель"}`,
+      timeMorning: "утро",
+      timeEvening: "вечер",
+      emailLabel: "Email",
+      emailPlaceholder: "you@example.com",
+      nameLabel: "Имя",
+      namePlaceholder: "Как к вам обращаться",
+      countryLabel: "Страна",
+      countryHint: "Определена автоматически",
+      submit: "Продолжить →",
+      submitting: "Отправляем...",
+      legalNote: "После отправки вы попадёте в кабинет. Оплата — отдельным шагом из кабинета.",
+      hint: "На email придёт резервная ссылка для входа — на случай если выйдете и забудете пароль.",
+      errors: {
+        invalid_email: "Введите корректный email.",
+        turnstile_failed: "Не удалось пройти проверку. Перезагрузите страницу.",
+        rate_limited: "Слишком много попыток. Подождите час и попробуйте снова.",
+        duplicate_active: "У вас уже есть активная заявка на эту программу — перейдите в кабинет.",
+        cohort_unavailable: "Эта когорта больше недоступна. Выберите другую.",
+        generic: "Что-то пошло не так. Попробуйте ещё раз.",
+      } as Record<string, string>,
+      seo: {
+        title: "Запись — контактные данные | Moirai",
+        description: "Подтвердите слот и оставьте email. Сразу попадёте в кабинет курса.",
+        noindex: true,
+      },
+    }
+  : {
+      eyebrow: "Step 2 of 2",
+      back: "← Back to slots",
+      title: "Almost there.",
+      lede: "Confirm your slot and your contact info. You'll land in your dashboard right after.",
+      summary: "Your slot",
+      schedule: "Schedule",
+      startsLabel: "Starts",
+      durationLabel: "Duration",
+      weeksLabel: (n: number) => `${n.toString()} ${n === 1 ? "week" : "weeks"}`,
+      timeMorning: "morning",
+      timeEvening: "evening",
+      emailLabel: "Email",
+      emailPlaceholder: "you@example.com",
+      nameLabel: "Name",
+      namePlaceholder: "What should we call you",
+      countryLabel: "Country",
+      countryHint: "Auto-detected",
+      submit: "Continue →",
+      submitting: "Sending...",
+      legalNote: "After submission you'll land in your dashboard. Payment is a separate step from there.",
+      hint: "We'll email you a backup sign-in link in case you log out and forget the password.",
+      errors: {
+        invalid_email: "Please enter a valid email address.",
+        turnstile_failed: "Verification failed. Reload the page and try again.",
+        rate_limited: "Too many attempts. Please wait an hour and try again.",
+        duplicate_active: "You already have an active application for this programme — open the dashboard.",
+        cohort_unavailable: "This cohort is no longer available. Choose another.",
+        generic: "Something went wrong. Try again.",
+      } as Record<string, string>,
+      seo: {
+        title: "Apply — contact info | Moirai",
+        description: "Confirm your slot and leave your email. You'll land in the course dashboard right after.",
+        noindex: true,
+      },
+    };
+
+const errorParam = Astro.url.searchParams.get("error");
+const errorMessage = errorParam && t.errors[errorParam] ? t.errors[errorParam] : null;
+
+const timeLabel = timeOfDay === "morning" ? t.timeMorning : t.timeEvening;
+---
+
+<Layout locale={typedLocale} seo={t.seo}>
+  <section class="apply-contact" aria-labelledby="apply-contact-title">
+    <p class="eyebrow">{t.eyebrow}</p>
+    <h1 id="apply-contact-title" class="apply-contact__title">{t.title}</h1>
+    <p class="apply-contact__lede">{t.lede}</p>
+
+    <a href={`/${typedLocale}/apply`} class="apply-contact__back">{t.back}</a>
+
+    <div class="apply-contact__layout">
+      <aside class="apply-contact__summary" aria-label={t.summary}>
+        <p class="eyebrow apply-contact__summary-eyebrow">{programme.data.title}</p>
+        <h2 class="apply-contact__summary-title">{daysLabel}</h2>
+        <dl class="apply-contact__meta">
+          <div>
+            <dt>{t.schedule}</dt>
+            <dd>{daysLabel} · {timeLabel} · <span class="apply-contact__time-et">{cohort.slot.time_et} ET</span></dd>
+          </div>
+          <div>
+            <dt>{t.startsLabel}</dt>
+            <dd>{formatDate(cohort.start_date)}</dd>
+          </div>
+          {durationWeeks > 0 && (
+            <div>
+              <dt>{t.durationLabel}</dt>
+              <dd>{t.weeksLabel(durationWeeks)}</dd>
+            </div>
+          )}
+        </dl>
+      </aside>
+
+      <form class="apply-contact__form" id="apply-form" novalidate>
+        <input type="hidden" name="cohort_id" value={cohort.id} />
+
+        {errorMessage && (
+          <div class="form__error" role="alert">{errorMessage}</div>
+        )}
+
+        <div class="form__field">
+          <label class="form__label" for="apply-email">{t.emailLabel}</label>
+          <input
+            class="form__input"
+            type="email"
+            id="apply-email"
+            name="email"
+            autocomplete="email"
+            placeholder={t.emailPlaceholder}
+            required
+          />
+        </div>
+
+        <div class="form__field">
+          <label class="form__label" for="apply-name">{t.nameLabel}</label>
+          <input
+            class="form__input"
+            type="text"
+            id="apply-name"
+            name="name"
+            autocomplete="name"
+            placeholder={t.namePlaceholder}
+            required
+            minlength="1"
+            maxlength="100"
+          />
+        </div>
+
+        <div class="form__field">
+          <label class="form__label" for="apply-country">
+            {t.countryLabel}
+            <span class="form__hint-inline">· {t.countryHint}</span>
+          </label>
+          <input
+            class="form__input"
+            type="text"
+            id="apply-country"
+            name="country"
+            autocomplete="country"
+            value={countryDefault}
+            maxlength="2"
+            pattern="[A-Za-z]{2}"
+          />
+        </div>
+
+        <TurnstileWidget />
+
+        <Btn type="submit" variant="primary" size="lg" arrow>{t.submit}</Btn>
+
+        <p class="form__hint apply-contact__hint">{t.hint}</p>
+        <p class="form__hint apply-contact__hint apply-contact__hint--legal">{t.legalNote}</p>
+      </form>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .apply-contact {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .apply-contact .eyebrow {
+    margin-bottom: var(--space-md);
+  }
+  .apply-contact__title {
+    font-family: var(--font-display);
+    font-size: clamp(36px, 5vw, 56px);
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    margin: 0 0 var(--space-md);
+  }
+  .apply-contact__lede {
+    color: var(--text-muted);
+    font-size: var(--type-body-lg);
+    line-height: var(--leading-relaxed);
+    margin-bottom: var(--space-lg);
+    max-width: 640px;
+  }
+  .apply-contact__back {
+    display: inline-block;
+    margin-bottom: var(--space-2xl);
+    color: var(--text-muted);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    border-bottom: 1px solid transparent;
+    transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
+  }
+  .apply-contact__back:hover {
+    color: var(--amber);
+    border-bottom-color: var(--amber);
+  }
+
+  .apply-contact__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    gap: var(--space-2xl);
+    align-items: start;
+  }
+
+  .apply-contact__summary {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: var(--space-xl);
+    position: sticky;
+    top: var(--space-xl);
+  }
+  .apply-contact__summary-eyebrow {
+    color: var(--text-accent);
+    margin: 0 0 var(--space-md);
+  }
+  .apply-contact__summary-title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    margin: 0 0 var(--space-lg);
+    color: var(--text);
+  }
+  .apply-contact__meta {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+  .apply-contact__meta > div {
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-md);
+  }
+  .apply-contact__meta dt {
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: var(--space-2xs);
+  }
+  .apply-contact__meta dd {
+    font-size: var(--type-body-md);
+    color: var(--text);
+    margin: 0;
+  }
+  .apply-contact__time-et {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: var(--type-body-sm);
+    color: var(--text-faint);
+  }
+
+  .apply-contact__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    max-width: 480px;
+  }
+
+  .form__hint-inline {
+    color: var(--text-faint);
+    font-weight: 400;
+    font-size: var(--type-micro-sm);
+  }
+
+  .apply-contact__hint {
+    color: var(--text-faint);
+    font-size: var(--type-body-sm);
+    line-height: 1.5;
+    margin: 0;
+  }
+  .apply-contact__hint--legal {
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-md);
+  }
+
+  @media (max-width: 840px) {
+    .apply-contact__layout {
+      grid-template-columns: 1fr;
+    }
+    .apply-contact__summary {
+      position: static;
+    }
+  }
+</style>
+
+<script>
+  /*
+   * Apply form submit handler.
+   * POST /api/apply → on success redirect to /dashboard?welcome=1.
+   */
+  const form = document.getElementById("apply-form") as HTMLFormElement | null;
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!form.reportValidity()) return;
+
+      const fd = new FormData(form);
+      const cohort_id = fd.get("cohort_id");
+      const email = fd.get("email");
+      const name = fd.get("name");
+      const country = (fd.get("country") as string | null)?.toUpperCase() || null;
+      const turnstileToken = fd.get("cf-turnstile-response");
+
+      if (!turnstileToken) {
+        window.location.search = `?cohort=${encodeURIComponent(String(cohort_id))}&error=turnstile_failed`;
+        return;
+      }
+
+      const submitBtn = form.querySelector<HTMLButtonElement>("button[type=submit]");
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.dataset.originalText = submitBtn.textContent ?? "";
+      }
+
+      const res = await fetch("/api/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cohort_id, email, name, country, turnstileToken }),
+        credentials: "same-origin",
+      });
+
+      if (res.ok) {
+        const data = (await res.json()) as { redirect?: string; access_token?: string };
+        if (data.access_token) {
+          sessionStorage.setItem("moirai_access_token", data.access_token);
+        }
+        window.location.href = data.redirect ?? `/en/dashboard?welcome=1`;
+        return;
+      }
+
+      let errCode = "generic";
+      try {
+        const body = (await res.json()) as { error?: string };
+        if (body.error) errCode = body.error;
+      } catch {
+        // ignore
+      }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+      }
+      window.location.search = `?cohort=${encodeURIComponent(String(cohort_id))}&error=${encodeURIComponent(errCode)}`;
+    });
+  }
+</script>
