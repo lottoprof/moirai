@@ -1,0 +1,39 @@
+---
+/*
+ * <OrganizationSchema /> — JSON-LD EducationalOrganization для главной
+ * и любой публичной страницы. Per-locale (inLanguage + description).
+ *
+ * @id стабилен между локалями (Google объединяет EN/RU в одну сущность):
+ *   ${SITE.url}/#organization
+ *
+ * Поддерживаемые подтипы:
+ *   EducationalOrganization > Organization
+ *
+ * Reference:
+ *   - schema.org/EducationalOrganization
+ *   - Google Search Central → Organization structured data
+ */
+
+import { SITE, SITE_DESCRIPTION } from "../../lib/site-config";
+
+interface Props {
+  locale: "en" | "ru";
+}
+const { locale } = Astro.props;
+
+const data = {
+  "@context": "https://schema.org",
+  "@type": "EducationalOrganization",
+  "@id": `${SITE.url}/#organization`,
+  name: SITE.name,
+  legalName: SITE.legalName,
+  url: SITE.url,
+  logo: SITE.logo,
+  description: SITE_DESCRIPTION[locale],
+  inLanguage: locale,
+  ...(SITE.social.length > 0 ? { sameAs: SITE.social } : {}),
+  ...(SITE.email ? { email: SITE.email } : {}),
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(data)} is:inline></script>

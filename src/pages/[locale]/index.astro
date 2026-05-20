@@ -17,10 +17,14 @@
 
 import { getEntry, getCollection, type CollectionEntry } from "astro:content";
 import Layout from "../../layouts/public/Layout.astro";
+import OrganizationSchema from "../../components/schema/OrganizationSchema.astro";
+import FaqSchema from "../../components/schema/FaqSchema.astro";
+import CourseSchema from "../../components/schema/CourseSchema.astro";
 import Hero from "../../components/public/Hero.astro";
 import Ticker from "../../components/public/Ticker.astro";
 import WhoCard from "../../components/public/WhoCard.astro";
 import ProgrammeCard from "../../components/public/ProgrammeCard.astro";
+import TierCard from "../../components/public/TierCard.astro";
 import FeatureItem from "../../components/public/FeatureItem.astro";
 import OutcomeItem from "../../components/public/OutcomeItem.astro";
 import AiModule from "../../components/public/AiModule.astro";
@@ -109,6 +113,66 @@ function formatPrice(cents: number, currency: string, locale: "en" | "ru"): stri
   return `${symbol}${value}`;
 }
 
+/**
+ * Programme features (open key-value record в zod) → читаемый список
+ * для TierCard. Известные ключи переводятся локально-зависимо,
+ * незнакомые ключи игнорируются (forward-compat для будущих фич).
+ *
+ * Stage 9: пока live на main только; ту же логику позже можно
+ * подтянуть в programme detail page.
+ */
+type FeatureValue = boolean | number | string;
+function programmeFeaturesToList(
+  features: Record<string, FeatureValue>,
+  locale: "en" | "ru",
+): string[] {
+  const out: string[] = [];
+  const ru = locale === "ru";
+
+  const cohortBased = features.cohort_based === true;
+  const cohortMax = typeof features.cohort_max === "number" ? features.cohort_max : null;
+  if (cohortBased && cohortMax !== null) {
+    out.push(ru
+      ? `Когортное обучение · до ${cohortMax.toString()} человек`
+      : `Cohort-based · up to ${cohortMax.toString()} students`);
+  } else if (features.cohort_based === false) {
+    out.push(ru ? "Без когорты · 1:1 с инструктором" : "No cohort · 1:1 with instructor");
+  }
+
+  if (typeof features.sessions_per_week === "number" && features.sessions_per_week > 0) {
+    const n = features.sessions_per_week;
+    out.push(ru ? `${n.toString()} занятия в неделю` : `${n.toString()} sessions/week`);
+  }
+
+  if (typeof features.one_on_one_sessions === "number" && features.one_on_one_sessions > 0) {
+    const n = features.one_on_one_sessions;
+    out.push(ru
+      ? `${n.toString()} личных сессий с инструктором`
+      : `${n.toString()} × 1:1 sessions with instructor`);
+  }
+
+  if (typeof features.consultations_count === "number" && features.consultations_count > 0) {
+    const n = features.consultations_count;
+    out.push(ru
+      ? `${n.toString()} вводная консультация · подбор плана`
+      : `${n.toString()} discovery call · personal plan`);
+  }
+
+  if (features.custom_pacing === true) {
+    out.push(ru ? "Гибкий график" : "Flexible schedule");
+  }
+
+  if (features.homework_review === true) {
+    out.push(ru ? "Личный разбор каждой работы" : "Personal review of every assignment");
+  }
+
+  if (features.recordings_access === true) {
+    out.push(ru ? "Пожизненный доступ к записям" : "Lifetime access to recordings");
+  }
+
+  return out;
+}
+
 function programmeMeta(p: ProgrammeEntry, locale: "en" | "ru"): string {
   const d = p.data;
   if (d.modules.length === 0) {
@@ -122,6 +186,40 @@ function programmeMeta(p: ProgrammeEntry, locale: "en" | "ru"): string {
     : `${d.lessons_total_hint} lesson${d.lessons_total_hint === 1 ? "" : "s"}`;
   return `${modulesLabel} · ${lessonsLabel} · ${formatPrice(d.price_amount, d.price_currency, locale)}`;
 }
+
+// Подготовка данных для Pricing TierCard'ов. Вынесено в frontmatter
+// потому что zod-inferred type для features (z.record) внутри JSX
+// требует cast'а, а TypeScript inside Astro template плохо обрабатывает
+// inline cast generics — путает `<` с JSX tag.
+interface TierCardProps {
+  slug: string;
+  featured: boolean;
+  badge?: string;
+  name: string;
+  price: string;
+  sub: string;
+  features: string[];
+  ctaText: string;
+  ctaHref: string;
+}
+const pricingCards: TierCardProps[] = programmeCards.map((p) => {
+  const slug = p.id.replace(`.${typedLocale}`, "");
+  const featured = slug === "bundle";
+  const featuresObj = p.data.features as Record<string, FeatureValue>;
+  return {
+    slug,
+    featured,
+    badge: featured
+      ? (typedLocale === "ru" ? "Лучшая цена" : "Best value")
+      : undefined,
+    name: p.data.title,
+    price: formatPrice(p.data.price_amount, p.data.price_currency, typedLocale),
+    sub: programmeMeta(p, typedLocale),
+    features: programmeFeaturesToList(featuresObj, typedLocale),
+    ctaText: p.data.marketing.cta_label,
+    ctaHref: `/${typedLocale}/programmes/${slug}`,
+  };
+});
 
 // UI-строки, не привязанные к данным коллекций. Когда появится
 // общий dictionary (Stage 7 translation-pair validator + i18n
@@ -142,6 +240,38 @@ const ui = typedLocale === "ru"
 ---
 
 <Layout locale={typedLocale} seo={seo}>
+  <Fragment slot="schema">
+    <OrganizationSchema locale={typedLocale} />
+    <FaqSchema items={faqs} />
+    {pricingCards.map((c) => {
+      const programme = programmeCards.find((p) => p.id === `${c.slug}.${typedLocale}`);
+      if (!programme) return null;
+      const level = c.slug === "beginner"
+        ? "Beginner"
+        : c.slug === "intermediate"
+        ? "Intermediate"
+        : c.slug === "bundle"
+        ? "All levels"
+        : undefined;
+      const hasPrice = programme.data.price_amount > 0;
+      return (
+        <CourseSchema
+          slug={c.slug}
+          locale={typedLocale}
+          name={programme.data.title}
+          description={programme.data.summary}
+          educationalLevel={level}
+          url={c.ctaHref}
+          offer={hasPrice
+            ? {
+                price: Math.round(programme.data.price_amount / 100),
+                priceCurrency: programme.data.price_currency,
+              }
+            : undefined}
+        />
+      );
+    })}
+  </Fragment>
   <Hero
     eyebrow={sections.hero.eyebrow}
     title={sections.hero.title}
@@ -219,14 +349,28 @@ const ui = typedLocale === "ru"
     </ul>
   </section>
 
-  {/* Pricing — TierCard'ы рендерятся из programmes + bundles
-      коллекций в Stage 9. */}
+  {/* Pricing — TierCard'ы из programmes коллекции. Порядок тот же
+      что в curriculum-секции (cardOrder), bundle получает featured-stamp
+      как акцентный вариант. Stage 9. */}
   <section class="section center" aria-labelledby="pricing-title">
     <header class="section__head">
       <p class="eyebrow">{sections.pricing.eyebrow}</p>
       <h2 id="pricing-title" class="h2">{sections.pricing.title}</h2>
     </header>
-    <p class="text-faint">{ui.pendingStage9}</p>
+    <div class="pricing-grid">
+      {pricingCards.map((c) => (
+        <TierCard
+          badge={c.badge}
+          name={c.name}
+          price={c.price}
+          sub={c.sub}
+          features={c.features}
+          ctaText={c.ctaText}
+          ctaHref={c.ctaHref}
+          featured={c.featured}
+        />
+      ))}
+    </div>
   </section>
 
   <section class="section section--alt center" aria-labelledby="ai-module-title">

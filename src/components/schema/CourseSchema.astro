@@ -1,0 +1,84 @@
+---
+/*
+ * <CourseSchema /> — JSON-LD Course для programme card / detail page.
+ *
+ * Google's Course structured data (BETA) — позволяет rich snippet
+ * с курсом в SERP'ах. Требует name + description + provider минимум;
+ * hasCourseInstance с offers сильно усиливает SERP-presence.
+ *
+ * Reference:
+ *   - schema.org/Course
+ *   - developers.google.com/search/docs/appearance/structured-data/course
+ */
+
+import { SITE } from "../../lib/site-config";
+
+interface Offer {
+  price: number;        // в основной валюте (не центы)
+  priceCurrency: string;
+  availability?: string;
+}
+
+interface Props {
+  /** Stable slug — для @id (без локали). */
+  slug: string;
+  locale: "en" | "ru";
+  name: string;
+  description: string;
+  /** "Beginner" | "Intermediate" | "All levels" */
+  educationalLevel?: string;
+  offer?: Offer;
+  /** CTA / detail page URL. */
+  url: string;
+}
+const {
+  slug,
+  locale,
+  name,
+  description,
+  educationalLevel,
+  offer,
+  url,
+} = Astro.props;
+
+const data = {
+  "@context": "https://schema.org",
+  "@type": "Course",
+  "@id": `${SITE.url}/${locale}/programmes/${slug}#course`,
+  name,
+  description,
+  url: `${SITE.url}${url}`,
+  inLanguage: locale,
+  provider: {
+    "@type": "EducationalOrganization",
+    "@id": `${SITE.url}/#organization`,
+    name: SITE.name,
+    url: SITE.url,
+  },
+  ...(educationalLevel ? { educationalLevel } : {}),
+  ...(offer
+    ? {
+        offers: {
+          "@type": "Offer",
+          price: offer.price,
+          priceCurrency: offer.priceCurrency,
+          availability: offer.availability ?? "https://schema.org/InStock",
+          url: `${SITE.url}${url}`,
+        },
+        hasCourseInstance: {
+          "@type": "CourseInstance",
+          courseMode: "Online",
+          inLanguage: locale,
+          offers: {
+            "@type": "Offer",
+            price: offer.price,
+            priceCurrency: offer.priceCurrency,
+            availability: offer.availability ?? "https://schema.org/InStock",
+          },
+        },
+      }
+    : {}),
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(data)} is:inline></script>

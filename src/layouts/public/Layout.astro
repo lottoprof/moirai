@@ -41,6 +41,11 @@ const pathname = Astro.url.pathname;
     <meta name="color-scheme" content="dark" />
 
     <SeoHead locale={locale} pathname={pathname} seo={seo} />
+
+    {/* Schema.org JSON-LD slot — каждая страница передаёт нужные
+        Schema.* компоненты. EducationalOrganization, FAQPage, Course
+        — см. src/components/schema/. */}
+    <slot name="schema" />
   </head>
 
   <body>

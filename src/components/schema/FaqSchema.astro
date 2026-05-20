@@ -1,0 +1,36 @@
+---
+/*
+ * <FaqSchema /> — JSON-LD FAQPage для страниц с FAQ-секцией.
+ * Принимает items[] — те же что рендерятся в UI через <Faq />,
+ * чтобы Q/A было синхронизировано.
+ *
+ * Google Rich Results: FAQPage эligible если ≥ 2 вопросов.
+ */
+
+interface FaqItem {
+  q: string;
+  a: string;
+}
+
+interface Props {
+  items: FaqItem[];
+}
+const { items } = Astro.props;
+
+const data = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: items.map((item) => ({
+    "@type": "Question",
+    name: item.q,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.a,
+    },
+  })),
+};
+---
+
+{items.length > 0 && (
+  <script type="application/ld+json" set:html={JSON.stringify(data)} is:inline></script>
+)}
