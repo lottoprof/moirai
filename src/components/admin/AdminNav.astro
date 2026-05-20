@@ -64,7 +64,7 @@ if (roles?.has("student")) {
 
 <nav class="admin-nav" aria-label={labels.aria}>
   <div class="admin-nav__brand">
-    <a href={`/admin/`} class="admin-nav__logo" aria-label="Moirai admin"><Logo height={22} /></a>
+    <a href={`/admin/`} class="admin-nav__logo" aria-label="Moirai admin"><Logo height={26} /></a>
     <a href={`/${locale}/`} class="admin-nav__site">{labels.site} <span aria-hidden="true">→</span></a>
   </div>
   <ul class="admin-nav__list" role="list">
@@ -86,11 +86,13 @@ if (roles?.has("student")) {
 </nav>
 
 <style>
+  /* Размерности синхронизированы с InstructorNav (padding/logo/font-size/gap)
+     чтобы admin и instructor шапки выглядели одинаково по высоте и весу. */
   .admin-nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-md) var(--container-pad);
+    padding: var(--space-lg) var(--container-pad);
     border-bottom: 1px solid var(--border);
     background: var(--bg);
   }
@@ -103,7 +105,7 @@ if (roles?.has("student")) {
 
   .admin-nav__logo {
     font-family: var(--font-display);
-    font-size: 18px;
+    font-size: 22px;
     font-weight: 300;
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
@@ -115,20 +117,24 @@ if (roles?.has("student")) {
   .admin-nav__site {
     font-family: var(--font-body);
     font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
     color: var(--text-faint);
     text-decoration: none;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+    transition: color var(--duration-fast) var(--ease-out);
   }
+  .admin-nav__site:hover { color: var(--text-muted); }
 
   .admin-nav__list {
     display: flex;
     align-items: center;
-    gap: var(--space-md);
+    gap: var(--space-lg);
     list-style: none;
     padding: 0;
     margin: 0;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
   .admin-nav__list::-webkit-scrollbar { display: none; }
@@ -137,27 +143,33 @@ if (roles?.has("student")) {
 
   .admin-nav__link {
     font-family: var(--font-body);
-    font-size: 11px;
+    font-size: var(--type-micro-md);
     font-weight: 500;
-    letter-spacing: 0.08em;
+    letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
     color: var(--text-muted);
     text-decoration: none;
     padding: 4px 2px;
+    transition: color var(--duration-fast) var(--ease-out);
   }
   .admin-nav__link:hover { color: var(--text); }
   .admin-nav__link--active { color: var(--text-accent); }
 
   .admin-nav__link--switch {
     color: var(--text-faint);
+    font-size: var(--type-micro-sm);
     padding-left: var(--space-sm);
     border-left: 1px solid var(--border);
-    margin-left: var(--space-2xs);
+    margin-left: var(--space-xs);
   }
   .admin-nav__link--switch:hover { color: var(--text-accent); }
 
   @media (max-width: 640px) {
-    .admin-nav { padding: var(--space-md); gap: var(--space-md); }
-    .admin-nav__list { gap: var(--space-sm); }
+    .admin-nav {
+      padding: var(--space-md) var(--space-md);
+      gap: var(--space-md);
+    }
+    .admin-nav__list { gap: var(--space-md); }
+    .admin-nav__link { letter-spacing: var(--tracking-wide); }
   }
 </style>
