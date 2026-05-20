@@ -11,30 +11,52 @@
 ```
 1. /[locale]/                       Hero CTA "Apply now"
               ↓
-2. /[locale]/apply (anonymous)      ВЫБОР СЛОТА
-   - Сетка свободных слотов
-   - Каждый слот: программа + пара дней + время + старт + N/max мест
+2. /[locale]/apply (anonymous)      ВЫБОР СЛОТА (FLOW-12,13,14)
+   - List view, grouped by programme, с фильтрами
+   - Каждый слот: программа + пара дней + время + старт +
+     гибридный spot count (FLOW-13)
+   - "1:1 at group price" бейдж при ≤ 2 (FLOW-11)
    - Клик → выбран
               ↓
 3. /[locale]/apply/contact          ID
    - Email + имя + Turnstile
-   - "Регистрируясь, вы соглашаетесь с Terms + Privacy"
-   - Submit → создаёт user + application + шлёт magic-link
+   - Submit → INSERT user + application(status='awaiting_payment')
+   - createRefreshSession() → Set-Cookie (FLOW-16)
+   - Send welcome email с magic-link (save-point convenience)
+   - Redirect → /dashboard
               ↓
-4. /[locale]/dashboard (logged in, БЕЗ ОПЛАТЫ)
-   - Application summary: программа, слот, старт даты
-   - Countdown до старта когорты
-   - Teaser курса (модули, инструкторы) — locked
+4. /[locale]/dashboard (logged in, БЕЗ ОПЛАТЫ)   FLOW-17
+   - Защищён только session-cookie (низкая ценность данных)
+   - Application summary + countdown до старта
+   - Curriculum teaser, инструкторы — locked модули
+   - Banner: "Set password optional · welcome email sent"
    - КНОПКА "Pay now → start the course"
               ↓
-5. /[locale]/checkout (Stripe Checkout redirect)
-   - Чекбокс "I accept Terms + Refund + Privacy"
-   - Pay → Stripe webhook → enrollment.status = 'paid'
-   - Audit log: offer_accepted с timestamp+IP+terms_version
+5. /[locale]/checkout                FLOW-18
+   - Краткая сводка заказа
+   - ОБЯЗАТЕЛЬНО: установка пароля (новые password fields)
+   - ОБЯЗАТЕЛЬНО: чекбокс "I accept Terms · Refund · Privacy"
+   - Pay button disabled пока оба не выполнены
+   - На submit → set password + redirect to Stripe Checkout
               ↓
-6. /[locale]/dashboard (paid, full access)
-   - Все модули, сессии, homework, инструктор
+6. Stripe Checkout (external)        FLOW-9 / E3
+   - Карточные данные, 3DS, webhooks
+   - Success → callback /api/checkout/success
+              ↓
+7. /api/checkout/success → audit_log event='offer_accepted' (FLOW-2 / E5)
+   - INSERT audit_log с user_id, ip_hash, ua, terms_version,
+     refund_version, privacy_version, programme_id, cohort_id,
+     amount, currency, stripe_payment_id
+   - UPDATE application.status='paid' + INSERT enrollment
+              ↓
+8. /[locale]/dashboard (paid, full access)
+   - Все модули, сессии, homework, инструктор разлочены
 ```
+
+Recovery flow (любой шаг после 3):
+
+- Клиент logged out → /login → "Email me a sign-in link" → свежий
+  token TTL 30 мин → клик из email → залогинен (FLOW-19)
 
 **Ключевое решение** (lottoprof, 2026-05-20):
 - Клиент попадает в дашборд **ДО оплаты** — повышает конверсию (видит что покупает, "ввязывается")
@@ -47,7 +69,7 @@
 
 - [x] A1. Apply доступен до регистрации (anonymous) или только залогиненным? → **anonymous** (FLOW-5: сначала слоты, потом email; FLOW-6: дашборд до оплаты)
 - [x] A2. Если anonymous — Apply создаёт user аккаунт автоматически или отдельный шаг? → **автоматически** при submit'е contact-формы (шаг 3 флоу)
-- [x] A3. Magic-link / OAuth / password — где подключается? → **magic-link** _предложение, требует подтверждения_
+- [x] A3. Magic-link / OAuth / password — где подключается? → **immediate session при Apply + magic-link как fallback** (FLOW-16, FLOW-19). Пароль — на checkout-step (FLOW-18)
 - [ ] A4. Повторный Apply через тот же email — разрешён?
 
 ### B. Сетка слотов
@@ -136,10 +158,10 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 
 ### K. Legal / compliance
 
-- [ ] K1. Чекбокс Terms+Privacy на Apply — обязательный?
+- [x] K1. Чекбокс Terms+Privacy — где? → **На checkout-step** (FLOW-18), а не на Apply. Apply — низкая ценность, чекбокс там был бы лишним friction. На checkout формулировка покрывает Terms + Refund + Privacy одним чекбоксом. Payment = explicit consent moment (FLOW-2)
 - [ ] K2. Marketing emails opt-in — отдельный чекбокс?
 - [ ] K3. Возрастная проверка (≥18) — дата рождения / чекбокс?
-- [ ] K4. GDPR Art. 7 — timestamp consent + audit_log?
+- [x] K4. GDPR Art. 7 timestamp consent — **audit_log event=`offer_accepted`** (FLOW-2, E5) с user_id, ip_hash, ua, terms_version, refund_version, privacy_version, payment_id. Это и есть GDPR proof of consent
 
 ## Зафиксированные решения
 
@@ -161,6 +183,10 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 | FLOW-13 | Spot count — **гибрид**: > 5 → "available"; ≤ 5 → "N spots left" (urgency); ≤ 2 → "1:1 at group price · individual bonus" (FLOW-11 reframe) | lottoprof 2026-05-20 |
 | FLOW-14 | Фильтры обязательны сразу: programme · day_pair · time_of_day · period (next 30d / 3mo / year). Default: all / all / all / next 3mo | lottoprof 2026-05-20 |
 | FLOW-15 | Cohorts хранятся в **D1** (не Content Collection). Static — programmes; dynamic — cohorts (apply_count, even-by-event обновления через админ-API) | lottoprof 2026-05-20 |
+| FLOW-16 | Apply submit → **immediate session** (HttpOnly cookie) + welcome email с magic-link (save-point convenience). Без email-click required для входа в дашборд в той же вкладке | lottoprof 2026-05-20 |
+| FLOW-17 | Pre-payment dashboard защищён только session-cookie + magic-link fallback. Без обязательного пароля — низкая ценность данных (только application + публичный teaser курса) | lottoprof 2026-05-20 |
+| FLOW-18 | На **checkout-step** перед оплатой — **обязательная установка пароля** + accept-чекбокс Terms/Refund/Privacy. Кнопка Pay disabled пока оба условия не выполнены. Гейт стоит на деньги + paid контент | lottoprof 2026-05-20 |
+| FLOW-19 | Magic-link — fallback recovery flow. На `/login` кнопка "Send me a sign-in link" → сервер генерит свежий token (TTL 30 мин) → шлёт email. Тот же KV-механизм что password-reset | lottoprof 2026-05-20 |
 
 ## Статус по блокам
 
@@ -176,7 +202,7 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 | H. Edge-кейсы | H1 | H2, H3, H4, H5 | 1/5 |
 | I. Data model | I1*, I2, I3*, I4* | — | 4/4 |
 | J. i18n | — | J1 | 0/1 |
-| K. Legal | — | K1, K2, K3, K4 | 0/4 |
+| K. Legal | K1, K4 | K2, K3 | 2/4 |
 
 `*` — требует подтверждения (мои предложения).
 
