@@ -1,0 +1,440 @@
+---
+/*
+ * <AnnouncementBar /> — top-bar над <Nav> на публичных страницах.
+ *
+ * Stage 24c: данные из коллекции `announcements`, фильтрация по
+ * starts_at/ends_at + текущая локаль, сортировка по priority desc и
+ * starts_at asc. Множественные активные сообщения ротируются на клиенте
+ * каждые 7 сек с pagination-точками; клик по точке переключает на это
+ * сообщение и приостанавливает auto-rotation на 15 сек.
+ *
+ * Dismiss: кнопка ✕ для `dismissible: true`. Состояние хранится в
+ * cookie `moirai_announce_dismissed` = JSON-массив slug'ов. TTL 7 дней.
+ * Slug = id без локали — чтобы dismiss сохранялся при переключении языка.
+ *
+ * Non-sticky (см. план): прокручивается вместе со страницей. Если ВСЕ
+ * сообщения dismissed → бар скрывается клиентским JS (display:none на
+ * root элементе).
+ *
+ * Подключается только в public Layout. На protected/auth страницах
+ * (login/register/admin/instructor/dashboard) НЕ показывается.
+ *
+ * SSG: build-time фильтрация по now. Для новых scheduled сообщений
+ * нужен redeploy. Stage 25+ — daily cron auto-deploy решит, либо
+ * SSR-флаг на root pages.
+ */
+
+import { getCollection, type CollectionEntry } from "astro:content";
+
+interface Props {
+  locale: "en" | "ru";
+}
+const { locale } = Astro.props;
+
+type AnnouncementEntry = CollectionEntry<"announcements">;
+
+const now = Date.now();
+const all = await getCollection("announcements");
+const active: AnnouncementEntry[] = all
+  .filter((e: AnnouncementEntry) => e.id.endsWith(`.${locale}`))
+  .filter((e: AnnouncementEntry) =>
+    e.data.starts_at.getTime() <= now && now <= e.data.ends_at.getTime(),
+  )
+  .sort((a: AnnouncementEntry, b: AnnouncementEntry) => {
+    if (b.data.priority !== a.data.priority) return b.data.priority - a.data.priority;
+    return a.data.starts_at.getTime() - b.data.starts_at.getTime();
+  });
+
+/** Slug без локали — общий идентификатор для dismiss-cookie. */
+function slugOf(id: string): string {
+  return id.replace(/\.(en|ru)$/, "");
+}
+
+const ru = locale === "ru";
+const labels = ru
+  ? {
+      aria: "Анонсы",
+      dismiss: "Скрыть сообщение",
+      pagination: "Переключение между сообщениями",
+    }
+  : {
+      aria: "Announcements",
+      dismiss: "Dismiss this announcement",
+      pagination: "Switch between announcements",
+    };
+
+const kindLabel: Record<AnnouncementEntry["data"]["kind"], string> = ru
+  ? {
+      soon: "Скоро",
+      new: "Новинка",
+      promo: "Акция",
+      cohort: "Когорта",
+      info: "Инфо",
+    }
+  : {
+      soon: "Coming soon",
+      new: "New",
+      promo: "Promo",
+      cohort: "Cohort",
+      info: "Info",
+    };
+---
+
+{active.length > 0 && (
+  <aside class="announce-bar" aria-label={labels.aria} data-rotate-ms="7000" data-pause-ms="15000">
+    <ul class="announce-bar__list" role="list">
+      {active.map((entry, i) => (
+        <li
+          class:list={["announce-bar__item", { "is-active": i === 0 }]}
+          data-slug={slugOf(entry.id)}
+          data-index={i.toString()}
+        >
+          <span class:list={["announce-bar__chip", `announce-bar__chip--${entry.data.kind}`]}>
+            {kindLabel[entry.data.kind]}
+          </span>
+          <span class="announce-bar__text">{entry.data.text}</span>
+          {entry.data.cta_text && entry.data.cta_href && (
+            <a class="announce-bar__cta" href={entry.data.cta_href}>
+              {entry.data.cta_text} <span class="announce-bar__cta-arrow" aria-hidden="true">→</span>
+            </a>
+          )}
+          {entry.data.dismissible && (
+            <button
+              class="announce-bar__dismiss"
+              type="button"
+              aria-label={labels.dismiss}
+              data-slug={slugOf(entry.id)}
+            >×</button>
+          )}
+        </li>
+      ))}
+    </ul>
+
+    {active.length > 1 && (
+      <div class="announce-bar__dots" role="tablist" aria-label={labels.pagination}>
+        {active.map((entry, i) => (
+          <button
+            type="button"
+            class:list={["announce-bar__dot", { "is-active": i === 0 }]}
+            data-index={i.toString()}
+            aria-label={`${(i + 1).toString()} / ${active.length.toString()}`}
+            aria-current={i === 0 ? "true" : undefined}
+          ></button>
+        ))}
+      </div>
+    )}
+  </aside>
+)}
+
+<style>
+  .announce-bar {
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-md);
+    padding: 10px var(--container-pad);
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    position: relative;
+    min-height: 48px;
+  }
+
+  .announce-bar__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    position: relative;
+    min-height: 28px;
+  }
+
+  .announce-bar__item {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+    line-height: 1.4;
+  }
+  .announce-bar__item.is-active {
+    display: flex;
+  }
+
+  .announce-bar__chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .announce-bar__chip--soon {
+    background: var(--amber-faint);
+    color: var(--text-accent);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  }
+  .announce-bar__chip--new {
+    background: var(--amber);
+    color: var(--ink);
+  }
+  .announce-bar__chip--promo {
+    background: var(--amber);
+    color: var(--ink);
+    animation: announce-pulse 2.5s ease-in-out infinite;
+  }
+  .announce-bar__chip--cohort {
+    background: transparent;
+    color: var(--text-accent);
+    border: 1px solid var(--amber);
+  }
+  .announce-bar__chip--info {
+    background: transparent;
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+  }
+
+  @keyframes announce-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.65; }
+  }
+
+  .announce-bar__text {
+    color: var(--text);
+  }
+
+  .announce-bar__cta {
+    color: var(--amber);
+    text-decoration: none;
+    border-bottom: 1px solid currentColor;
+    padding-bottom: 1px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .announce-bar__cta:hover {
+    color: var(--amber-light);
+  }
+  .announce-bar__cta-arrow {
+    margin-left: 2px;
+  }
+
+  .announce-bar__dismiss {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    padding: 2px 6px;
+    margin-left: var(--space-xs);
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .announce-bar__dismiss:hover {
+    color: var(--text);
+  }
+
+  .announce-bar__dots {
+    display: inline-flex;
+    gap: var(--space-2xs);
+    flex-shrink: 0;
+  }
+  .announce-bar__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-strong);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .announce-bar__dot:hover {
+    background: var(--text-muted);
+  }
+  .announce-bar__dot.is-active {
+    background: var(--amber);
+  }
+
+  @media (max-width: 640px) {
+    .announce-bar {
+      padding: 8px var(--space-md);
+      font-size: var(--type-micro-md);
+    }
+    .announce-bar__item {
+      gap: var(--space-xs);
+    }
+    .announce-bar__text {
+      flex-basis: 100%;
+      text-align: center;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .announce-bar__chip--promo {
+      animation: none;
+    }
+  }
+</style>
+
+<script>
+  /*
+   * Client-side announcement bar:
+   *   - читает cookie moirai_announce_dismissed (JSON массив slug'ов)
+   *   - скрывает dismissed items, если все скрыты → root display:none
+   *   - запускает rotation между видимыми (data-rotate-ms)
+   *   - клик по dot → переключение + pause на data-pause-ms
+   *   - клик по ✕ → cookie + advance to next visible / hide bar
+   */
+  const COOKIE_NAME = "moirai_announce_dismissed";
+  const COOKIE_TTL_DAYS = 7;
+
+  function readDismissed(): string[] {
+    const cookies = document.cookie.split(";");
+    for (const c of cookies) {
+      const [k, ...rest] = c.trim().split("=");
+      if (k === COOKIE_NAME) {
+        try {
+          const parsed = JSON.parse(decodeURIComponent(rest.join("=")));
+          if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === "string");
+        } catch { /* ignore */ }
+      }
+    }
+    return [];
+  }
+
+  function writeDismissed(slugs: string[]): void {
+    const value = encodeURIComponent(JSON.stringify(slugs));
+    const maxAge = COOKIE_TTL_DAYS * 24 * 3600;
+    document.cookie = `${COOKIE_NAME}=${value}; Max-Age=${String(maxAge)}; Path=/; SameSite=Lax`;
+  }
+
+  function initBar(bar: HTMLElement): void {
+    const items = Array.from(bar.querySelectorAll<HTMLElement>(".announce-bar__item"));
+    const dots = Array.from(bar.querySelectorAll<HTMLButtonElement>(".announce-bar__dot"));
+    const dismissed = new Set(readDismissed());
+
+    // Hide dismissed items by clearing is-active and marking hidden via inline style
+    const visible: HTMLElement[] = [];
+    items.forEach((it) => {
+      const slug = it.dataset.slug ?? "";
+      if (dismissed.has(slug)) {
+        it.style.display = "none";
+        return;
+      }
+      visible.push(it);
+    });
+
+    // Sync dots — hide dots for dismissed items
+    dots.forEach((dot) => {
+      const idx = Number(dot.dataset.index);
+      const item = items[idx];
+      if (!item) return;
+      if (item.style.display === "none") dot.style.display = "none";
+    });
+
+    if (visible.length === 0) {
+      bar.style.display = "none";
+      return;
+    }
+
+    // Reset active state — first visible becomes active
+    items.forEach((it) => it.classList.remove("is-active"));
+    dots.forEach((d) => { d.classList.remove("is-active"); d.removeAttribute("aria-current"); });
+    visible[0].classList.add("is-active");
+    const firstIdx = Number(visible[0].dataset.index);
+    const firstDot = dots.find((d) => Number(d.dataset.index) === firstIdx);
+    if (firstDot) {
+      firstDot.classList.add("is-active");
+      firstDot.setAttribute("aria-current", "true");
+    }
+
+    let currentVisibleIdx = 0;
+    function show(idxInVisible: number): void {
+      visible.forEach((it) => it.classList.remove("is-active"));
+      dots.forEach((d) => { d.classList.remove("is-active"); d.removeAttribute("aria-current"); });
+      const target = visible[idxInVisible];
+      if (!target) return;
+      target.classList.add("is-active");
+      const realIdx = Number(target.dataset.index);
+      const targetDot = dots.find((d) => Number(d.dataset.index) === realIdx);
+      if (targetDot) {
+        targetDot.classList.add("is-active");
+        targetDot.setAttribute("aria-current", "true");
+      }
+      currentVisibleIdx = idxInVisible;
+    }
+
+    // Auto-rotation
+    const rotateMs = Number(bar.dataset.rotateMs ?? "7000");
+    const pauseMs = Number(bar.dataset.pauseMs ?? "15000");
+    let intervalId: number | null = null;
+    let pauseUntil = 0;
+
+    function tick(): void {
+      if (Date.now() < pauseUntil) return;
+      const next = (currentVisibleIdx + 1) % visible.length;
+      show(next);
+    }
+    if (visible.length > 1) {
+      intervalId = window.setInterval(tick, rotateMs);
+    }
+
+    // Dot clicks
+    dots.forEach((dot) => {
+      dot.addEventListener("click", () => {
+        const realIdx = Number(dot.dataset.index);
+        const idxInVisible = visible.findIndex((it) => Number(it.dataset.index) === realIdx);
+        if (idxInVisible < 0) return;
+        show(idxInVisible);
+        pauseUntil = Date.now() + pauseMs;
+      });
+    });
+
+    // Dismiss buttons
+    bar.querySelectorAll<HTMLButtonElement>(".announce-bar__dismiss").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const slug = btn.dataset.slug ?? "";
+        if (!slug) return;
+        dismissed.add(slug);
+        writeDismissed(Array.from(dismissed));
+
+        // Remove this item + its dot from rotation
+        const item = btn.closest<HTMLElement>(".announce-bar__item");
+        if (!item) return;
+        item.style.display = "none";
+        const realIdx = Number(item.dataset.index);
+        const matchedDot = dots.find((d) => Number(d.dataset.index) === realIdx);
+        if (matchedDot) matchedDot.style.display = "none";
+
+        const wasActive = item.classList.contains("is-active");
+        const idxInVisible = visible.findIndex((it) => it === item);
+        if (idxInVisible >= 0) visible.splice(idxInVisible, 1);
+
+        if (visible.length === 0) {
+          bar.style.display = "none";
+          if (intervalId !== null) window.clearInterval(intervalId);
+          return;
+        }
+
+        if (wasActive) {
+          const next = idxInVisible % visible.length;
+          show(next);
+        } else {
+          // Recompute currentVisibleIdx after splice
+          const activeStillEl = visible.find((it) => it.classList.contains("is-active"));
+          if (activeStillEl) {
+            currentVisibleIdx = visible.indexOf(activeStillEl);
+          }
+        }
+      });
+    });
+  }
+
+  const bar = document.querySelector<HTMLElement>(".announce-bar");
+  if (bar) initBar(bar);
+</script>
