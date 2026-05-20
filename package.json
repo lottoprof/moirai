@@ -19,6 +19,9 @@
     "seed:slots": "node scripts/seed-slots.mjs",
     "seed:slots:local": "node scripts/seed-slots.mjs --local",
     "seed:slots:dry": "node scripts/seed-slots.mjs --dry-run",
+    "publish:cohorts": "node scripts/publish-cohorts.mjs",
+    "publish:cohorts:local": "node scripts/publish-cohorts.mjs --local",
+    "publish:cohorts:dry": "node scripts/publish-cohorts.mjs --dry-run",
     "deploy": "pnpm build && wrangler pages deploy ./dist --project-name moirai --branch main --commit-message \"$(git log -1 --pretty=%s)\"",
     "deploy:preview": "pnpm build && wrangler pages deploy ./dist --project-name moirai --commit-message \"$(git log -1 --pretty=%s)\""
   },
