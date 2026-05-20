@@ -37,5 +37,11 @@ declare namespace Cloudflare {
 
     // === Resend — transactional email (verify links, password reset) ===
     RESEND_API_KEY?: string;       // Bearer для api.resend.com/emails
+
+    // === Payment provider (Stage 14) — Lemon Squeezy / Paddle / Mock ===
+    PAYMENT_PROVIDER?: "mock" | "lemonsqueezy" | "paddle";  // default: 'mock'
+    LEMONSQUEEZY_API_KEY?: string;       // Stage 14.5
+    LEMONSQUEEZY_STORE_ID?: string;
+    LEMONSQUEEZY_WEBHOOK_SECRET?: string;
   }
 }
