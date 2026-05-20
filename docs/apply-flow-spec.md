@@ -222,11 +222,10 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 
 **Спека готова к плану.** Следующий шаг — `.agent/plans/active/stage14-apply.md`.
 
-## Production TODOs (sync с прочими доками после спеки)
+## Production TODOs ✅ выполнены (2026-05-20)
 
-1. **`src/content/legal/refund.{en,ru}.mdx`** — переписать §3 (Refunds outside EU)
-   на 3-окна FLOW-9a. Текущий placeholder использует упрощённую модель.
-2. **Programme `individual.{en,ru}.mdx`** — переосмыслить позиционирование
-   с учётом FLOW-11 (потенциальный конфликт: cohort с 1 студентом ≈ individual)
-3. **`docs/methodist-modules-guide.md`** — добавить раздел про
-   `lessons` → `cohort.duration_weeks` расчёт.
+1. ✅ `src/content/legal/refund.{en,ru}.mdx` §3 — переписан под FLOW-9a (3 окна)
+2. ✅ `src/content/programmes/individual.{en,ru}.mdx` — repositioned под FLOW-28: `published: false`, CTA "Contact us", чёткое разделение от FLOW-11 cohort-reframe
+3. ✅ `src/content/config.ts` — programme schema получила `published: boolean` (default true)
+4. ✅ `src/pages/[locale]/index.astro` — фильтрация программ с `published: false` из home grid
+5. ✅ `docs/methodist-modules-guide.md` — добавлен раздел "Lessons → длительность курса" с формулой и таблицей

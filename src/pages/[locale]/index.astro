@@ -108,7 +108,10 @@ const cardOrder = ["beginner", "intermediate", "bundle", "individual"];
 const localeProgrammes = allProgrammes.filter((p: ProgrammeEntry) => p.id.endsWith(`.${typedLocale}`));
 const programmeCards = cardOrder
   .map((slug) => localeProgrammes.find((p: ProgrammeEntry) => p.id === `${slug}.${typedLocale}`))
-  .filter((p): p is ProgrammeEntry => p !== undefined);
+  .filter((p): p is ProgrammeEntry => p !== undefined)
+  // FLOW-29: программа с `published: false` показывается только по прямой
+  // ссылке (/programmes/<id>), не появляется в home grid / cards / pricing.
+  .filter((p: ProgrammeEntry) => p.data.published !== false);
 
 // Currency formatter — €399.00 → "€399"
 function formatPrice(cents: number, currency: string, locale: "en" | "ru"): string {

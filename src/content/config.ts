@@ -98,6 +98,14 @@ const programmes = defineCollection({
     price_amount: z.number().int().nonnegative(),        // центы; 0 для individual (договорная)
     price_currency: z.string().length(3),                // ISO 4217
     features: programmeFeaturesSchema,
+    /**
+     * Stage 14 FLOW-29: видимость в публичном каталоге.
+     *   true (default)  — programme в /apply grid, /home cards, новые cohorts публикуются
+     *   false           — visible только по прямой ссылке (/programmes/<id>),
+     *                     скрыто из grid'ов, новые cohorts НЕ публикуются,
+     *                     existing cohorts продолжают работать
+     */
+    published: z.boolean().default(true),
     seo: seoSchema,
     ...monolingualField,
   }),
