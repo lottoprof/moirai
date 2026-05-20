@@ -119,16 +119,18 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 
 ### F. Коммуникации после Apply
 
-- [ ] F1. Confirmation email сразу — что в нём?
-- [ ] F2. Notification инструктору — где (email / dashboard)?
-- [ ] F3. Когда группа собирается — auto-email?
-- [ ] F4. Дашборд если apply есть но enrollment не active — что показывать?
+- [x] F1. Confirmation email сразу — что в нём? → **welcome email с magic-link** save-point (FLOW-16); содержание: подтверждение Apply + slot info + magic-link + ссылки на login/account. **Confirmation email при payment success** — Sprint 1 (FLOW-23)
+- [x] F2. Notification инструктору — где? → **Sprint 1: ничего**; Sprint 2: email/dashboard alert при оплате студента в его cohort'е (FLOW-23 → потом)
+- [x] F3. Когда группа собирается — auto-email? → **N/A**: cohorts auto-published на 12 мес, нет момента "собралась" (FLOW-7). Reminder email "cohort starts in 7 days" — Sprint 2
+- [x] F4. Дашборд если apply есть но enrollment не active — что показывать? → **Application summary + countdown + curriculum teaser + Pay now CTA** (FLOW-17 + flow diagram шаг 4)
 
 ### G. Видимость в admin/instructor
 
-- [ ] G1. Apply-список — где (admin/applications)? Статусы и переходы?
-- [ ] G2. Инструктор видит applications своего слота или всех?
-- [ ] G3. Какие статусы (new → contacted → ... → paid)?
+- [x] G1. Apply-список — где? → **`/admin/applications`** (FLOW-20): tabs + filters + bulk + row actions + drawer с детальной info
+- [x] G2. Инструктор видит applications своего слота или всех? → **только свои cohorts** (`lead_instructor_id = current_user`), без payment сумм и audit log оплаты (FLOW-21)
+- [x] G3. Какие статусы? → **awaiting_payment → paid → running → completed** + ветки cancelled / expired / refunded (FLOW-22)
+- [x] G4. Notifications? → **минимум Sprint 1**: только client confirmation email при payment success (FLOW-23). Остальное Sprint 2
+- [x] G5. Audit log events? → **6 типов** для apply flow (FLOW-24)
 
 ### H. Edge-кейсы
 
@@ -187,6 +189,11 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 | FLOW-17 | Pre-payment dashboard защищён только session-cookie + magic-link fallback. Без обязательного пароля — низкая ценность данных (только application + публичный teaser курса) | lottoprof 2026-05-20 |
 | FLOW-18 | На **checkout-step** перед оплатой — **обязательная установка пароля** + accept-чекбокс Terms/Refund/Privacy. Кнопка Pay disabled пока оба условия не выполнены. Гейт стоит на деньги + paid контент | lottoprof 2026-05-20 |
 | FLOW-19 | Magic-link — fallback recovery flow. На `/login` кнопка "Send me a sign-in link" → сервер генерит свежий token (TTL 30 мин) → шлёт email. Тот же KV-механизм что password-reset | lottoprof 2026-05-20 |
+| FLOW-20 | `/admin/applications` view: tabs со счётчиками (All / Awaiting payment / Paid / Running / Cancelled / Expired / Refunded), фильтры (programme / cohort / status / date range / search), row actions (View / Contact / Transfer / Cancel / Trigger refund), bulk (cancel + export CSV), drawer с детальной info + audit log per application | lottoprof 2026-05-20 |
+| FLOW-21 | Instructor view `/[locale]/instructor/` — секции **"My upcoming cohorts"** (с paid/awaiting counts + days-until-start) и **"My active cohorts"** (week N of M + homework awaiting). Click → детальная cohort page со списком студентов. Не видит чужих cohorts, payment сумм, audit log оплаты | lottoprof 2026-05-20 |
+| FLOW-22 | Application status machine: **awaiting_payment → paid → running → completed** + 3 terminal branches **cancelled / expired / refunded**. Переходы фиксируются в audit_log event=`application_status_changed` с from/to/actor/reason | lottoprof 2026-05-20 |
+| FLOW-23 | Notifications минимум Sprint 1: **только client confirmation email при payment success** (Resend transactional). Остальные (admin digest / instructor alerts / cohort-start reminders) — Sprint 2 | lottoprof 2026-05-20 |
+| FLOW-24 | Audit log apply-events (6 типов): `apply_submitted`, `offer_accepted` (FLOW-2), `application_status_changed`, `application_cancelled`, `application_transferred`, `refund_processed`. Все с user_id + ip_hash + ua + metadata JSON | lottoprof 2026-05-20 |
 
 ## Статус по блокам
 
@@ -197,8 +204,8 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 | C. Apply form | C1*, C3* | C2, C4 | 2/4 |
 | D. Группа | D1, D2, D3, D5, D6 | D4 | 5/6 |
 | E. Оплата | E1, E3*, E4, E5, E6 | E2 | 5/6 |
-| F. Коммуникации | — | F1, F2, F3, F4 | 0/4 |
-| G. Admin/Instructor | — | G1, G2, G3 | 0/3 |
+| F. Коммуникации | F1, F2, F3, F4 | — | 4/4 |
+| G. Admin/Instructor | G1, G2, G3, G4, G5 | — | 5/5 |
 | H. Edge-кейсы | H1 | H2, H3, H4, H5 | 1/5 |
 | I. Data model | I1*, I2, I3*, I4* | — | 4/4 |
 | J. i18n | — | J1 | 0/1 |
