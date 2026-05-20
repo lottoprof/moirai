@@ -49,8 +49,21 @@ function bytesToB64(bytes: Uint8Array): string {
   return btoa(s);
 }
 
+/**
+ * Decode base64 OR base64url to bytes.
+ *
+ * `hashPassword()` пишет стандартный base64 (`btoa` → `+`/`/`), но
+ * исторически часть hashes попала в DB как base64url (`-`/`_`, без
+ * padding) — например через manual seed или внешние утилиты. Парсер
+ * нормализует оба варианта в standard base64 перед `atob()`.
+ */
 function b64ToBytes(b64: string): Uint8Array {
-  const s = atob(b64);
+  const normalized = b64
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const padLen = (4 - (normalized.length % 4)) % 4;
+  const padded = normalized + "=".repeat(padLen);
+  const s = atob(padded);
   const out = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
   return out;
