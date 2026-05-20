@@ -1,0 +1,113 @@
+---
+/*
+ * /[locale]/checkout/success — landing после успешной оплаты.
+ *
+ * Stage 14n. Сюда редиректит:
+ *   - Mock provider после /api/checkout/mock-complete
+ *   - Real provider (LemonSqueezy) после webhook + redirect
+ *
+ * К моменту попадания сюда payment уже обработан (markAsPaid +
+ * enrollment INSERT + audit_log + confirmation email).
+ *
+ * Простая success page с CTA "Open dashboard". Не делает дополнительных
+ * D1-операций (idempotent re-load безопасен).
+ */
+
+import Layout from "../../../layouts/public/Layout.astro";
+import Btn from "../../../components/public/Btn.astro";
+import { verifyRefreshSession } from "../../../lib/server/session";
+import { findUserById } from "../../../lib/server/user-ops";
+import { findApplicationById } from "../../../lib/server/applications";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/checkout/success");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+
+const env = Astro.locals.runtime.env;
+const session = await verifyRefreshSession(env, Astro.request);
+if (!session) {
+  return Astro.redirect(`/${typedLocale}/login`);
+}
+const user = await findUserById(env, session.userId);
+if (!user) return Astro.redirect(`/${typedLocale}/login`);
+
+const applicationId = Astro.url.searchParams.get("application");
+if (applicationId) {
+  const app = await findApplicationById(env, applicationId);
+  if (!app || app.user_id !== user.id) {
+    return Astro.redirect(`/${typedLocale}/dashboard`);
+  }
+  // Если статус ещё awaiting_payment — webhook не сработал, что-то странное.
+  // Show success всё равно (мог быть delivery delay у provider'a), dashboard
+  // покажет реальный статус. Идемпотентный flow.
+}
+
+const t = ru
+  ? {
+      eyebrow: "Оплата подтверждена",
+      title: "Готово.",
+      lede: "Запись на курс завершена. Чек придёт на ваш email в течение нескольких минут. Доступ к материалам откроется к старту когорты.",
+      cta: "Открыть кабинет",
+      seo: {
+        title: "Оплата подтверждена — Moirai",
+        description: "Ваша запись на курс завершена.",
+        noindex: true,
+      },
+    }
+  : {
+      eyebrow: "Payment confirmed",
+      title: "All set.",
+      lede: "Your enrollment is complete. A receipt will arrive in your inbox within a few minutes. Course materials unlock at cohort start.",
+      cta: "Open dashboard",
+      seo: {
+        title: "Payment confirmed — Moirai",
+        description: "Your enrollment is complete.",
+        noindex: true,
+      },
+    };
+---
+
+<Layout locale={typedLocale} seo={t.seo}>
+  <section class="checkout-success">
+    <p class="eyebrow">{t.eyebrow}</p>
+    <h1 class="checkout-success__title">{t.title}</h1>
+    <p class="checkout-success__lede">{t.lede}</p>
+    <div class="checkout-success__cta">
+      <Btn href={`/${typedLocale}/dashboard`} variant="primary" size="lg" arrow>{t.cta}</Btn>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .checkout-success {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: 640px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .checkout-success .eyebrow {
+    margin-bottom: var(--space-md);
+    color: var(--text-accent);
+  }
+  .checkout-success__title {
+    font-family: var(--font-display);
+    font-size: clamp(48px, 7vw, 80px);
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    margin: 0 0 var(--space-lg);
+  }
+  .checkout-success__lede {
+    color: var(--text-muted);
+    font-size: var(--type-body-lg);
+    line-height: var(--leading-relaxed);
+    margin-bottom: var(--space-2xl);
+  }
+  .checkout-success__cta {
+    margin-top: var(--space-xl);
+  }
+</style>

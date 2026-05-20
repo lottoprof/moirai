@@ -18,7 +18,7 @@
 
 import type { Locale } from "../../../db/types";
 
-export type EmailKind = "verify" | "password_reset" | "apply_welcome";
+export type EmailKind = "verify" | "password_reset" | "apply_welcome" | "payment_confirmation";
 
 const messages: Record<string, string | undefined> = {
   // === VERIFY (новая регистрация) ===
@@ -77,6 +77,25 @@ const messages: Record<string, string | undefined> = {
   "ru:apply_welcome:link_hint": "Или скопируйте эту ссылку в браузер:",
   "ru:apply_welcome:expires":   "Если выйдете и забудете пароль — зайдите на moiraionline.pro/login, введите email и запросите ссылку для входа. Мы пришлём свежую при каждом запросе.",
   "ru:apply_welcome:ignore":    "Если вы не подавали заявку — напишите нам на hello@moiraionline.pro.",
+
+  // === PAYMENT CONFIRMATION (после webhook checkout_completed, Stage 14m) ===
+  "en:payment_confirmation:subject":   "Payment confirmed — see you at the start",
+  "en:payment_confirmation:heading":   "Payment confirmed.",
+  "en:payment_confirmation:welcome":   "Your enrollment is complete.",
+  "en:payment_confirmation:body":      "Your spot is locked in. You'll get access to course materials when the cohort starts. Open your dashboard to see the schedule and what's coming.",
+  "en:payment_confirmation:button":    "Open dashboard",
+  "en:payment_confirmation:link_hint": "Or copy this link to your browser:",
+  "en:payment_confirmation:expires":   "Keep this email for your records — it's your receipt.",
+  "en:payment_confirmation:ignore":    "Questions about the schedule or materials? Reply to this email or write to hello@moiraionline.pro.",
+
+  "ru:payment_confirmation:subject":   "Оплата подтверждена — увидимся на старте",
+  "ru:payment_confirmation:heading":   "Оплата подтверждена.",
+  "ru:payment_confirmation:welcome":   "Запись завершена.",
+  "ru:payment_confirmation:body":      "Ваше место зарезервировано. Доступ к материалам откроется к старту когорты. Откройте кабинет, чтобы увидеть расписание и что вас ждёт.",
+  "ru:payment_confirmation:button":    "Открыть кабинет",
+  "ru:payment_confirmation:link_hint": "Или скопируйте эту ссылку в браузер:",
+  "ru:payment_confirmation:expires":   "Сохраните это письмо — это ваш чек.",
+  "ru:payment_confirmation:ignore":    "Вопросы по расписанию или материалам? Ответьте на это письмо или напишите на hello@moiraionline.pro.",
 
   // === COMMON ===
   "en:common:footer":  "Moirai — Online Filmmaking Program",
