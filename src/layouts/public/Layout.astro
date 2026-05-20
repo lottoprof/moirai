@@ -13,6 +13,7 @@ import "../../styles/fonts.css";
 import "../../styles/base.css";
 import "../../styles/utilities.css";
 import SeoHead from "../../components/public/SeoHead.astro";
+import AnnouncementBar from "../../components/public/AnnouncementBar.astro";
 import Nav from "../../components/public/Nav.astro";
 import Footer from "../../components/public/Footer.astro";
 
@@ -30,6 +31,14 @@ interface Props {
 
 const { locale, seo } = Astro.props;
 const pathname = Astro.url.pathname;
+
+/**
+ * AnnouncementBar показывается только на маркетинговых страницах.
+ * На auth-формах (login/register/password-reset/verify-email) + apply +
+ * inactive отвлекал бы пользователя от целевого действия.
+ */
+const hideAnnouncementBar =
+  /^\/(en|ru)\/(login|register|password-reset|verify-email|verify-email-pending|apply|inactive)\b/.test(pathname);
 ---
 
 <!doctype html>
@@ -50,6 +59,8 @@ const pathname = Astro.url.pathname;
 
   <body>
     <a href="#main" class="skip-link">Skip to main content</a>
+
+    {!hideAnnouncementBar && <AnnouncementBar locale={locale} />}
 
     <Nav locale={locale} pathname={pathname} />
 
