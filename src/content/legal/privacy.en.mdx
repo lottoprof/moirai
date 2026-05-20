@@ -21,18 +21,47 @@ website moiraionline.pro and provides online filmmaking courses.
 **Data controller:** Moirai Online Filmmaking Program.
 **Contact:** hello@moiraionline.pro.
 
-## 2. What data we collect
+## 2. What data we process about you
 
-When you create an account, apply to a cohort, or contact us, we collect:
+### 2.1 Data you provide directly
 
-- **Identity data**: name, email address
-- **Authentication data**: hashed password, OAuth tokens (Google/Discord)
-- **Account data**: language preference, enrolled programmes, homework submissions, instructor feedback
-- **Technical data**: IP address (hashed), user-agent, session identifiers
-- **Communications**: email correspondence with the team
+- **At registration**: email address, password (we store a one-way hash, never the plaintext), display name, language preference (en/ru)
+- **At OAuth sign-in (Google/Discord)**: your provider account email and provider user ID — we use these to identify you on return; we do **not** keep your Google or Discord access/refresh tokens after the initial verification
+- **In profile / account settings**: any name update, language change, password change
+- **At enrollment**: programme purchased; we do **not** process or store your payment card — that is handled entirely by our payment processor (Stripe)
+- **In homework submissions**: text, attached files (scripts, videos, images you upload)
+- **In communications**: email correspondence with the team
 
-We do not collect special category data (race, religion, health, etc.) and
-we do not buy data from third parties.
+### 2.2 Data generated through your use of the service
+
+- **Authentication sessions**: a random session identifier (in a HttpOnly cookie on your device), the SHA-256 hash of the refresh secret (in our database), expiry timestamp, your user-agent string, and a **hashed** IP address (we never store your plaintext IP)
+- **Account roles**: which roles you have (student, instructor, admin) and when each was granted
+- **Course progress** (when programmes start): module completion, homework submissions, instructor feedback, last-seen timestamps
+- **Audit log**: security-relevant events (login success/fail, password reset, role grant, etc.) with timestamp, hashed IP, user-agent — kept for fraud and abuse investigation
+
+### 2.3 Short-lived technical data
+
+Stored only for the duration of a flow (10 minutes to 1 hour) in our key-value store:
+
+- OAuth PKCE state and verifier (during OAuth flow)
+- Email-verification and password-reset tokens
+- Rate-limit counters (per IP / per email, for anti-abuse)
+
+### 2.4 Categories we do **not** collect or store
+
+- ❌ Plaintext passwords — we store only a PBKDF2-SHA256 hash with a unique random salt
+- ❌ Plaintext IP addresses — we store only a SHA-256 hash (using a server-side salt)
+- ❌ Payment card data — Stripe handles this end-to-end; we receive only a transaction reference
+- ❌ Google or Discord OAuth tokens — used once during sign-in and discarded
+- ❌ Analytics tracking — no Google Analytics, no Mixpanel, no marketing pixels
+- ❌ Retargeting / third-party advertising cookies
+- ❌ Special-category data (race, religion, health, political opinions, sexual orientation, biometric/genetic data)
+- ❌ Personal data of minors under 16 (see §9)
+
+### 2.5 Data we do not buy or receive from third parties
+
+We do not buy data from data brokers, ad networks, or marketing lists.
+All data about you originates from your direct interaction with our service.
 
 ## 3. Legal basis (GDPR Art. 6)
 
