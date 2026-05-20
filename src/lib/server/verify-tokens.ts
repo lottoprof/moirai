@@ -13,7 +13,7 @@ import type { Locale } from "../../../db/types";
 
 const KEY_PREFIX = "vt:";
 
-export type VerifyTokenKind = "email_verify" | "password_reset";
+export type VerifyTokenKind = "email_verify" | "password_reset" | "magic_link";
 
 export interface VerifyTokenPayload {
   kind: VerifyTokenKind;
@@ -33,6 +33,7 @@ const TOKEN_BYTES = 32;
 
 export const TTL_VERIFY_EMAIL = 30 * 60;   // 30 мин
 export const TTL_PASSWORD_RESET = 15 * 60; // 15 мин
+export const TTL_MAGIC_LINK = 30 * 60;     // 30 мин (FLOW-19)
 
 function bytesToBase64Url(bytes: Uint8Array): string {
   let s = "";

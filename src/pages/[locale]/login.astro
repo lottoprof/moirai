@@ -40,6 +40,10 @@ const t = locale === "ru"
       forgotLink: "Сбросить",
       rememberMe: "Запомнить меня на 7 дней",
       rememberHint: "Без галочки сессия истечёт через 1 день. С галочкой — 7 дней.",
+      magicLinkLabel: "Прислать ссылку для входа на email",
+      magicLinkHint: "Не помните пароль или не задавали его? Введите email — пришлём свежую ссылку.",
+      magicLinkSent: "Если email зарегистрирован, ссылка для входа отправлена. Проверьте почту (включая Спам).",
+      magicLinkEmailRequired: "Введите email, чтобы получить ссылку.",
       or: "или",
       google: "Войти через Google",
       discord: "Войти через Discord",
@@ -57,6 +61,7 @@ const t = locale === "ru"
         oauth_cancelled: "Вход через социальную сеть отменён.",
         oauth_state_invalid: "Сессия входа истекла или повторно использована. Попробуйте ещё раз.",
         oauth_email_unverified: "Провайдер не подтвердил email. Войдите через другой метод или верифицируйте email у провайдера.",
+        magic_link_invalid: "Ссылка для входа недействительна или истекла. Запросите новую.",
       } as Record<string, string>,
     }
   : {
@@ -72,6 +77,10 @@ const t = locale === "ru"
       forgotLink: "Reset it",
       rememberMe: "Remember me for 7 days",
       rememberHint: "Without this, the session expires after 1 day. With it — 7 days.",
+      magicLinkLabel: "Email me a sign-in link",
+      magicLinkHint: "Don't remember your password or never set one? Type your email — we'll send a fresh link.",
+      magicLinkSent: "If the email is registered, a sign-in link has been sent. Check your inbox (and spam).",
+      magicLinkEmailRequired: "Type your email to receive a link.",
       or: "or",
       google: "Continue with Google",
       discord: "Continue with Discord",
@@ -89,10 +98,12 @@ const t = locale === "ru"
         oauth_cancelled: "Social sign-in cancelled.",
         oauth_state_invalid: "Sign-in session expired or replayed. Try again.",
         oauth_email_unverified: "Provider didn't verify email. Use another method or verify email with the provider.",
+        magic_link_invalid: "Sign-in link is invalid or expired. Request a new one.",
       } as Record<string, string>,
     };
 
 const errorMessage = error && t.errors[error] ? t.errors[error] : null;
+const magicSent = Astro.url.searchParams.get("sent") === "magic";
 ---
 
 <Layout
@@ -111,6 +122,9 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
 
       {errorMessage && (
         <div class="form__error" role="alert">{errorMessage}</div>
+      )}
+      {magicSent && (
+        <div class="form__notice" role="status">{t.magicLinkSent}</div>
       )}
 
       <div class="form__field">
@@ -155,6 +169,11 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
         {t.forgot} <a href={`/${locale}/password-reset`}>{t.forgotLink}</a>.
         {" "}<br />{t.hint}
       </p>
+
+      <div class="form__divider">{t.or}</div>
+
+      <button type="button" id="magic-link-btn" class="form__alt-action">{t.magicLinkLabel}</button>
+      <p class="form__hint form__hint--small">{t.magicLinkHint}</p>
 
       <div class="form__divider">{t.or}</div>
 
@@ -218,6 +237,53 @@ const errorMessage = error && t.errors[error] ? t.errors[error] : null;
       } catch {
         // ignore
       }
+      window.location.search = `?error=${encodeURIComponent(errCode)}`;
+    });
+  }
+
+  // Magic-link request handler (FLOW-19)
+  const magicBtn = document.getElementById("magic-link-btn") as HTMLButtonElement | null;
+  if (magicBtn && form) {
+    magicBtn.addEventListener("click", async () => {
+      const fd = new FormData(form);
+      const email = fd.get("email") as string | null;
+      const turnstileToken = fd.get("cf-turnstile-response");
+      const returnTo = fd.get("return_to") as string | null;
+
+      if (!email || email.length < 3) {
+        window.location.search = "?error=magic_link_email_required";
+        // fallback if error key not in dict — keep generic; for now reuse turnstile_failed style
+        return;
+      }
+      if (!turnstileToken) {
+        window.location.search = "?error=turnstile_failed";
+        return;
+      }
+
+      magicBtn.disabled = true;
+      const res = await fetch("/api/auth/magic-link/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          turnstileToken,
+          return_to: returnTo || undefined,
+        }),
+        credentials: "same-origin",
+      });
+
+      // Server возвращает 200 даже для unknown email (no-leak).
+      // Показываем generic "if registered, link sent" notice.
+      if (res.ok) {
+        window.location.search = "?sent=magic";
+        return;
+      }
+      let errCode = "rate_limited";
+      try {
+        const body = (await res.json()) as { error?: string };
+        if (body.error) errCode = body.error;
+      } catch { /* ignore */ }
+      magicBtn.disabled = false;
       window.location.search = `?error=${encodeURIComponent(errCode)}`;
     });
   }

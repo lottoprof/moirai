@@ -18,7 +18,7 @@
 
 import type { Locale } from "../../../db/types";
 
-export type EmailKind = "verify" | "password_reset" | "apply_welcome" | "payment_confirmation";
+export type EmailKind = "verify" | "password_reset" | "apply_welcome" | "payment_confirmation" | "magic_link";
 
 const messages: Record<string, string | undefined> = {
   // === VERIFY (новая регистрация) ===
@@ -96,6 +96,25 @@ const messages: Record<string, string | undefined> = {
   "ru:payment_confirmation:link_hint": "Или скопируйте эту ссылку в браузер:",
   "ru:payment_confirmation:expires":   "Сохраните это письмо — это ваш чек.",
   "ru:payment_confirmation:ignore":    "Вопросы по расписанию или материалам? Ответьте на это письмо или напишите на hello@moiraionline.pro.",
+
+  // === MAGIC LINK (sign-in без пароля, FLOW-19 / Stage 14o) ===
+  "en:magic_link:subject":   "Your sign-in link — Moirai",
+  "en:magic_link:heading":   "Sign in to Moirai.",
+  "en:magic_link:welcome":   "",
+  "en:magic_link:body":      "Tap the button below to sign in. You don't need a password.",
+  "en:magic_link:button":    "Sign in",
+  "en:magic_link:link_hint": "Or copy this link to your browser:",
+  "en:magic_link:expires":   "This link is valid for 30 minutes and works once.",
+  "en:magic_link:ignore":    "If you didn't ask for a sign-in link, ignore this email. No action is needed — the link can't sign you out of an active session.",
+
+  "ru:magic_link:subject":   "Ссылка для входа — Moirai",
+  "ru:magic_link:heading":   "Войти в Moirai.",
+  "ru:magic_link:welcome":   "",
+  "ru:magic_link:body":      "Нажмите кнопку ниже, чтобы войти. Пароль не нужен.",
+  "ru:magic_link:button":    "Войти",
+  "ru:magic_link:link_hint": "Или скопируйте эту ссылку в браузер:",
+  "ru:magic_link:expires":   "Ссылка действительна 30 минут и работает один раз.",
+  "ru:magic_link:ignore":    "Если вы не запрашивали ссылку — проигнорируйте это письмо. Действий не требуется — ссылка не выкидывает из активной сессии.",
 
   // === COMMON ===
   "en:common:footer":  "Moirai — Online Filmmaking Program",
