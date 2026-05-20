@@ -56,13 +56,15 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 дальнейший шаг (когорта + старт + контекст для контакта).
 
 - [x] B1. Гранулярность: "день+время" или фиксированная пара дней? → **фиксированная пара дней** (FLOW-4: 2 раза в неделю)
-- [x] B2. Утро/вечер — конкретные часы или диапазон? → **2 раза в сутки утро/вечер** (FLOW-4), конкретные часы _уточнить_
-- [ ] B3. Часовой пояс — фиксированный ET или конвертация под клиента?
-- [ ] B4. UI: матрица 7×2 или предустановленный shortlist?
-- [x] B5. Можно выбрать несколько слотов (preference order) или один? → **один** _предложение (1 slot = 1 cohort), требует подтверждения_
-- [ ] B6. Откуда ограничиваются: availability инструктора или фикс пресет?
-- [ ] B7. Что показываем по местам: "7/10 мест" / просто "available" / без счётчика?
-- [ ] B8. Если все слоты заняты — waitlist / "next cohort" / disabled?
+- [x] B2. Утро/вечер — конкретные часы или диапазон? → **2 раза в сутки утро/вечер** (FLOW-4), конкретные часы _уточнить (предложение: 09:00 ET morning, 19:00 ET evening)_
+- [ ] B3. Часовой пояс — фиксированный ET или конвертация под клиента? _предложение: фикс ET для cohort schedule (инструкторы из NY), клиент видит и свою TZ tooltip'ом_
+- [x] B4. UI: матрица 7×2 или предустановленный shortlist? → **list view сгруппированный по programme** (FLOW-12)
+- [x] B5. Можно выбрать несколько слотов (preference order) или один? → **один** (1 slot = 1 cohort заявка)
+- [x] B6. Откуда ограничиваются slots? → **админ-конфиг** (FLOW-10): admin задаёт slots × programmes × instructors, скрипт auto-публикует cohorts на 12 мес (FLOW-7)
+- [x] B7. Что показываем по местам? → **гибрид** (FLOW-13): > 5 spots → "available"; ≤ 5 → "N left"; ≤ 2 → "1:1 at group price"
+- [x] B8. Если все слоты заняты? → **N/A**: grid auto-публикует следующую cohort (FLOW-7, без waitlist'a)
+- [x] B9. Фильтры? → programme / day_pair / time_of_day / period, обязательны сразу (FLOW-14)
+- [x] B10. Где хранится cohort? → **D1** таблица (FLOW-15)
 
 ### C. Apply form — поля (после выбора слота)
 
@@ -155,13 +157,17 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 | FLOW-9a | Refund policy 3 окна: до T-14: 100%; T-14 до T-7: 50%; T-7 до T: только credit/transfer; после T: no refund | lottoprof 2026-05-20 |
 | FLOW-10 | Конфигурация slots / cohorts / instructor availability / start_dates — через admin LK (Sprint 2). До этого — правка через коллекцию + redeploy | lottoprof 2026-05-20 |
 | FLOW-11 | Минимальная группа = 1 (cohort всегда run'ится). При 1-2 студентах **переквалифицируется в Individual** — маркетинговый ход "вы получили индивидуальную программу со скидкой". Инструктор может вручную merge близкие cohorts (договорившись со студентами) | lottoprof 2026-05-20 |
+| FLOW-12 | Slot UI: list view, сгруппированный по programme. Календарь-сетка отвергнута (overkill для ~4 программ × ~6 cohorts) | lottoprof 2026-05-20 |
+| FLOW-13 | Spot count — **гибрид**: > 5 → "available"; ≤ 5 → "N spots left" (urgency); ≤ 2 → "1:1 at group price · individual bonus" (FLOW-11 reframe) | lottoprof 2026-05-20 |
+| FLOW-14 | Фильтры обязательны сразу: programme · day_pair · time_of_day · period (next 30d / 3mo / year). Default: all / all / all / next 3mo | lottoprof 2026-05-20 |
+| FLOW-15 | Cohorts хранятся в **D1** (не Content Collection). Static — programmes; dynamic — cohorts (apply_count, even-by-event обновления через админ-API) | lottoprof 2026-05-20 |
 
 ## Статус по блокам
 
 | Блок | Закрыто | Открыто | Готовность |
 |---|---|---|---|
 | A. Точка входа | A1, A2, A3* | A4 | 3/4 |
-| B. Слоты | B1, B2, B5* | B3, B4, B6, B7, B8 | 3/8 |
+| B. Слоты | B1, B2, B4, B5, B6, B7, B8, B9, B10 | B3 | 9/10 |
 | C. Apply form | C1*, C3* | C2, C4 | 2/4 |
 | D. Группа | D1, D2, D3, D5, D6 | D4 | 5/6 |
 | E. Оплата | E1, E3*, E4, E5, E6 | E2 | 5/6 |
