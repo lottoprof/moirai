@@ -1,0 +1,123 @@
+---
+/*
+ * <StatsBanner /> — конкретика-полоса под Hero (или другой секцией).
+ * Заменяет декоративный <Ticker /> на главной (Stage 24).
+ *
+ * Items: массив из 4 (рекомендовано) value/label пар. Value крупное,
+ * амбер для accent items, label маленьким каптальцем. Без анимации —
+ * статичная информационная лента.
+ *
+ * Mobile (< 640px): grid 2×2; desktop — flex row equal-width 4×1.
+ *
+ * Источник: stage24 plan (замена ticker'a на конкретику типа
+ * "10 students max · 2 sessions/week · personal review · finished short").
+ */
+
+interface StatItem {
+  /** Главное значение — "10", "2", "1:1" и т.п. */
+  value: string;
+  /** Подпись — "students max", "sessions/week" */
+  label: string;
+  /** Если true → value подсвечивается амбером (акцент на конкретике). */
+  accent?: boolean;
+}
+
+interface Props {
+  items: StatItem[];
+}
+
+const { items } = Astro.props;
+---
+
+<section class="stats-banner" aria-label="Key facts">
+  <ul class="stats-banner__list" role="list">
+    {items.map((stat: StatItem) => (
+      <li class="stats-banner__item">
+        <span class:list={["stats-banner__value", { "stats-banner__value--accent": stat.accent }]}>
+          {stat.value}
+        </span>
+        <span class="stats-banner__label">{stat.label}</span>
+      </li>
+    ))}
+  </ul>
+</section>
+
+<style>
+  .stats-banner {
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    padding: var(--space-xl) var(--container-pad);
+  }
+
+  .stats-banner__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-width: var(--container-max);
+    margin-inline: auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-lg);
+    align-items: center;
+  }
+
+  .stats-banner__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--space-2xs);
+    padding: 0 var(--space-md);
+    position: relative;
+  }
+
+  /* Тонкие разделители между ячейками на desktop */
+  .stats-banner__item + .stats-banner__item::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 20%;
+    bottom: 20%;
+    width: 1px;
+    background: var(--border);
+  }
+
+  .stats-banner__value {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 300;
+    line-height: 1;
+    color: var(--text);
+    letter-spacing: var(--tracking-tight);
+  }
+  .stats-banner__value--accent {
+    color: var(--text-accent);
+  }
+
+  .stats-banner__label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  @media (max-width: 640px) {
+    .stats-banner {
+      padding: var(--space-lg) var(--space-md);
+    }
+    .stats-banner__list {
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-lg);
+    }
+    /* На mobile разделители только между колонками одной строки */
+    .stats-banner__item + .stats-banner__item::before {
+      display: none;
+    }
+    .stats-banner__value {
+      font-size: 28px;
+    }
+  }
+</style>
