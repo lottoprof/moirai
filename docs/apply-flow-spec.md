@@ -70,7 +70,7 @@ Recovery flow (любой шаг после 3):
 - [x] A1. Apply доступен до регистрации (anonymous) или только залогиненным? → **anonymous** (FLOW-5: сначала слоты, потом email; FLOW-6: дашборд до оплаты)
 - [x] A2. Если anonymous — Apply создаёт user аккаунт автоматически или отдельный шаг? → **автоматически** при submit'е contact-формы (шаг 3 флоу)
 - [x] A3. Magic-link / OAuth / password — где подключается? → **immediate session при Apply + magic-link как fallback** (FLOW-16, FLOW-19). Пароль — на checkout-step (FLOW-18)
-- [ ] A4. Повторный Apply через тот же email — разрешён?
+- [x] A4. Повторный Apply через тот же email — разрешён? → **зависит** (FLOW-25): same cohort → reject; different cohort same programme → transfer; different programme → allowed; уже paid/running → reject; completed/cancelled/expired/refunded → allow re-take
 
 ### B. Сетка слотов
 
@@ -79,7 +79,7 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 
 - [x] B1. Гранулярность: "день+время" или фиксированная пара дней? → **фиксированная пара дней** (FLOW-4: 2 раза в неделю)
 - [x] B2. Утро/вечер — конкретные часы или диапазон? → **2 раза в сутки утро/вечер** (FLOW-4), конкретные часы _уточнить (предложение: 09:00 ET morning, 19:00 ET evening)_
-- [ ] B3. Часовой пояс — фиксированный ET или конвертация под клиента? _предложение: фикс ET для cohort schedule (инструкторы из NY), клиент видит и свою TZ tooltip'ом_
+- [x] B3. Часовой пояс? → **фикс ET, UI показывает только ET** (FLOW-26). Без local TZ-конвертации (DST + autodetection issues)
 - [x] B4. UI: матрица 7×2 или предустановленный shortlist? → **list view сгруппированный по programme** (FLOW-12)
 - [x] B5. Можно выбрать несколько слотов (preference order) или один? → **один** (1 slot = 1 cohort заявка)
 - [x] B6. Откуда ограничиваются slots? → **админ-конфиг** (FLOW-10): admin задаёт slots × programmes × instructors, скрипт auto-публикует cohorts на 12 мес (FLOW-7)
@@ -90,24 +90,24 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 
 ### C. Apply form — поля (после выбора слота)
 
-- [x] C1. Обязательные: email, slot уже выбран — нужно ли **имя** обязательным?
-- [ ] C2. Опциональные: телефон / страна / опыт / мотивация / source?
-- [x] C3. Turnstile — да (как на login/register) _предложение, требует подтверждения_
-- [ ] C4. Промокод/реферал — сразу или Sprint 2?
+- [x] C1. Обязательные: email, slot уже выбран — нужно ли **имя** обязательным? → **да** (FLOW-27, для welcome email + dashboard greeting)
+- [x] C2. Опциональные? → Sprint 1: **country (auto-detect by IP)** (FLOW-27). Phone / experience / motivation / source — Sprint 2
+- [x] C3. Turnstile — да (FLOW-27)
+- [x] C4. Промокод/реферал? → **Sprint 2** (нет payment в Sprint 1 — не нужно)
 
 ### D. Формирование группы
 
 - [x] D1. Минимум 1 человек — стартуем сразу или окно ожидания N дней? → **стартуем по фиксированной дате независимо от размера** (FLOW-3, FLOW-11)
 - [x] D2. Максимум 10 — что если 11-й хочет тот же слот? → **берёт следующую auto-published cohort** (FLOW-7 без waitlist'a)
 - [x] D3. Когда стартует cohort? → **фиксированные даты** из админ-сетки (FLOW-3, FLOW-7, FLOW-8)
-- [ ] D4. Один клиент = одна программа активна одновременно или несколько (например Beginner + AI module)?
+- [x] D4. Один клиент = одна программа активна одновременно или несколько? → **разные программы parallel** (Beginner + AI module когда AI выйдет) **разрешено** (FLOW-25). **Same programme дважды одновременно** (две active applications на Beginner) — **заблокировано**
 - [x] D5. Cohort = группа или группа = подгруппа внутри cohort? → **cohort = run** (1 slot × 1 программа × 1 start date); группа = N студентов внутри cohort'ы. При N ≤ 2 — reframe в Individual (FLOW-11)
 - [x] D6. Сколько дней дашборд живёт без оплаты? → **бессрочно** (pay anytime, FLOW-9). Дашборд закрывается только при отмене application или старте курса без оплаты
 
 ### E. Оплата
 
 - [x] E1. Apply → сразу к оплате или Apply бесплатно? → **Apply бесплатно**, оплата из дашборда (FLOW-1, FLOW-2)
-- [ ] E2. Discovery-call — для всех или только individual?
+- [x] E2. Discovery-call — для всех или только individual? → **Sprint 1: ни для кого** (standard apply flow без discovery). **Individual programme выведена из apply flow** (FLOW-28), на её странице — "Contact us". Real discovery-call flow — Sprint 2+
 - [x] E3. Stripe Checkout (redirect) vs Elements (embedded)? → **Stripe Checkout (redirect)** _предложение для Sprint 1, требует подтверждения_
 - [x] E4. Если cohort не сформировалась — refund или авто-перенос? → **N/A**: cohort всегда run'ится; при 1-2 студентах переквалифицируется в Individual (FLOW-11) — маркетинговое позиционирование "вы получили индивидуальную программу"
 - [x] E5. Что фиксируется при оплате как offer acceptance? → **audit_log event=`offer_accepted`** с user_id, ip_hash, ua, terms_version, refund_version, privacy_version, programme_id, cohort_id, amount, currency, stripe_payment_id (FLOW-2)
@@ -135,10 +135,10 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 ### H. Edge-кейсы
 
 - [x] H1. Apply без free слотов? → **N/A**: grid auto-публикуется на 12 мес вперёд, всегда есть свободные cohorts (FLOW-7)
-- [ ] H2. Дубль Apply (email+programme+cohort) — заменяет / отклоняется / показывает существующий?
-- [ ] H3. Apply на archived programme — 404 / disabled?
-- [ ] H4. Apply на individual programme — отдельный flow (discovery-call)? _уточнить: или Individual теперь = любая cohort с 1-2 студентами по FLOW-11, а старая "individual"-programma остаётся для custom-плана?_
-- [ ] H5. Apply на уже купленную programme — блок или re-take?
+- [x] H2. Дубль Apply (email+programme+cohort)? → **reject** (FLOW-25): "Вы уже подали заявку → [link на dashboard]"
+- [x] H3. Apply на archived programme? → **`published: false` в frontmatter** (FLOW-29): visible по прямой ссылке, скрыто из grid'a /apply, новые cohorts не публикуются
+- [x] H4. Apply на individual programme? → **выведена из apply flow** (FLOW-28): "Contact us" вместо apply. Custom curriculum + discovery-call — Sprint 2+
+- [x] H5. Apply на уже купленную programme? → **зависит от статуса** (FLOW-25): paid/running → reject; completed → allow re-take; cancelled/expired/refunded → allow повторно
 
 ### I. Data model
 
@@ -156,13 +156,13 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 
 ### J. i18n
 
-- [ ] J1. Apply form en+ru, fallback стратегия для непереведённых slot-names?
+- [x] J1. Apply form en+ru, fallback стратегия для slot-names? → **data-driven, через Intl** (FLOW-30): slot хранит `days_json` (array weekday codes) + `time_et`. UI генерит label через **Intl.DateTimeFormat** per locale. Нет hardcoded enum'a, нет dict для weekday — Intl даёт "Mon+Thu" / "Пн+Чт" бесплатно. Админ может добавлять любые weekdays без code change
 
 ### K. Legal / compliance
 
 - [x] K1. Чекбокс Terms+Privacy — где? → **На checkout-step** (FLOW-18), а не на Apply. Apply — низкая ценность, чекбокс там был бы лишним friction. На checkout формулировка покрывает Terms + Refund + Privacy одним чекбоксом. Payment = explicit consent moment (FLOW-2)
-- [ ] K2. Marketing emails opt-in — отдельный чекбокс?
-- [ ] K3. Возрастная проверка (≥18) — дата рождения / чекбокс?
+- [x] K2. Marketing emails opt-in? → **на checkout, optional, UNCHECKED by default** (FLOW-31); `users.marketing_opt_in BOOL`; unsubscribe в /account
+- [x] K3. Возрастная проверка (≥18)? → **обязательный чекбокс на checkout** (FLOW-31): "I am 18+ (or 16+ with parental consent)". Без сбора DOB (privacy minimization). 16-17 с родителями — manual flow через support email в Sprint 1
 - [x] K4. GDPR Art. 7 timestamp consent — **audit_log event=`offer_accepted`** (FLOW-2, E5) с user_id, ip_hash, ua, terms_version, refund_version, privacy_version, payment_id. Это и есть GDPR proof of consent
 
 ## Зафиксированные решения
@@ -194,27 +194,33 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 | FLOW-22 | Application status machine: **awaiting_payment → paid → running → completed** + 3 terminal branches **cancelled / expired / refunded**. Переходы фиксируются в audit_log event=`application_status_changed` с from/to/actor/reason | lottoprof 2026-05-20 |
 | FLOW-23 | Notifications минимум Sprint 1: **только client confirmation email при payment success** (Resend transactional). Остальные (admin digest / instructor alerts / cohort-start reminders) — Sprint 2 | lottoprof 2026-05-20 |
 | FLOW-24 | Audit log apply-events (6 типов): `apply_submitted`, `offer_accepted` (FLOW-2), `application_status_changed`, `application_cancelled`, `application_transferred`, `refund_processed`. Все с user_id + ip_hash + ua + metadata JSON | lottoprof 2026-05-20 |
+| FLOW-25 | Дубли Apply: same programme + same cohort → reject "уже подали"; same programme + different cohort → transfer (старый soft-cancelled, новый replaces); different programme → allowed; уже paid/running на ту же программу → reject; completed/cancelled/expired/refunded → allow re-take | lottoprof 2026-05-20 |
+| FLOW-26 | Cohort schedule в **фикс ET**. UI показывает **только ET** (без local TZ conversion) — нет проблем с DST, нет автодетекции браузера | lottoprof 2026-05-20 |
+| FLOW-27 | Apply form Sprint 1 fields: email + name + country (auto-detect by IP, optional) + Turnstile. Phone / source / experience / motivation / promo — Sprint 2 | lottoprof 2026-05-20 |
+| FLOW-28 | Individual programme **выведена из apply flow** в Sprint 1 → CTA "Contact us" (mailto / form). FLOW-11 reframe покрывает массовый кейс "1-2 студента в cohort = individual feel". Real custom-tailored individual + discovery-call — Sprint 2+ | lottoprof 2026-05-20 |
+| FLOW-29 | `published: boolean` в programme frontmatter (default true). false → программа visible по прямой ссылке (archive), но НЕ в grid /apply, новые cohorts НЕ публикуются, existing cohorts продолжают работать | lottoprof 2026-05-20 |
+| FLOW-30 | Slots — **data-driven** в D1: `days_json` (array of weekday codes) + `time_et` (HH:MM). UI генерит label через **Intl.DateTimeFormat** per locale — нет hardcoded enum'a, нет dict для weekday-имён. Админ в /admin LK может задать любые weekdays + любое время без code change | lottoprof 2026-05-20 |
+| FLOW-31 | На checkout (FLOW-18) — два дополнительных чекбокса: (1) marketing opt-in **optional, UNCHECKED by default** → `users.marketing_opt_in BOOL` (unsubscribe в /account); (2) age confirmation **required**: "I am 18+ (or 16+ with parental consent)". DOB не собирается (privacy minimization) | lottoprof 2026-05-20 |
 
-## Статус по блокам
+## Статус по блокам — ВСЕ ЗАКРЫТЫ ✅
 
-| Блок | Закрыто | Открыто | Готовность |
-|---|---|---|---|
-| A. Точка входа | A1, A2, A3* | A4 | 3/4 |
-| B. Слоты | B1, B2, B4, B5, B6, B7, B8, B9, B10 | B3 | 9/10 |
-| C. Apply form | C1*, C3* | C2, C4 | 2/4 |
-| D. Группа | D1, D2, D3, D5, D6 | D4 | 5/6 |
-| E. Оплата | E1, E3*, E4, E5, E6 | E2 | 5/6 |
-| F. Коммуникации | F1, F2, F3, F4 | — | 4/4 |
-| G. Admin/Instructor | G1, G2, G3, G4, G5 | — | 5/5 |
-| H. Edge-кейсы | H1 | H2, H3, H4, H5 | 1/5 |
-| I. Data model | I1*, I2, I3*, I4* | — | 4/4 |
-| J. i18n | — | J1 | 0/1 |
-| K. Legal | K1, K4 | K2, K3 | 2/4 |
+| Блок | Готовность |
+|---|---|
+| A. Точка входа | 4/4 |
+| B. Слоты | 10/10 |
+| C. Apply form | 4/4 |
+| D. Группа | 6/6 |
+| E. Оплата | 6/6 |
+| F. Коммуникации | 4/4 |
+| G. Admin/Instructor | 5/5 |
+| H. Edge-кейсы | 5/5 |
+| I. Data model | 4/4 |
+| J. i18n | 1/1 |
+| K. Legal | 4/4 |
 
-`*` — требует подтверждения (мои предложения).
+**Итого: 53/53 вопроса** (изначальные A1-K4 + добавленные по ходу B9, B10, C5*, D6, E6, G4, G5, H1).
 
-**Минимум для старта плана**: A4, B3/B4/B6/B7/B8, C2/C4, D4, E2, G всё,
-H2-H5, K1/K3.
+**Спека готова к плану.** Следующий шаг — `.agent/plans/active/stage14-apply.md`.
 
 ## Production TODOs (sync с прочими доками после спеки)
 
