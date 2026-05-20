@@ -21,7 +21,7 @@ import OrganizationSchema from "../../components/schema/OrganizationSchema.astro
 import FaqSchema from "../../components/schema/FaqSchema.astro";
 import CourseSchema from "../../components/schema/CourseSchema.astro";
 import Hero from "../../components/public/Hero.astro";
-import Ticker from "../../components/public/Ticker.astro";
+import StatsBanner from "../../components/public/StatsBanner.astro";
 import WhoCard from "../../components/public/WhoCard.astro";
 import ProgrammeCard from "../../components/public/ProgrammeCard.astro";
 import TierCard from "../../components/public/TierCard.astro";
@@ -74,9 +74,14 @@ interface CurriculumLevel {
   tracks: Track[];
   final: { title: string; body: string };
 }
+interface StatItem {
+  value: string;
+  label: string;
+  accent?: boolean;
+}
 interface HomeSections {
   hero: { eyebrow: string; title: string; lede: string; cta_text: string; cta_href: string };
-  ticker: { items: string[] };
+  stats: { items: StatItem[] };
   who: { eyebrow: string; title: string; audiences: CtaItem[] };
   curriculum: { eyebrow: string; title: string; intro: string; levels: CurriculumLevel[] };
   included: { eyebrow: string; title: string; items: CtaItem[] };
@@ -280,7 +285,7 @@ const ui = typedLocale === "ru"
     ctaHref={sections.hero.cta_href}
   />
 
-  <Ticker items={sections.ticker.items} />
+  <StatsBanner items={sections.stats.items} />
 
   <section class="section center" aria-labelledby="who-title">
     <header class="section__head">
@@ -373,15 +378,14 @@ const ui = typedLocale === "ru"
     </div>
   </section>
 
-  <section class="section section--alt center" aria-labelledby="ai-module-title">
-    <AiModule
-      badge={sections.ai_module.badge}
-      title={sections.ai_module.title}
-      body={sections.ai_module.body}
-      ctaText={sections.ai_module.cta_text}
-      ctaHref={sections.ai_module.cta_href}
-    />
-  </section>
+  {/* Slim banner — компонент сам по себе <section> (Stage 24h). */}
+  <AiModule
+    badge={sections.ai_module.badge}
+    title={sections.ai_module.title}
+    body={sections.ai_module.body}
+    ctaText={sections.ai_module.cta_text}
+    ctaHref={sections.ai_module.cta_href}
+  />
 
   {faqs.length > 0 && (
     <section class="section center">
