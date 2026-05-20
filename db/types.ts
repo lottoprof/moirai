@@ -36,6 +36,33 @@ export type ModuleStatus = "draft" | "published" | "archived";
 /** enrollment.status — runtime жизнь экземпляра programme'a у user'a. */
 export type EnrollmentStatus = "active" | "completed" | "cancelled" | "refunded";
 
+/** cohort.status — состояние конкретной запущенной cohort'ы (migration 0009).
+ *  - open       — приём applications, до start_date
+ *  - running    — start_date наступил, курс идёт
+ *  - completed  — end_date наступил, курс закончен
+ *  - cancelled  — admin отменил (instructor unavailable etc.)
+ */
+export type CohortStatus = "open" | "running" | "completed" | "cancelled";
+
+/** application.status — lifecycle state machine (FLOW-22 / migration 0009).
+ *
+ *  Normal path:
+ *    awaiting_payment → paid → running → completed
+ *
+ *  Terminal branches (любая стадия → terminal):
+ *    cancelled — клиент / admin отменил
+ *    expired   — cohort стартовала без оплаты
+ *    refunded  — оплачено, потом возвращено (FLOW-9a)
+ */
+export type ApplicationStatus =
+  | "awaiting_payment"
+  | "paid"
+  | "running"
+  | "completed"
+  | "cancelled"
+  | "expired"
+  | "refunded";
+
 /** События в audit_log.event — открытое множество, расширяется по
  *  мере добавления auth-flow'ов; CHECK constraint в SQL отсутствует
  *  специально, чтобы не блокировать новые события миграцией. */
@@ -59,7 +86,14 @@ export type AuditEvent =
   | "enrollment_granted"
   | "enrollment_status_changed"
   | "enrollment_module_added"
-  | "enrollment_module_removed";
+  | "enrollment_module_removed"
+  // Apply flow events (FLOW-24 / migration 0009)
+  | "apply_submitted"
+  | "offer_accepted"
+  | "application_status_changed"
+  | "application_cancelled"
+  | "application_transferred"
+  | "refund_processed";
 
 // ============================================================
 // Row types — soft mirror таблиц D1.
@@ -84,6 +118,9 @@ export interface UserRow {
   locale: Locale;
   referral_code: string;
   deactivated_at: number | null;
+  /** FLOW-31 (migration 0009): marketing email opt-in. 0 = default,
+   *  1 = клиент отметил чекбокс на checkout. Unsubscribe → toggle back. */
+  marketing_opt_in: number;
   created_at: number;
   updated_at: number;
 }
@@ -262,6 +299,109 @@ export interface EnrollmentModuleRow {
   order_idx: number;
   added_by: string;
   added_at: number;
+}
+
+// ============================================================
+// Apply flow rows (migration 0009 — Stage 14a)
+// ============================================================
+
+/**
+ * slots — admin-конфиг расписания (FLOW-30).
+ *
+ * `programme_id` ссылается на slug из Content Collection `programmes`
+ * (не FK — soft-validation в коде).
+ *
+ * `days_json` — JSON array weekday codes: `'["mon","thu"]'`. UI рендерит
+ * через Intl.DateTimeFormat per locale, без hardcoded enums.
+ *
+ * `time_et` — фикс ET формата `'HH:MM'` (FLOW-26).
+ *
+ * `instructor_id` — FK users(id) ON DELETE SET NULL. NULL = slot не
+ * назначен инструктору (admin переназначит).
+ *
+ * `active = 0` → slot скрыт из публичной grid'a, новые cohorts не
+ * публикуются. Existing cohorts продолжают работать.
+ */
+export interface SlotRow {
+  id: string;
+  programme_id: string;
+  days_json: string;             // '["mon","thu"]'
+  time_et: string;               // 'HH:MM'
+  instructor_id: string | null;
+  max_students: number;
+  active: number;                // 0 | 1
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * cohorts — auto-published runs из slots (FLOW-7, migration 0009).
+ *
+ * Создаются скриптом `scripts/publish-cohorts.mjs` на горизонт 12 мес.
+ *
+ * `start_date` — unix sec UTC midnight. Отображается на UI через
+ * Intl.DateTimeFormat с `timeZone='America/New_York'` (FLOW-26).
+ *
+ * `end_date` — denormalized snapshot при INSERT, вычисляется как
+ * `start_date + ROUND(programme.lessons_total / 2)` недель (FLOW-8).
+ *
+ * `apply_count` / `paid_count` — denormalized counters, maintained
+ * app-side в `applications.ts` helpers, НЕ триггерами.
+ */
+export interface CohortRow {
+  id: string;
+  programme_id: string;
+  slot_id: string;
+  start_date: number;            // unix sec
+  end_date: number;              // unix sec
+  status: CohortStatus;
+  apply_count: number;
+  paid_count: number;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * applications — заявки клиентов с lifecycle status machine (FLOW-22).
+ *
+ * Один user × programme — может иметь несколько applications во времени
+ * (re-take после completed/cancelled/expired/refunded — FLOW-25), но
+ * только **одну одновременно active** (enforced partial unique index
+ * в migration 0009).
+ *
+ * `enrollment_id` — NULL пока не paid. После webhook
+ * `checkout.session.completed` создаётся enrollment row + UPDATE.
+ *
+ * `terms_version` / `refund_version` / `privacy_version` — snapshot
+ * на момент checkout (FLOW-2), нужны для GDPR proof of consent.
+ *
+ * `stripe_session_id` / `stripe_payment_id` — для reconciliation со
+ * Stripe dashboard'ом, refund processing, audit trail.
+ *
+ * `country` — ISO 3166-1 alpha-2, optional (auto-detect IP на Apply).
+ *
+ * `marketing_opt_in` — копируется на users.marketing_opt_in при
+ * checkout success.
+ */
+export interface ApplicationRow {
+  id: string;
+  user_id: string;
+  programme_id: string;
+  cohort_id: string;
+  enrollment_id: string | null;
+  status: ApplicationStatus;
+  country: string | null;
+  marketing_opt_in: number;      // 0 | 1
+  age_confirmed: number;         // 0 | 1
+  terms_version: string | null;
+  refund_version: string | null;
+  privacy_version: string | null;
+  stripe_session_id: string | null;
+  stripe_payment_id: string | null;
+  amount_cents: number | null;
+  currency: string | null;
+  created_at: number;
+  updated_at: number;
 }
 
 // ============================================================
