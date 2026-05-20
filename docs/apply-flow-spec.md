@@ -73,20 +73,25 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 
 ### D. Формирование группы
 
-- [x] D1. Минимум 1 человек — стартуем сразу или окно ожидания N дней? → **стартуем по фиксированной дате независимо от размера** (FLOW-3)
-- [ ] D2. Максимум 10 — что если 11-й хочет тот же слот (waitlist / next cohort)?
-- [x] D3. Когда стартует cohort? → **фиксированные даты** (FLOW-3 + countdown в дашборде, нужны конкретные даты в админке)
-- [ ] D4. Один клиент = одна группа или несколько одновременно?
-- [ ] D5. Cohort = группа или группа = подгруппа внутри cohort?
-- [ ] D6. Сколько дней дашборд живёт без оплаты (auto-expire application за N дней до старта)?
+- [x] D1. Минимум 1 человек — стартуем сразу или окно ожидания N дней? → **стартуем по фиксированной дате независимо от размера** (FLOW-3, FLOW-11)
+- [x] D2. Максимум 10 — что если 11-й хочет тот же слот? → **берёт следующую auto-published cohort** (FLOW-7 без waitlist'a)
+- [x] D3. Когда стартует cohort? → **фиксированные даты** из админ-сетки (FLOW-3, FLOW-7, FLOW-8)
+- [ ] D4. Один клиент = одна программа активна одновременно или несколько (например Beginner + AI module)?
+- [x] D5. Cohort = группа или группа = подгруппа внутри cohort? → **cohort = run** (1 slot × 1 программа × 1 start date); группа = N студентов внутри cohort'ы. При N ≤ 2 — reframe в Individual (FLOW-11)
+- [x] D6. Сколько дней дашборд живёт без оплаты? → **бессрочно** (pay anytime, FLOW-9). Дашборд закрывается только при отмене application или старте курса без оплаты
 
 ### E. Оплата
 
 - [x] E1. Apply → сразу к оплате или Apply бесплатно? → **Apply бесплатно**, оплата из дашборда (FLOW-1, FLOW-2)
 - [ ] E2. Discovery-call — для всех или только individual?
 - [x] E3. Stripe Checkout (redirect) vs Elements (embedded)? → **Stripe Checkout (redirect)** _предложение для Sprint 1, требует подтверждения_
-- [ ] E4. Если cohort не сформировалась — refund или авто-перенос?
+- [x] E4. Если cohort не сформировалась — refund или авто-перенос? → **N/A**: cohort всегда run'ится; при 1-2 студентах переквалифицируется в Individual (FLOW-11) — маркетинговое позиционирование "вы получили индивидуальную программу"
 - [x] E5. Что фиксируется при оплате как offer acceptance? → **audit_log event=`offer_accepted`** с user_id, ip_hash, ua, terms_version, refund_version, privacy_version, programme_id, cohort_id, amount, currency, stripe_payment_id (FLOW-2)
+- [x] E6. Refund schedule — **3 окна** (FLOW-9a):
+  - От apply до T-14: **100% refund**
+  - T-14 → T-7: **50% refund**
+  - T-7 → T: **только credit/transfer на следующую cohort**, no cash refund
+  - После T (старт курса): **no refund** (digital content consumed per EU Directive 2011/83 Art. 16(m))
 
 ### F. Коммуникации после Apply
 
@@ -103,10 +108,10 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 
 ### H. Edge-кейсы
 
-- [ ] H1. Apply без free слотов — waitlist / next cohort?
-- [ ] H2. Дубль Apply (email+programme) — заменяет / отклоняется / показывает существующий?
+- [x] H1. Apply без free слотов? → **N/A**: grid auto-публикуется на 12 мес вперёд, всегда есть свободные cohorts (FLOW-7)
+- [ ] H2. Дубль Apply (email+programme+cohort) — заменяет / отклоняется / показывает существующий?
 - [ ] H3. Apply на archived programme — 404 / disabled?
-- [ ] H4. Apply на individual — отдельный flow (discovery-call)?
+- [ ] H4. Apply на individual programme — отдельный flow (discovery-call)? _уточнить: или Individual теперь = любая cohort с 1-2 студентами по FLOW-11, а старая "individual"-programma остаётся для custom-плана?_
 - [ ] H5. Apply на уже купленную programme — блок или re-take?
 
 ### I. Data model
@@ -144,24 +149,39 @@ UX-порядок: слот выбирается **первым** (FLOW-5), по
 | FLOW-4 | Слоты: 2 раза в сутки (утро/вечер) × 2 раза в неделю (фиксированные пары дней) | lottoprof 2026-05-20 |
 | FLOW-5 | Сначала клиент видит слоты → выбирает → потом email | lottoprof 2026-05-20 |
 | FLOW-6 | Apply имеет промежуточную ценность: дашборд с описанием + countdown пока не оплатил | lottoprof 2026-05-20 |
+| FLOW-7 | Без waitlist'a. Сетка cohorts auto-публикуется на горизонт 12 месяцев из админ-конфига (slots × programmes × instructors) | lottoprof 2026-05-20 |
+| FLOW-8 | Длительность курса рассчитывается: `lessons / sessions_per_week` → недель. Beginner ~6.5w, Intermediate ~8.5w, Bundle ~15w | lottoprof 2026-05-20 |
+| FLOW-9 | Payment window — **B (pay anytime)**. Дашборд имеет CTA "Pay now" сразу после Apply. Защита от late cancellations через 3 refund-окна (см. FLOW-9a) | lottoprof 2026-05-20 |
+| FLOW-9a | Refund policy 3 окна: до T-14: 100%; T-14 до T-7: 50%; T-7 до T: только credit/transfer; после T: no refund | lottoprof 2026-05-20 |
+| FLOW-10 | Конфигурация slots / cohorts / instructor availability / start_dates — через admin LK (Sprint 2). До этого — правка через коллекцию + redeploy | lottoprof 2026-05-20 |
+| FLOW-11 | Минимальная группа = 1 (cohort всегда run'ится). При 1-2 студентах **переквалифицируется в Individual** — маркетинговый ход "вы получили индивидуальную программу со скидкой". Инструктор может вручную merge близкие cohorts (договорившись со студентами) | lottoprof 2026-05-20 |
 
 ## Статус по блокам
 
 | Блок | Закрыто | Открыто | Готовность |
 |---|---|---|---|
-| A. Точка входа | A1, A2, A3*| A4 | 3/4 |
+| A. Точка входа | A1, A2, A3* | A4 | 3/4 |
 | B. Слоты | B1, B2, B5* | B3, B4, B6, B7, B8 | 3/8 |
 | C. Apply form | C1*, C3* | C2, C4 | 2/4 |
-| D. Группа | D1, D3 | D2, D4, D5, D6 | 2/6 |
-| E. Оплата | E1, E3*, E5 | E2, E4 | 3/5 |
+| D. Группа | D1, D2, D3, D5, D6 | D4 | 5/6 |
+| E. Оплата | E1, E3*, E4, E5, E6 | E2 | 5/6 |
 | F. Коммуникации | — | F1, F2, F3, F4 | 0/4 |
 | G. Admin/Instructor | — | G1, G2, G3 | 0/3 |
-| H. Edge-кейсы | — | H1, H2, H3, H4, H5 | 0/5 |
+| H. Edge-кейсы | H1 | H2, H3, H4, H5 | 1/5 |
 | I. Data model | I1*, I2, I3*, I4* | — | 4/4 |
 | J. i18n | — | J1 | 0/1 |
 | K. Legal | — | K1, K2, K3, K4 | 0/4 |
 
 `*` — требует подтверждения (мои предложения).
 
-**Минимум для старта плана**: A4 + B (большинство) + D (большинство) +
-E2/E4 + G1/G3. F/H/J/K можно решать инкрементально по ходу.
+**Минимум для старта плана**: A4, B3/B4/B6/B7/B8, C2/C4, D4, E2, G всё,
+H2-H5, K1/K3.
+
+## Production TODOs (sync с прочими доками после спеки)
+
+1. **`src/content/legal/refund.{en,ru}.mdx`** — переписать §3 (Refunds outside EU)
+   на 3-окна FLOW-9a. Текущий placeholder использует упрощённую модель.
+2. **Programme `individual.{en,ru}.mdx`** — переосмыслить позиционирование
+   с учётом FLOW-11 (потенциальный конфликт: cohort с 1 студентом ≈ individual)
+3. **`docs/methodist-modules-guide.md`** — добавить раздел про
+   `lessons` → `cohort.duration_weeks` расчёт.
