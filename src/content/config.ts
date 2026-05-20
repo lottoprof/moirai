@@ -191,6 +191,34 @@ const works = defineCollection({
 });
 
 /**
+ * announcements — top bar сообщения над публичной навигацией.
+ *
+ * Stage 24: типы (soon/new/promo/cohort/info) → визуальный вариант
+ * в <AnnouncementBar />. Lifecycle через starts_at / ends_at; активные
+ * фильтруются на SSR/SSG-стороне. priority — сортировка при множественных
+ * активных (ротация на клиенте каждые 7s).
+ *
+ * dismissible: true → крестик справа + cookie moirai_announce_dismissed
+ * с массивом slug'ов (TTL 7d). false → нельзя скрыть.
+ *
+ * Markdown body не используется; один `text` достаточно. cta — опционально.
+ */
+const announcements = defineCollection({
+  loader: localeAwareGlob("announcements"),
+  schema: z.object({
+    kind: z.enum(["soon", "new", "promo", "cohort", "info"]),
+    text: z.string().min(1).max(160),
+    cta_text: z.string().min(1).max(40).optional(),
+    cta_href: z.string().min(1).max(2048).optional(),
+    starts_at: z.coerce.date(),
+    ends_at: z.coerce.date(),
+    priority: z.number().int().min(0).max(10).default(5),
+    dismissible: z.boolean().default(true),
+    ...monolingualField,
+  }),
+});
+
+/**
  * legal — статичные юридические документы: privacy, terms, refund, cookies.
  * Каждый документ — отдельный MDX с frontmatter (title, version, last_updated)
  * и markdown body. Rendered через /[locale]/legal/[id].astro.
@@ -220,4 +248,5 @@ export const collections = {
   journal,
   works,
   legal,
+  announcements,
 };
