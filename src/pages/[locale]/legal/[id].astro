@@ -1,0 +1,205 @@
+---
+/*
+ * /{locale}/legal/{id} — render для коллекции legal.
+ * Поддерживаемые id: privacy, terms, refund, cookies.
+ *
+ * Body — markdown через <Content /> (Astro Content Collections).
+ * Frontmatter добавляет meta-шапку: версия, last_updated, draft-badge.
+ *
+ * SSG (prerender) — статика для CDN. URL стабилен между версиями
+ * (история — в git); audit trail по version-полю.
+ */
+
+import { getCollection, render, type CollectionEntry } from "astro:content";
+import Layout from "../../../layouts/public/Layout.astro";
+
+export const prerender = true;
+
+type LegalEntry = CollectionEntry<"legal">;
+
+export async function getStaticPaths() {
+  const docs = await getCollection("legal");
+  return docs.map((doc: LegalEntry) => {
+    const [id, locale] = doc.id.split(".");
+    return {
+      params: { locale, id },
+      props: { entry: doc },
+    };
+  });
+}
+
+interface Props {
+  entry: LegalEntry;
+}
+const { entry } = Astro.props as Props;
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  throw new Error(`Unexpected locale: ${String(locale)}`);
+}
+const typedLocale: "en" | "ru" = locale;
+
+const { Content } = await render(entry);
+
+const t = typedLocale === "ru"
+  ? {
+      eyebrow: "Юридические документы",
+      versionLabel: "Версия",
+      updatedLabel: "Обновлено",
+      draftBadge: "Черновик · до утверждения юристом",
+      dateLocale: "ru-RU",
+    }
+  : {
+      eyebrow: "Legal",
+      versionLabel: "Version",
+      updatedLabel: "Last updated",
+      draftBadge: "Draft · pending legal review",
+      dateLocale: "en-US",
+    };
+
+const lastUpdated = new Intl.DateTimeFormat(t.dateLocale, {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+}).format(entry.data.last_updated);
+---
+
+<Layout locale={typedLocale} seo={entry.data.seo}>
+  <article class="legal-page">
+    <header class="legal-page__head">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1 class="h1">{entry.data.title}</h1>
+      <p class="legal-page__meta">
+        {t.versionLabel}: <strong>{entry.data.version}</strong> · {t.updatedLabel}: <time datetime={entry.data.last_updated.toISOString()}>{lastUpdated}</time>
+      </p>
+      {entry.data.draft && (
+        <p class="legal-page__draft-badge" role="status">{t.draftBadge}</p>
+      )}
+    </header>
+
+    <div class="legal-page__body prose">
+      <Content />
+    </div>
+  </article>
+</Layout>
+
+<style>
+  .legal-page {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  .legal-page__head {
+    margin-bottom: var(--space-2xl);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: var(--space-xl);
+  }
+
+  .legal-page__head .eyebrow {
+    margin-bottom: var(--space-md);
+  }
+
+  .legal-page__head .h1 {
+    margin-bottom: var(--space-md);
+  }
+
+  .legal-page__meta {
+    font-size: var(--type-body-sm);
+    color: var(--text-faint);
+  }
+  .legal-page__meta strong {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .legal-page__draft-badge {
+    display: inline-block;
+    margin-top: var(--space-md);
+    padding: 6px 12px;
+    background: var(--amber-faint);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+    color: var(--text-accent);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    border-radius: 2px;
+  }
+
+  /* Prose стилизация — markdown body */
+  .legal-page__body {
+    color: var(--text-muted);
+    line-height: 1.7;
+    font-size: var(--type-body-md);
+  }
+  .legal-page__body :global(h2) {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text);
+    margin-top: var(--space-2xl);
+    margin-bottom: var(--space-md);
+  }
+  .legal-page__body :global(h3) {
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    font-weight: 500;
+    color: var(--text);
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-sm);
+    letter-spacing: var(--tracking-wide);
+  }
+  .legal-page__body :global(p) {
+    margin-bottom: var(--space-md);
+  }
+  .legal-page__body :global(ul),
+  .legal-page__body :global(ol) {
+    margin: var(--space-md) 0;
+    padding-left: 1.5em;
+  }
+  .legal-page__body :global(li) {
+    margin-bottom: var(--space-xs);
+  }
+  .legal-page__body :global(a) {
+    color: var(--amber);
+    border-bottom: 1px solid var(--amber-faint);
+  }
+  .legal-page__body :global(a:hover) {
+    color: var(--amber-light);
+    border-bottom-color: var(--amber-light);
+  }
+  .legal-page__body :global(blockquote) {
+    border-left: 3px solid var(--amber);
+    padding: var(--space-md) var(--space-lg);
+    margin: var(--space-lg) 0;
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-style: normal;
+  }
+  .legal-page__body :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-lg) 0;
+    font-size: var(--type-body-sm);
+  }
+  .legal-page__body :global(th),
+  .legal-page__body :global(td) {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .legal-page__body :global(th) {
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-weight: 500;
+  }
+  .legal-page__body :global(code) {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.9em;
+    background: var(--bg-elevated);
+    padding: 1px 6px;
+    border-radius: 2px;
+    color: var(--text);
+  }
+</style>

@@ -33,8 +33,20 @@ const links = locale === "ru"
     ];
 
 const labels = locale === "ru"
-  ? { aria: "Подвал", privacy: "Конфиденциальность", terms: "Условия" }
-  : { aria: "Footer", privacy: "Privacy", terms: "Terms" };
+  ? {
+      aria: "Подвал",
+      privacy: "Конфиденциальность",
+      terms: "Условия",
+      refund: "Возврат",
+      cookies: "Cookies",
+    }
+  : {
+      aria: "Footer",
+      privacy: "Privacy",
+      terms: "Terms",
+      refund: "Refund",
+      cookies: "Cookies",
+    };
 ---
 
 <footer class="footer">
@@ -48,7 +60,9 @@ const labels = locale === "ru"
     <div class="footer__copy">
       © 2026 Moirai ·{" "}
       <a href={`${base}/legal/privacy`}>{labels.privacy}</a> ·{" "}
-      <a href={`${base}/legal/terms`}>{labels.terms}</a>
+      <a href={`${base}/legal/terms`}>{labels.terms}</a> ·{" "}
+      <a href={`${base}/legal/refund`}>{labels.refund}</a> ·{" "}
+      <a href={`${base}/legal/cookies`}>{labels.cookies}</a>
     </div>
   </div>
 </footer>

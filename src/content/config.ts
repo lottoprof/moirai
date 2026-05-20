@@ -190,6 +190,28 @@ const works = defineCollection({
   }),
 });
 
+/**
+ * legal — статичные юридические документы: privacy, terms, refund, cookies.
+ * Каждый документ — отдельный MDX с frontmatter (title, version, last_updated)
+ * и markdown body. Rendered через /[locale]/legal/[id].astro.
+ *
+ * `kind` фиксирует тип документа (для индекса в footer / sitemap).
+ * `version` — увеличивается при substantive changes (audit trail).
+ * `last_updated` — дата последней правки текста, отображается в шапке.
+ */
+const legal = defineCollection({
+  loader: localeAwareGlob("legal"),
+  schema: z.object({
+    title: z.string().min(1),
+    kind: z.enum(["privacy", "terms", "refund", "cookies"]),
+    version: z.string().min(1),         // "0.1-draft", "1.0", "1.1" и т.д.
+    last_updated: z.coerce.date(),
+    draft: z.boolean().default(true),   // показывать DRAFT-баннер до утверждения юристом
+    seo: seoSchema,
+    ...monolingualField,
+  }),
+});
+
 export const collections = {
   programmes,
   instructors,
@@ -197,4 +219,5 @@ export const collections = {
   pages,
   journal,
   works,
+  legal,
 };
