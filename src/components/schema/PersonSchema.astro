@@ -1,0 +1,60 @@
+---
+/*
+ * <PersonSchema /> — JSON-LD Person для instructor card / detail page.
+ *
+ * Stage 6d. Связан с EducationalOrganization через `worksFor` —
+ * это даёт Google полную картину "учитель X работает в школе Y".
+ *
+ * @id стабилен: ${SITE.url}/${locale}/instructors/${id}#person
+ * (instructor detail pages — Sprint 2; пока id используется только в JSON-LD).
+ *
+ * Reference:
+ *   - schema.org/Person
+ *   - google.com/search-quality-guidelines (E-E-A-T для instructors)
+ */
+
+import { SITE } from "../../lib/site-config";
+
+interface Props {
+  /** stable slug — для @id (e.g. "vladimir-popov") */
+  slug: string;
+  locale: "en" | "ru";
+  name: string;
+  /** role/title — e.g. "Director · Editor · Educator" */
+  jobTitle: string;
+  /** short bio (single sentence-ish) */
+  description?: string;
+  /** photo URL (https://...). Опционально — R2 публичный URL когда подключим. */
+  image?: string;
+  /** массив URLs соцсетей */
+  sameAs?: string[];
+}
+const {
+  slug,
+  locale,
+  name,
+  jobTitle,
+  description,
+  image,
+  sameAs,
+} = Astro.props;
+
+const data = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "@id": `${SITE.url}/${locale}/instructors/${slug}#person`,
+  name,
+  jobTitle,
+  inLanguage: locale,
+  worksFor: {
+    "@type": "EducationalOrganization",
+    "@id": `${SITE.url}/#organization`,
+    name: SITE.name,
+  },
+  ...(description ? { description } : {}),
+  ...(image ? { image } : {}),
+  ...(sameAs && sameAs.length > 0 ? { sameAs } : {}),
+};
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(data)} is:inline></script>

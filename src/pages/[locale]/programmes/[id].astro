@@ -21,6 +21,7 @@ import { getEntry } from "astro:content";
 import Layout from "../../../layouts/public/Layout.astro";
 import Btn from "../../../components/public/Btn.astro";
 import ModuleTimelineItem from "../../../components/public/ModuleTimelineItem.astro";
+import CourseSchema from "../../../components/schema/CourseSchema.astro";
 
 export const prerender = false;
 
@@ -130,6 +131,23 @@ const isIndividual = programme.data.modules.length === 0;
 ---
 
 <Layout locale={typedLocale} seo={programme.data.seo}>
+  <Fragment slot="schema">
+    <CourseSchema
+      slug={id}
+      locale={typedLocale}
+      name={programme.data.title}
+      description={programme.data.summary}
+      educationalLevel={id === "beginner" ? "Beginner" : id === "intermediate" ? "Intermediate" : id === "bundle" ? "All levels" : undefined}
+      url={`/${typedLocale}/programmes/${id}`}
+      offer={programme.data.price_amount > 0
+        ? {
+            price: Math.round(programme.data.price_amount / 100),
+            priceCurrency: programme.data.price_currency,
+          }
+        : undefined}
+    />
+  </Fragment>
+
   <section class="programme-hero" aria-labelledby="prog-title">
     <p class="programme-hero__eyebrow">{programme.data.marketing.tagline}</p>
     <h1 id="prog-title" class="programme-hero__title">{programme.data.title}.</h1>

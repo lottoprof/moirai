@@ -12,6 +12,7 @@
     "preview": "astro preview",
     "lint": "eslint .",
     "typecheck": "astro check",
+    "check:translations": "node scripts/check-translation-pairs.mjs",
     "prepare": "wrangler types || true",
     "seed:modules": "node scripts/seed-modules.mjs",
     "seed:modules:local": "node scripts/seed-modules.mjs --local",

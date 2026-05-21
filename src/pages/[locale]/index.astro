@@ -20,6 +20,7 @@ import Layout from "../../layouts/public/Layout.astro";
 import OrganizationSchema from "../../components/schema/OrganizationSchema.astro";
 import FaqSchema from "../../components/schema/FaqSchema.astro";
 import CourseSchema from "../../components/schema/CourseSchema.astro";
+import PersonSchema from "../../components/schema/PersonSchema.astro";
 import Hero from "../../components/public/Hero.astro";
 import InstructorCard from "../../components/public/InstructorCard.astro";
 import StatsBanner from "../../components/public/StatsBanner.astro";
@@ -289,6 +290,19 @@ const ui = typedLocale === "ru"
                 priceCurrency: programme.data.price_currency,
               }
             : undefined}
+        />
+      );
+    })}
+    {instructorEntries.map((entry: InstructorEntry) => {
+      const slug = entry.id.replace(`.${typedLocale}`, "");
+      return (
+        <PersonSchema
+          slug={slug}
+          locale={typedLocale}
+          name={entry.data.name}
+          jobTitle={entry.data.role}
+          description={entry.data.bio_short}
+          sameAs={entry.data.social ? Object.values(entry.data.social) : undefined}
         />
       );
     })}
