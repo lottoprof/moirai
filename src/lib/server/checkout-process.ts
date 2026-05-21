@@ -97,6 +97,21 @@ export async function processCheckoutSuccess(
     )
     .run();
 
+  // 1b. INSERT enrollment_modules — копируем programme.modules как ordered list.
+  // added_by = system (используем user.id как marker; Sprint 2 — system-user
+  // через явный constant). Lazy progress: module_progress rows создаются
+  // при первом open страницы модуля (см. student-modules.ts).
+  const modules = programme.data.modules;
+  if (modules.length > 0) {
+    const stmts = modules.map((slug: string, idx: number) =>
+      env.DB.prepare(
+        `INSERT INTO enrollment_modules (enrollment_id, module_slug, order_idx, added_by, added_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      ).bind(enrollmentId, slug, idx, user.id, now),
+    );
+    await env.DB.batch(stmts);
+  }
+
   // 2. markAsPaid (atomic: UPDATE applications + cohort.paid_count++)
   await markAsPaid(env, application.id, input.paymentId, enrollmentId);
 
