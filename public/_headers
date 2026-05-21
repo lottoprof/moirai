@@ -1,5 +1,28 @@
-# Cloudflare Pages headers — статика
+# Cloudflare Pages headers — статика + security
 # Docs: https://developers.cloudflare.com/pages/configuration/headers/
+
+# ============================================================
+# Security headers — Stage 8 (применяются ко всем ответам)
+# ============================================================
+# HSTS — max-age 1 год + includeSubDomains. preload не включаем —
+# отдельная процедура hstspreload.org submission, требует 6+ месяцев
+# стабильного HSTS.
+#
+# X-Frame-Options DENY — anti-clickjacking. CSP frame-ancestors сделаем
+# отдельным stage когда будет полная картина внешних ресурсов.
+#
+# Permissions-Policy: запрещаем все sensor/device API кроме payment(self)
+# который потребуется для платёжного API в будущем.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(self), usb=()
+
+# ============================================================
+# Caching — статика
+# ============================================================
 
 # Шрифты — immutable, hash-stable, 1 год + immutable hint
 /fonts/*
