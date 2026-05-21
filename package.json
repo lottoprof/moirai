@@ -22,6 +22,9 @@
     "publish:cohorts": "node scripts/publish-cohorts.mjs",
     "publish:cohorts:local": "node scripts/publish-cohorts.mjs --local",
     "publish:cohorts:dry": "node scripts/publish-cohorts.mjs --dry-run",
+    "drafts:gen": "node scripts/generate-student-book-drafts.mjs",
+    "drafts:gen:force": "node scripts/generate-student-book-drafts.mjs --force",
+    "drafts:upload": "node scripts/upload-student-books.mjs",
     "deploy": "pnpm build && wrangler pages deploy ./dist --project-name moirai --branch main --commit-message \"$(git log -1 --pretty=%s)\"",
     "deploy:preview": "pnpm build && wrangler pages deploy ./dist --project-name moirai --commit-message \"$(git log -1 --pretty=%s)\""
   },

@@ -43,13 +43,15 @@ binding = "KV_CACHE"
 id      = "e25c15615afa4732a82fed14e9282636"
 
 # ============================================================
-# R2 — медиа (видео, og-картинки, инструктор-фото).
-# Добавится когда подключим image pipeline + первый R2-зависимый
-# контент (Sprint 1+).
+# R2 — содержимое модулей (student_book bodies, изображения, видео).
+# Stage 22: подключён `moirai-content` bucket — source of truth для
+# тел модулей. Метаданные в D1 (`modules.body_r2_key` хранит путь:
+# modules/{slug}.{locale}.md). Sprint 2: добавим bucket для media
+# (instructor photos, og-images) если понадобится отдельный namespace.
 # ============================================================
-# [[r2_buckets]]
-# binding     = "MEDIA"
-# bucket_name = "moirai-media"
+[[r2_buckets]]
+binding     = "MODULE_CONTENT"
+bucket_name = "moirai-content"
 
 # ============================================================
 # Public vars — версионируются в репо. Только публичные значения.
