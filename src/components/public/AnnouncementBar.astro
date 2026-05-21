@@ -243,20 +243,32 @@ const kindLabel: Record<AnnouncementEntry["data"]["kind"], string> = ru
     gap: var(--space-2xs);
     flex-shrink: 0;
   }
+  /* Pagination dot — visual 8×8, hit area 24×24 (WCAG 2.5.5 AA).
+     Background на button transparent; visual circle через ::before. */
   .announce-bar__dot {
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .announce-bar__dot::before {
+    content: "";
     width: 8px;
     height: 8px;
     border-radius: 50%;
     background: var(--border-strong);
-    border: none;
-    padding: 0;
-    cursor: pointer;
     transition: background var(--duration-fast) var(--ease-out);
   }
-  .announce-bar__dot:hover {
+  .announce-bar__dot:hover::before {
     background: var(--text-muted);
   }
-  .announce-bar__dot.is-active {
+  .announce-bar__dot.is-active::before {
     background: var(--amber);
   }
 
