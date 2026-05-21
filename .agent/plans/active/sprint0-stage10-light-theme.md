@@ -1,5 +1,12 @@
 # Sprint 0 Stage 10 — Light theme infrastructure (context-driven)
 
+> **STATUS 2026-05-21:** Не начат, deferred.
+> Триггер: после первой реальной правки body модуля методистом —
+> станет ясно сколько текста в типичном reading region. Module page
+> на dashboard сейчас рендерит markdown — первый кандидат для light theme
+> когда body станет длинным (1000+ слов).
+> Приоритет: низкий, UX-улучшение, не блокирует продажи.
+
 ## Context
 
 `docs/Design_system.md` §4 ("Light theme variant") описывает

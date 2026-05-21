@@ -1,5 +1,13 @@
 # Sprint 0 Stage 16 — Collection index pages (works / journal)
 
+> **STATUS 2026-05-21:** Не начат, deferred.
+> Блокирует контент: коллекции `works/` и `journal/` пустые. Студенческие
+> фильмы появятся после 1й завершившейся cohort'ы; журнал — после
+> запуска content-pipeline.
+> Footer-ссылки `/works` и `/journal` сейчас 404. Опция: удалить из
+> Footer до реализации (избежать live-404). Приоритет: низкий до
+> появления контента.
+
 ## Context
 
 Footer ссылается на `/{locale}/works` и `/{locale}/journal` —

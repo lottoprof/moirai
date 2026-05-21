@@ -1,5 +1,12 @@
 # Sprint 0 Stage 15 — Static placeholder pages (FAQ / Contact / Legal)
 
+> **STATUS 2026-05-21:** Частично закрыт.
+> - ✅ `/faq` — отдельный page, JSON-LD, обе локали (через follow-up)
+> - ✅ `/legal/{privacy,terms,refund,cookies}` — DRAFT bodies, 4 doc × 2 locale (stage14 prep)
+> - ❌ `/contact` — НЕ сделан, ждёт данных
+> Остаток scope: contact page (mailto + socials + optional form).
+> См. ROADMAP.md в этой папке для общего статуса.
+
 ## Context
 
 Footer на каждой публичной странице ссылается на 6 endpoints, все
