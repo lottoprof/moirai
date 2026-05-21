@@ -258,7 +258,9 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
       me = await fetchMe(token);
     }
     if (!me) {
-      // Может быть refresh cookie живой — попытка обновить access
+      // Может быть refresh cookie живой — попытка обновить access.
+      // refresh endpoint возвращает 200 { ok: false } на missing cookie
+      // (а не 401), чтобы не плодить console errors для анонимных visits.
       token = await tryRefresh();
       if (token) me = await fetchMe(token);
     }

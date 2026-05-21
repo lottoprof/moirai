@@ -111,7 +111,7 @@ const kindLabel: Record<AnnouncementEntry["data"]["kind"], string> = ru
     </ul>
 
     {active.length > 1 && (
-      <div class="announce-bar__dots" role="tablist" aria-label={labels.pagination}>
+      <div class="announce-bar__dots" role="group" aria-label={labels.pagination}>
         {active.map((entry, i) => (
           <button
             type="button"
