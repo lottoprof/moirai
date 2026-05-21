@@ -150,6 +150,12 @@ const t = ru
         provider_failed: "Не удалось создать платёжную сессию. Попробуйте ещё раз.",
         generic: "Что-то пошло не так. Попробуйте ещё раз.",
       } as Record<string, string>,
+      validation: {
+        "ck-password": "Введите пароль (минимум 10 символов).",
+        "ck-password-confirm": "Повторите пароль.",
+        "ck-terms": "Чтобы продолжить, примите Соглашение, Политику возврата и Политику конфиденциальности.",
+        "ck-age": "Необходимо подтвердить возраст: 18+ (или 16+ с согласием родителей).",
+      } as Record<string, string>,
       seo: {
         title: "Оплата — Moirai",
         description: "Завершите оформление и оплатите курс.",
@@ -195,6 +201,12 @@ const t = ru
         cohort_unavailable: "Cohort no longer available. Contact support.",
         provider_failed: "Couldn't create payment session. Please try again.",
         generic: "Something went wrong. Try again.",
+      } as Record<string, string>,
+      validation: {
+        "ck-password": "Please enter a password (min 10 characters).",
+        "ck-password-confirm": "Please confirm your password.",
+        "ck-terms": "You must accept the Terms, Refund Policy, and Privacy Policy to continue.",
+        "ck-age": "You must confirm you are 18+ (or 16+ with parental consent).",
       } as Record<string, string>,
       seo: {
         title: "Checkout — Moirai",
@@ -531,9 +543,10 @@ const totalLabel = formatPrice(totalCents, currency);
   }
 </style>
 
-<script>
+<script define:vars={{ validationMessages: t.validation }}>
   /*
    * Checkout form handler:
+   *   - Custom validation messages (per page locale, не браузерный)
    *   - Validation: password match + min length + consent + age
    *   - Submit → POST /api/checkout/initiate
    *   - На success: redirect на provider checkout URL
@@ -541,6 +554,20 @@ const totalLabel = formatPrice(totalCents, currency);
    */
   const form = document.getElementById("checkout-form") as HTMLFormElement | null;
   if (form) {
+    // Native browser validation использует locale БРАУЗЕРА (а не <html lang>) —
+    // на EN-странице с RU-Chrome подсказки идут на русском. Override через
+    // setCustomValidity per field на 'invalid', clear на input/change.
+    const msgs = validationMessages as Record<string, string>;
+    form.querySelectorAll<HTMLInputElement>("[required]").forEach((el) => {
+      const msg = msgs[el.id];
+      if (!msg) return;
+      el.addEventListener("invalid", () => {
+        if (!el.validity.valid) el.setCustomValidity(msg);
+      });
+      el.addEventListener("input", () => el.setCustomValidity(""));
+      el.addEventListener("change", () => el.setCustomValidity(""));
+    });
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!form.reportValidity()) return;
