@@ -44,6 +44,9 @@ export type EnrollmentStatus = "active" | "completed" | "cancelled" | "refunded"
  */
 export type CohortStatus = "open" | "running" | "completed" | "cancelled";
 
+/** module_progress.status — Stage 26 (migration 0010). Per (enrollment, module). */
+export type ModuleProgressStatus = "not_started" | "in_progress" | "done";
+
 /** application.status — lifecycle state machine (FLOW-22 / migration 0009).
  *
  *  Normal path:
@@ -300,6 +303,31 @@ export interface EnrollmentModuleRow {
   order_idx: number;
   added_by: string;
   added_at: number;
+}
+
+/**
+ * module_progress — progress tracking student'a по конкретному модулю
+ * внутри enrollment'а (migration 0010 / Stage 26).
+ *
+ * 1 row per (enrollment_id, module_slug). Locale хранится для context
+ * (язык body который студент видит), не для PK.
+ *
+ * Lifecycle:
+ *   not_started → in_progress (auto при первом open) → done (explicit "Mark complete")
+ *
+ * Lazy creation: row создаётся при первом open страницы модуля; если
+ * методист добавит модуль в programme после старта когорты — студент
+ * увидит его новым без data-migration.
+ */
+export interface ModuleProgressRow {
+  enrollment_id: string;
+  module_slug: string;
+  locale: Locale;
+  status: ModuleProgressStatus;
+  last_seen_at: number | null;
+  completed_at: number | null;
+  created_at: number;
+  updated_at: number;
 }
 
 // ============================================================
