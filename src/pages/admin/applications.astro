@@ -1,0 +1,443 @@
+---
+/*
+ * /admin/applications — управление заявками (Stage 14q, FLOW-20).
+ *
+ * SSR таблица + tabs по статусу + filters (programme / cohort / search).
+ *
+ * URL state:
+ *   ?status=awaiting_payment|paid|running|completed|cancelled|expired|refunded|all (default 'awaiting_payment')
+ *   ?programme=beginner|intermediate|bundle|individual|all
+ *   ?cohort=<id>
+ *   ?q=email or name search
+ *
+ * Row actions (Sprint 1 MVP — view only):
+ *   - Contact (mailto)
+ *   Sprint 2: Transfer / Cancel / Refund — endpoints + drawer
+ */
+
+import Layout from "../../layouts/admin/Layout.astro";
+import InstructorHero from "../../components/instructor/InstructorHero.astro";
+import { getUserWithRoles } from "../../lib/server/guards";
+import { verifyRefreshSession } from "../../lib/server/session";
+import type { ApplicationStatus } from "../../../db/types";
+
+export const prerender = false;
+
+// Inline guard (см. /admin/users.astro)
+const env = Astro.locals.runtime.env;
+const session = await verifyRefreshSession(env, Astro.request);
+if (!session) {
+  return Astro.redirect(`/en/login?return_to=${encodeURIComponent(Astro.url.pathname)}`, 302);
+}
+const adminUser = await getUserWithRoles(env, session.userId);
+if (!adminUser) return Astro.redirect("/en/login", 302);
+if (adminUser.deactivated_at !== null) return Astro.redirect(`/${adminUser.locale}/inactive`, 302);
+if (!adminUser.roles.has("admin")) return new Response(null, { status: 404 });
+
+const locale = adminUser.locale;
+const ru = locale === "ru";
+const intlLocale = ru ? "ru-RU" : "en-US";
+
+// URL state
+const statusFilter = (Astro.url.searchParams.get("status") ?? "awaiting_payment") as
+  | ApplicationStatus | "all";
+const programmeFilter = Astro.url.searchParams.get("programme") ?? "all";
+const cohortFilter = Astro.url.searchParams.get("cohort");
+const searchQuery = (Astro.url.searchParams.get("q") ?? "").trim();
+
+// Counts по статусам (для tabs)
+interface CountRow { status: string; n: number }
+const counts = await env.DB.prepare(
+  `SELECT status, COUNT(*) AS n FROM applications GROUP BY status`,
+).all<CountRow>();
+const totalCount = counts.results.reduce((s, c) => s + c.n, 0);
+const countByStatus: Record<string, number> = {};
+for (const c of counts.results) countByStatus[c.status] = c.n;
+
+// Main query
+interface AppListRow {
+  id: string;
+  user_id: string;
+  user_email: string;
+  user_name: string | null;
+  programme_id: string;
+  cohort_id: string;
+  cohort_start_date: number;
+  status: string;
+  amount_cents: number | null;
+  currency: string | null;
+  country: string | null;
+  created_at: number;
+}
+
+const where: string[] = [];
+const binds: unknown[] = [];
+
+if (statusFilter !== "all") {
+  where.push(`a.status = ?`);
+  binds.push(statusFilter);
+}
+if (programmeFilter !== "all") {
+  where.push(`a.programme_id = ?`);
+  binds.push(programmeFilter);
+}
+if (cohortFilter) {
+  where.push(`a.cohort_id = ?`);
+  binds.push(cohortFilter);
+}
+if (searchQuery) {
+  where.push(`(LOWER(u.email) LIKE ? OR LOWER(COALESCE(u.name, '')) LIKE ?)`);
+  const q = `%${searchQuery.toLowerCase()}%`;
+  binds.push(q, q);
+}
+
+const sql = `
+  SELECT
+    a.id, a.user_id, u.email AS user_email, u.name AS user_name,
+    a.programme_id, a.cohort_id,
+    c.start_date AS cohort_start_date,
+    a.status, a.amount_cents, a.currency, a.country, a.created_at
+  FROM applications a
+  JOIN users u ON u.id = a.user_id
+  JOIN cohorts c ON c.id = a.cohort_id
+  ${where.length > 0 ? "WHERE " + where.join(" AND ") : ""}
+  ORDER BY a.created_at DESC
+  LIMIT 200
+`;
+const applications = await env.DB.prepare(sql).bind(...binds).all<AppListRow>();
+
+// Date formatter
+const dateFmt = new Intl.DateTimeFormat(intlLocale, { month: "short", day: "numeric", year: "numeric" });
+function formatDate(unixSec: number): string {
+  return dateFmt.format(new Date(unixSec * 1000));
+}
+function formatRelative(unixSec: number): string {
+  const diffSec = Math.floor(Date.now() / 1000) - unixSec;
+  if (diffSec < 60) return ru ? "только что" : "just now";
+  if (diffSec < 3600) {
+    const m = Math.floor(diffSec / 60);
+    return ru ? `${m.toString()} мин назад` : `${m.toString()}m ago`;
+  }
+  if (diffSec < 86400) {
+    const h = Math.floor(diffSec / 3600);
+    return ru ? `${h.toString()} ч назад` : `${h.toString()}h ago`;
+  }
+  const d = Math.floor(diffSec / 86400);
+  return ru ? `${d.toString()} дн назад` : `${d.toString()}d ago`;
+}
+function formatAmount(cents: number | null, currency: string | null): string {
+  if (cents === null) return "—";
+  const v = (cents / 100).toFixed(2);
+  const sym = currency === "EUR" ? "€" : currency === "USD" ? "$" : currency ?? "";
+  return `${sym}${v}`;
+}
+
+// Tab definitions
+interface Tab {
+  key: ApplicationStatus | "all";
+  label: string;
+  count: number;
+}
+const tabs: Tab[] = [
+  { key: "all", label: ru ? "Все" : "All", count: totalCount },
+  { key: "awaiting_payment", label: ru ? "Ждут оплаты" : "Awaiting payment", count: countByStatus["awaiting_payment"] ?? 0 },
+  { key: "paid", label: ru ? "Оплачено" : "Paid", count: countByStatus["paid"] ?? 0 },
+  { key: "running", label: ru ? "Идёт" : "Running", count: countByStatus["running"] ?? 0 },
+  { key: "completed", label: ru ? "Завершено" : "Completed", count: countByStatus["completed"] ?? 0 },
+  { key: "cancelled", label: ru ? "Отменено" : "Cancelled", count: countByStatus["cancelled"] ?? 0 },
+  { key: "expired", label: ru ? "Истекло" : "Expired", count: countByStatus["expired"] ?? 0 },
+  { key: "refunded", label: ru ? "Возвращено" : "Refunded", count: countByStatus["refunded"] ?? 0 },
+];
+
+const programmeOptions = ["all", "beginner", "intermediate", "bundle", "individual"];
+
+const t = ru
+  ? {
+      eyebrow: "Админ · заявки",
+      title: "Заявки на курс",
+      subtitle: `${applications.results.length.toString()} из ${totalCount.toString()}`,
+      searchPlaceholder: "Поиск по email/имени",
+      filterProgramme: "Программа",
+      filterAll: "Все",
+      tableHeaderEmail: "Email / имя",
+      tableHeaderProgramme: "Программа",
+      tableHeaderCohort: "Когорта",
+      tableHeaderStatus: "Статус",
+      tableHeaderAmount: "Сумма",
+      tableHeaderApplied: "Подано",
+      empty: "Нет заявок по выбранным фильтрам.",
+      seo: { title: "Заявки — Moirai Admin", description: "Управление заявками на курс." },
+    }
+  : {
+      eyebrow: "Admin · applications",
+      title: "Applications",
+      subtitle: `${applications.results.length.toString()} of ${totalCount.toString()}`,
+      searchPlaceholder: "Search by email / name",
+      filterProgramme: "Programme",
+      filterAll: "All",
+      tableHeaderEmail: "Email / name",
+      tableHeaderProgramme: "Programme",
+      tableHeaderCohort: "Cohort",
+      tableHeaderStatus: "Status",
+      tableHeaderAmount: "Amount",
+      tableHeaderApplied: "Applied",
+      empty: "No applications match the current filters.",
+      seo: { title: "Applications — Moirai Admin", description: "Manage course applications." },
+    };
+
+function buildUrl(overrides: Record<string, string | null>): string {
+  const sp = new URLSearchParams(Astro.url.searchParams);
+  for (const [k, v] of Object.entries(overrides)) {
+    if (v === null) sp.delete(k);
+    else sp.set(k, v);
+  }
+  const s = sp.toString();
+  return s ? `?${s}` : Astro.url.pathname;
+}
+---
+
+<Layout
+  locale={locale}
+  seo={t.seo}
+  currentNavKey="enrollments"
+  userRoles={adminUser.roles}
+>
+  <InstructorHero eyebrow={t.eyebrow} title={t.title} subtitle={t.subtitle} />
+
+  <section class="admin-apps">
+    <!-- Tabs -->
+    <nav class="admin-apps__tabs" aria-label="Status tabs">
+      {tabs.map((tab) => (
+        <a
+          href={buildUrl({ status: tab.key === "all" ? null : tab.key })}
+          class:list={["admin-apps__tab", { "admin-apps__tab--on": (tab.key === "all" && statusFilter === "all") || statusFilter === tab.key }]}
+        >
+          {tab.label}
+          <span class="admin-apps__tab-count">{tab.count}</span>
+        </a>
+      ))}
+    </nav>
+
+    <!-- Filters -->
+    <form class="admin-apps__filters" method="GET" action={Astro.url.pathname}>
+      {statusFilter !== "all" && <input type="hidden" name="status" value={statusFilter} />}
+      <input
+        class="admin-apps__search"
+        type="search"
+        name="q"
+        value={searchQuery}
+        placeholder={t.searchPlaceholder}
+      />
+      <label class="admin-apps__filter">
+        <span>{t.filterProgramme}</span>
+        <select name="programme" onchange="this.form.submit()">
+          {programmeOptions.map((p) => (
+            <option value={p} selected={p === programmeFilter}>
+              {p === "all" ? t.filterAll : p}
+            </option>
+          ))}
+        </select>
+      </label>
+    </form>
+
+    {/* Table */}
+    {applications.results.length === 0 ? (
+      <p class="admin-apps__empty">{t.empty}</p>
+    ) : (
+      <div class="admin-apps__table-wrapper">
+        <table class="admin-apps__table">
+          <thead>
+            <tr>
+              <th>{t.tableHeaderEmail}</th>
+              <th>{t.tableHeaderProgramme}</th>
+              <th>{t.tableHeaderCohort}</th>
+              <th>{t.tableHeaderStatus}</th>
+              <th>{t.tableHeaderAmount}</th>
+              <th>{t.tableHeaderApplied}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {applications.results.map((app) => (
+              <tr>
+                <td>
+                  <a href={`mailto:${app.user_email}`} class="admin-apps__email">{app.user_email}</a>
+                  {app.user_name && <div class="admin-apps__name">{app.user_name}</div>}
+                </td>
+                <td>{app.programme_id}</td>
+                <td>{formatDate(app.cohort_start_date)}</td>
+                <td>
+                  <span class:list={["admin-apps__status", `admin-apps__status--${app.status}`]}>{app.status}</span>
+                </td>
+                <td>{formatAmount(app.amount_cents, app.currency)}</td>
+                <td title={formatDate(app.created_at)}>{formatRelative(app.created_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </section>
+</Layout>
+
+<style>
+  .admin-apps {
+    padding: var(--space-xl) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  .admin-apps__tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2xs);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: var(--space-sm);
+    margin-bottom: var(--space-lg);
+  }
+  .admin-apps__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+  }
+  .admin-apps__tab:hover {
+    color: var(--text);
+  }
+  .admin-apps__tab--on {
+    color: var(--ink);
+    background: var(--amber);
+    border-color: var(--amber);
+  }
+  .admin-apps__tab-count {
+    background: rgba(0,0,0,0.15);
+    padding: 2px 6px;
+    border-radius: 2px;
+    font-size: var(--type-micro-sm);
+  }
+  .admin-apps__tab--on .admin-apps__tab-count {
+    background: rgba(0,0,0,0.25);
+  }
+
+  .admin-apps__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+    align-items: center;
+  }
+  .admin-apps__search {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text);
+  }
+  .admin-apps__filter {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--type-micro-md);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+  .admin-apps__filter select {
+    padding: 8px 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    text-transform: none;
+  }
+
+  .admin-apps__empty {
+    text-align: center;
+    padding: var(--space-3xl) var(--space-xl);
+    color: var(--text-muted);
+  }
+
+  .admin-apps__table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+  .admin-apps__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--type-body-sm);
+  }
+  .admin-apps__table th,
+  .admin-apps__table td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .admin-apps__table th {
+    background: var(--bg-elevated);
+    color: var(--text-faint);
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .admin-apps__table tbody tr:hover {
+    background: color-mix(in srgb, var(--amber) 5%, transparent);
+  }
+  .admin-apps__email {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .admin-apps__email:hover { color: var(--amber); }
+  .admin-apps__name {
+    color: var(--text-faint);
+    font-size: var(--type-micro-md);
+  }
+
+  .admin-apps__status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .admin-apps__status--awaiting_payment {
+    color: var(--text-accent);
+    background: var(--amber-faint);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  }
+  .admin-apps__status--paid,
+  .admin-apps__status--running {
+    color: var(--ink);
+    background: var(--amber);
+  }
+  .admin-apps__status--completed {
+    color: var(--text-faint);
+    border: 1px solid var(--border-strong);
+  }
+  .admin-apps__status--cancelled,
+  .admin-apps__status--expired,
+  .admin-apps__status--refunded {
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+  }
+</style>

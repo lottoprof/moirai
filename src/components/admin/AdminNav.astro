@@ -13,7 +13,7 @@ import ZoneNav from "../shared/ZoneNav.astro";
 
 interface Props {
   locale: "en" | "ru";
-  currentKey: "overview" | "users" | "enrollments" | "modules" | "instructors" | "queues" | "account";
+  currentKey: "overview" | "users" | "applications" | "enrollments" | "modules" | "instructors" | "queues" | "account";
   roles?: Set<Role>;
 }
 
@@ -24,6 +24,7 @@ const labels = locale === "ru"
       aria: "Навигация админа",
       overview: "Обзор",
       users: "Пользователи",
+      applications: "Заявки",
       enrollments: "Записи",
       modules: "Модули",
       instructors: "Преподаватели",
@@ -37,6 +38,7 @@ const labels = locale === "ru"
       aria: "Admin navigation",
       overview: "Overview",
       users: "Users",
+      applications: "Applications",
       enrollments: "Enrollments",
       modules: "Modules",
       instructors: "Instructors",
@@ -48,9 +50,10 @@ const labels = locale === "ru"
     };
 
 const items = [
-  { key: "overview",    label: labels.overview,    href: `/admin/` },
-  { key: "users",       label: labels.users,       href: `/admin/users` },
-  { key: "enrollments", label: labels.enrollments, href: `/admin/` },
+  { key: "overview",     label: labels.overview,     href: `/admin/` },
+  { key: "users",        label: labels.users,        href: `/admin/users` },
+  { key: "applications", label: labels.applications, href: `/admin/applications` },
+  { key: "enrollments",  label: labels.enrollments,  href: `/admin/` },
   { key: "modules",     label: labels.modules,     href: `/admin/` },
   { key: "instructors", label: labels.instructors, href: `/admin/` },
   { key: "queues",      label: labels.queues,      href: `/admin/` },
