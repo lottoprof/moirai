@@ -282,6 +282,21 @@
   background: var(--amber-faint);
 }
 
+/*
+ * Hidden username/email field — sr-only-style чтобы password managers
+ * (Chrome/Safari/1Password) видели context "к какому аккаунту относится
+ * новый пароль". display:none скрывает от Chrome PM тоже — поэтому
+ * absolute + zero-size + opacity:0 (визуально невидимо, но PM подхватит).
+ */
+.form__hidden-username {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .form__notice {
   color: var(--text);
   font-size: var(--type-body-sm);

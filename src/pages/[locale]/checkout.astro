@@ -268,6 +268,25 @@ const totalLabel = formatPrice(totalCents, currency);
           <fieldset class="checkout__fieldset">
             <legend class="checkout__fieldset-legend">{t.passwordTitle}</legend>
             <p class="checkout__fieldset-lede">{t.passwordLede}</p>
+
+            {/*
+              Hidden username (email user'a) — обязательно для password manager'ов
+              (Chrome/Safari/1Password): без context'a "к какому аккаунту относится
+              новый пароль" Chrome agressively autofill'ит и затирает поле при
+              переключении фокуса. Hidden но НЕ через display:none (chrome игнорит
+              такие) — sr-only + readonly + tabindex=-1.
+            */}
+            <input
+              type="email"
+              name="username"
+              autocomplete="username"
+              value={user.email}
+              readonly
+              tabindex="-1"
+              aria-hidden="true"
+              class="form__hidden-username"
+            />
+
             <div class="form__field">
               <label class="form__label" for="ck-password">{t.passwordLabel}</label>
               <input
