@@ -5,30 +5,39 @@
 ## GitHub identity / SSH key
 
 Репо `lottoprof/moirai` принадлежит GitHub-аккаунту **lottoprof**.
-В системе настроено несколько SSH ключей; **default** (`~/.ssh/id_ed25519`)
-аутентифицируется как **admin310st** — у которого **нет push-доступа**
-к `lottoprof/moirai`.
+В системе несколько SSH ключей; **default** (`~/.ssh/id_ed25519`)
+аутентифицируется как **admin310st**, у которого **нет push-доступа**.
 
-**Ключ для lottoprof: `~/.ssh/id_ed_seo`** (verified 2026-05-21).
+**Ключ lottoprof: `~/.ssh/id_ed_seo`** (verified 2026-05-21).
 
-Push команда:
-
-```bash
-GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed_seo -o IdentitiesOnly=yes" git push origin main
-```
-
-Если меняешь `~/.ssh/config` — добавь блок:
+В `~/.ssh/config` уже есть alias:
 
 ```
-Host github.com
+Host github-lottoprof
     HostName github.com
     User git
     IdentityFile ~/.ssh/id_ed_seo
     IdentitiesOnly yes
 ```
 
-Проверка identity: `ssh -i ~/.ssh/id_ed_seo -T git@github.com`
-→ должно быть `Hi lottoprof!`.
+**Remote URL должен использовать этот alias**, а не `github.com`:
+
+```bash
+git remote set-url origin git@github-lottoprof:lottoprof/moirai.git
+```
+
+После этого `git push origin main` работает без override.
+
+Проверка: `git remote -v` должно показать `git@github-lottoprof:…`,
+не `git@github.com:…`. Если показывает github.com — поправить URL
+командой выше, иначе push уйдёт под admin310st и упадёт с
+"Permission to lottoprof/moirai.git denied to admin310st".
+
+Альтернатива (одноразовый push без правки remote):
+
+```bash
+GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed_seo -o IdentitiesOnly=yes" git push origin main
+```
 
 ## Branching
 
