@@ -22,6 +22,8 @@ import StatCard from "../../../components/dashboard/StatCard.astro";
 import HwQueueCard from "../../../components/instructor/HwQueueCard.astro";
 import StudentRow from "../../../components/instructor/StudentRow.astro";
 import { requireRole } from "../../../lib/server/guards";
+import { listCohortsByInstructor, parseDaysJson, normalizeDayPair, deriveTimeOfDay, type CohortWithSlot } from "../../../lib/server/cohorts";
+import { getEntry } from "astro:content";
 
 export const prerender = false;
 
@@ -50,6 +52,19 @@ const myEnrollments = await env.DB.prepare(
    WHERE e.lead_instructor_id = ? AND e.status = 'active'
    ORDER BY e.enrolled_at DESC`,
 ).bind(user.id).all<MyEnrollment>();
+
+// FLOW-21: My cohorts (upcoming + active) — Stage 14r
+const myCohorts: CohortWithSlot[] = await listCohortsByInstructor(env, user.id, ["open", "running"]);
+const upcomingCohorts = myCohorts.filter((c) => c.status === "open");
+const activeCohorts = myCohorts.filter((c) => c.status === "running");
+
+// Programme titles map (для всех уникальных programme_id из cohorts)
+const uniqueProgrammeIds = Array.from(new Set(myCohorts.map((c) => c.programme_id)));
+const programmeTitleMap = new Map<string, string>();
+await Promise.all(uniqueProgrammeIds.map(async (slug) => {
+  const entry = await getEntry("programmes", `${slug}.${locale}`);
+  if (entry) programmeTitleMap.set(slug, entry.data.title);
+}));
 
 // ============================================================
 // STUB: эти данные будут из D1 в Sprint 2 (homework, sessions tables)
@@ -110,6 +125,12 @@ const t = locale === "ru"
       sessionLabel: "Следующая сессия",
       review: "Проверить →",
       waiting: locale === "ru" ? "д. в ожидании" : "d waiting",
+      myUpcomingCohorts: "Мои когорты — предстоящие",
+      myActiveCohorts: "Мои когорты — идут",
+      noCohorts: "Когорты ещё не назначены. Админ привяжет slot позже.",
+      cohortApplied: (n: number) => `${n.toString()} ${n === 1 ? "заявка" : n < 5 ? "заявки" : "заявок"}`,
+      cohortPaid: (n: number) => `${n.toString()} оплачено`,
+      cohortDaysUntil: (d: number) => d > 0 ? `через ${d.toString()} ${d === 1 ? "день" : d < 5 ? "дня" : "дней"}` : d === 0 ? "сегодня" : `идёт ${Math.abs(d).toString()}-й день`,
       seo: { title: "Преподаватель — Moirai", description: "Очередь проверки и студенты." },
     }
   : {
@@ -127,6 +148,12 @@ const t = locale === "ru"
       sessionLabel: "Next session",
       review: "Review →",
       waiting: "d waiting",
+      myUpcomingCohorts: "My cohorts — upcoming",
+      myActiveCohorts: "My cohorts — running",
+      noCohorts: "No cohorts assigned yet. Admin will link a slot later.",
+      cohortApplied: (n: number) => `${n.toString()} ${n === 1 ? "application" : "applications"}`,
+      cohortPaid: (n: number) => `${n.toString()} paid`,
+      cohortDaysUntil: (d: number) => d > 0 ? `in ${d.toString()} ${d === 1 ? "day" : "days"}` : d === 0 ? "today" : `day ${Math.abs(d).toString()}`,
       seo: { title: "Instructor — Moirai", description: "Review queue and my students." },
     };
 ---
@@ -196,6 +223,74 @@ const t = locale === "ru"
         </div>
       </div>
     </section>
+
+    {/* FLOW-21 My cohorts — Stage 14r */}
+    {(upcomingCohorts.length > 0 || activeCohorts.length > 0) ? (
+      <>
+        {activeCohorts.length > 0 && (
+          <section aria-label={t.myActiveCohorts}>
+            <p class="instructor-content__section-label">{t.myActiveCohorts}</p>
+            <div class="my-cohorts">
+              {activeCohorts.map((c) => {
+                const days = normalizeDayPair(parseDaysJson(c.slot.days_json));
+                const daysLabel = days.join("+");
+                const tod = deriveTimeOfDay(c.slot.time_et);
+                const daysUntil = Math.ceil((c.start_date - Math.floor(Date.now() / 1000)) / 86400);
+                return (
+                  <div class="my-cohort-card">
+                    <div class="my-cohort-card__head">
+                      <strong>{programmeTitleMap.get(c.programme_id) ?? c.programme_id}</strong>
+                      <span class="my-cohort-card__when">{t.cohortDaysUntil(daysUntil)}</span>
+                    </div>
+                    <p class="my-cohort-card__meta">
+                      {daysLabel} · {tod} · {c.slot.time_et} ET
+                    </p>
+                    <p class="my-cohort-card__stats">
+                      <span>{t.cohortApplied(c.apply_count)}</span>
+                      <span class="my-cohort-card__paid">{t.cohortPaid(c.paid_count)}</span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {upcomingCohorts.length > 0 && (
+          <section aria-label={t.myUpcomingCohorts}>
+            <p class="instructor-content__section-label">{t.myUpcomingCohorts}</p>
+            <div class="my-cohorts">
+              {upcomingCohorts.map((c) => {
+                const days = normalizeDayPair(parseDaysJson(c.slot.days_json));
+                const daysLabel = days.join("+");
+                const tod = deriveTimeOfDay(c.slot.time_et);
+                const daysUntil = Math.ceil((c.start_date - Math.floor(Date.now() / 1000)) / 86400);
+                return (
+                  <div class="my-cohort-card">
+                    <div class="my-cohort-card__head">
+                      <strong>{programmeTitleMap.get(c.programme_id) ?? c.programme_id}</strong>
+                      <span class="my-cohort-card__when">{t.cohortDaysUntil(daysUntil)}</span>
+                    </div>
+                    <p class="my-cohort-card__meta">
+                      {daysLabel} · {tod} · {c.slot.time_et} ET
+                    </p>
+                    <p class="my-cohort-card__stats">
+                      <span>{t.cohortApplied(c.apply_count)}</span>
+                      <span class="my-cohort-card__paid">{t.cohortPaid(c.paid_count)}</span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </>
+    ) : (
+      <section aria-label={t.myUpcomingCohorts}>
+        <p class="instructor-content__section-label">{t.myUpcomingCohorts}</p>
+        <p class="my-cohorts-empty">{t.noCohorts}</p>
+      </section>
+    )}
   </div>
 </Layout>
 
@@ -263,6 +358,62 @@ const t = locale === "ru"
     font-size: var(--type-micro-md);
     color: var(--text-accent);
     margin-top: var(--space-2xs);
+  }
+
+  /* My cohorts (Stage 14r) */
+  .my-cohorts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-sm);
+  }
+  .my-cohorts-empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-md) var(--space-lg);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+  }
+  .my-cohort-card {
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    border-radius: 2px;
+    padding: var(--space-md);
+  }
+  .my-cohort-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-2xs);
+  }
+  .my-cohort-card__head strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .my-cohort-card__when {
+    color: var(--text-accent);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+  .my-cohort-card__meta {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    margin: 0 0 var(--space-sm);
+  }
+  .my-cohort-card__stats {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-faint);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    margin: 0;
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-xs);
+  }
+  .my-cohort-card__paid {
+    color: var(--text-accent);
   }
 
   @media (max-width: 768px) {
