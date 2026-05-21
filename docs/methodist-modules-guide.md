@@ -334,15 +334,142 @@ body сразу (CF cache по этому пути не настроен; SSR н
   ожидает эту структуру
 - Заливать ассеты в R2 вручную — только через upload-script
 
-### Sprint 2 — external repo workflow
+### Validator — R2 ↔ D1 consistency
 
-Когда настроим `moirai-content` отдельный git-репо, методист будет:
+Каждый body в R2 должен иметь соответствующую metadata row в D1
+`modules` table (slug + locale + body_r2_key). Если связь сломана,
+runtime получит пустой body на странице модуля.
 
-1. Клонировать локально
-2. Править `modules/{slug}/student_book.{locale}.md`
-3. `git push` → GH Actions → POST на `/api/admin/modules/sync` → D1 + R2
+**Защита:**
 
-До этого — правка в moirai monorepo, ручной upload через scripts.
+1. **Prevention** (в `upload-student-books.mjs`): перед каждым upload'ом
+   скрипт делает SELECT в D1 — если нет row с `(slug, locale)` и `has_text=1`,
+   файл **пропускается** с warning. Orphan-объектов в R2 не появится.
+
+2. **Retrospective validator** (`scripts/check-r2-d1-mapping.mjs`):
+   - Quick (D1 only): `pnpm check:r2-d1:fast` — проверяет конвенцию пути,
+     отсутствие NULL и duplicate keys. Sub-секунда.
+   - Full (D1 + 48 R2 HEAD requests): `pnpm check:r2-d1` — каждый D1.body_r2_key
+     дёргается через `wrangler r2 object get`. ~30-60 сек.
+
+   Exit code 0 = ok, 1 = есть missing/inconsistencies. Подходит для CI gate.
+
+   **Что НЕ проверяет** (TODO Sprint 2): R2 objects без D1 row (orphan
+   detection). Wrangler CLI не имеет `r2 object list`. Решение: через
+   S3-compatible API с access keys (опционально).
+
+### Workflow методиста — полная последовательность
+
+#### Сценарий A: новый модуль (Sprint 1, manual)
+
+```bash
+# 1. Добавить metadata в scripts/seed/modules-2026-05-19.json
+#    (или будущий yaml в external repo)
+
+# 2. Залить metadata в D1
+pnpm seed:modules                # prod
+# или
+pnpm seed:modules:local          # local dev D1
+
+# 3. Сгенерить draft markdown для нового модуля
+pnpm drafts:gen                  # missing only (skip existing)
+
+# 4. Отредактировать scripts/seed/student-book-drafts/<slug>.<locale>.md
+#    Заполнить секции: Опорный материал, Видео, Домашнее задание
+
+# 5. Залить body в R2
+pnpm drafts:upload               # все, или
+node scripts/upload-student-books.mjs --only=<slug>.<locale>
+
+# 6. Verify
+pnpm check:r2-d1                 # full check (D1 + R2)
+```
+
+#### Сценарий B: правка существующего модуля
+
+```bash
+# 1. Отредактировать markdown файл
+$EDITOR scripts/seed/student-book-drafts/beg-05-voiceover.en.md
+
+# 2. Залить
+pnpm drafts:upload               # все (idempotent overwrite)
+# или одиночно:
+node scripts/upload-student-books.mjs --only=beg-05-voiceover.en
+
+# 3. (Опционально) verify
+pnpm check:r2-d1
+```
+
+#### Что коммитится в git
+
+✅ `scripts/seed/modules-2026-05-19.json` (или будущий yaml)
+✅ `scripts/seed/student-book-drafts/*.md` — все 48+ файлов
+❌ НИКОГДА: R2 keys, secret API tokens, payment data
+
+R2 — это runtime артефакт (как deployed dist/), не source. Source — это
+mdx-файлы в git.
+
+### Sprint 2 / 3 TODO
+
+#### External repo `moirai-content`
+
+**Цель:** методист работает в **отдельном** git репо без доступа к
+платформенному коду / секретам / payments.
+
+```
+moirai-content/                  # new repo
+├── modules/
+│   ├── beg-01-lumiere-frame/
+│   │   ├── metadata.yaml        # methodist source of truth
+│   │   ├── student_book.en.md
+│   │   ├── student_book.ru.md
+│   │   ├── images/              # img assets (R2 uploads)
+│   │   └── private/             # answer keys, не уходит в публичный R2
+│   └── ...
+├── .github/workflows/
+│   └── sync.yml                 # GH Actions → POST /api/admin/modules/sync
+└── README.md                    # инструкция methodist'у
+```
+
+Steps to implement (high-level):
+
+- [ ] Создать репо `lottoprof/moirai-content`
+- [ ] Скрипт миграции `scripts/seed/* → moirai-content/modules/*`
+- [ ] GH Actions workflow `.github/workflows/sync.yml`:
+  - Triggers: push to main + manual workflow_dispatch
+  - Steps: parse changed files → POST на `/api/admin/modules/sync`
+    с GitHub OIDC token (бесcredential auth)
+- [ ] POST /api/admin/modules/sync endpoint (admin-only):
+  - Валидирует payload signature
+  - UPSERT в D1 modules
+  - PUT bodies в R2
+  - Logs audit_log event='modules_synced'
+- [ ] Migration: переносим existing 24 modules в новый репо
+- [ ] Deprecation: methodist больше не клонирует platform repo
+
+#### Validation / quality gates
+
+- [ ] CI gate: `pnpm check:r2-d1` на каждый PR в moirai monorepo
+- [ ] CI gate: `pnpm check:translations` (translation-pair validator)
+- [ ] CI gate: yaml schema validation в moirai-content (zod через TS-script)
+- [ ] Linkcheck: ссылки на YouTube / external resources валидны
+- [ ] Orphan detection: S3 list R2 → diff vs D1 → report orphan keys
+
+#### Content authoring features
+
+- [ ] Mermaid diagram rendering (методисты просили)
+- [ ] YouTube embed renderer
+- [ ] Math (KaTeX) — низкий priority
+- [ ] Image upload pipeline (R2 sub-paths `modules/{slug}/images/`)
+- [ ] Private answer keys (отдельный R2 path с ACL)
+- [ ] Module versioning (semver на module metadata)
+
+#### Admin UI (Sprint 3+)
+
+- [ ] `/admin/modules` view — list + drawer с body preview
+- [ ] Inline edit body через rich-editor
+- [ ] Module preview (как видит студент) без deploy
+- [ ] Bulk actions: archive / unpublish / re-sync
 
 ---
 

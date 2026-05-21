@@ -26,6 +26,8 @@
     "drafts:gen": "node scripts/generate-student-book-drafts.mjs",
     "drafts:gen:force": "node scripts/generate-student-book-drafts.mjs --force",
     "drafts:upload": "node scripts/upload-student-books.mjs",
+    "check:r2-d1": "node scripts/check-r2-d1-mapping.mjs",
+    "check:r2-d1:fast": "node scripts/check-r2-d1-mapping.mjs --skip-r2",
     "deploy": "pnpm build && wrangler pages deploy ./dist --project-name moirai --branch main --commit-message \"$(git log -1 --pretty=%s)\"",
     "deploy:preview": "pnpm build && wrangler pages deploy ./dist --project-name moirai --commit-message \"$(git log -1 --pretty=%s)\""
   },
