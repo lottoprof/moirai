@@ -34,6 +34,8 @@ import {
 import { getCohortById } from "../../../../../lib/server/cohorts";
 import { getPaymentProvider } from "../../../../../lib/server/payment";
 import { logAuth } from "../../../../../lib/server/audit";
+import { findUserById } from "../../../../../lib/server/user-ops";
+import { sendEmail } from "../../../../../lib/server/email";
 
 export const prerender = false;
 
@@ -128,7 +130,20 @@ export const POST: APIRoute = async (ctx) => {
     return jsonError("db_error", 500);
   }
 
-  // 7. Audit log (FLOW-24)
+  // 7. Send refund confirmation email
+  const user = await findUserById(env, application.user_id);
+  if (user) {
+    const url = new URL(request.url);
+    await sendEmail(env, {
+      to: user.email,
+      locale: user.locale,
+      kind: "refund_processed",
+      actionUrl: `${url.origin}/${user.locale}/apply`,
+      recipientName: user.name,
+    });
+  }
+
+  // 8. Audit log (FLOW-24)
   await logAuth(env, "refund_processed", application.user_id, "password", request, {
     application_id: application.id,
     cohort_id: cohort.id,

@@ -20,6 +20,14 @@ import type { APIRoute } from "astro";
 import { requireRoleApi } from "../../../../lib/server/guards";
 import { expireOverdueApplications } from "../../../../lib/server/applications";
 import { logAuth } from "../../../../lib/server/audit";
+import { sendEmail } from "../../../../lib/server/email";
+
+interface ExpiredRow {
+  user_id: string;
+  email: string;
+  name: string | null;
+  locale: "en" | "ru";
+}
 
 export const prerender = false;
 
@@ -38,8 +46,30 @@ export const POST: APIRoute = async (ctx) => {
   const env = ctx.locals.runtime.env;
   const now = Math.floor(Date.now() / 1000);
 
-  // 1. Expire overdue applications (helper уже idempotent)
+  // 1. Pre-fetch users которым нужно отправить expired notification
+  //    (до UPDATE, чтобы найти все awaiting_payment в стартовавших cohorts)
+  const aboutToExpire = await env.DB.prepare(
+    `SELECT u.id AS user_id, u.email, u.name, u.locale
+       FROM applications a
+       JOIN users u ON u.id = a.user_id
+       WHERE a.status = 'awaiting_payment'
+         AND a.cohort_id IN (SELECT id FROM cohorts WHERE start_date <= ?)`,
+  ).bind(now).all<ExpiredRow>();
+
+  // 2. Expire overdue applications (helper уже idempotent)
   const expiredCount = await expireOverdueApplications(env);
+
+  // 3. Send expired notifications
+  const origin = new URL(ctx.request.url).origin;
+  for (const row of aboutToExpire.results) {
+    await sendEmail(env, {
+      to: row.email,
+      locale: row.locale,
+      kind: "application_expired",
+      actionUrl: `${origin}/${row.locale}/apply`,
+      recipientName: row.name,
+    });
+  }
 
   // 2. Cohort transitions — open → running
   const toRunning = await env.DB.prepare(

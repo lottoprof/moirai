@@ -18,7 +18,14 @@
 
 import type { Locale } from "../../../db/types";
 
-export type EmailKind = "verify" | "password_reset" | "apply_welcome" | "payment_confirmation" | "magic_link";
+export type EmailKind =
+  | "verify"
+  | "password_reset"
+  | "apply_welcome"
+  | "payment_confirmation"
+  | "magic_link"
+  | "application_expired"
+  | "refund_processed";
 
 const messages: Record<string, string | undefined> = {
   // === VERIFY (новая регистрация) ===
@@ -115,6 +122,44 @@ const messages: Record<string, string | undefined> = {
   "ru:magic_link:link_hint": "Или скопируйте эту ссылку в браузер:",
   "ru:magic_link:expires":   "Ссылка действительна 30 минут и работает один раз.",
   "ru:magic_link:ignore":    "Если вы не запрашивали ссылку — проигнорируйте это письмо. Действий не требуется — ссылка не выкидывает из активной сессии.",
+
+  // === APPLICATION EXPIRED (cohort стартовала без оплаты, Stage 14u) ===
+  "en:application_expired:subject":   "Your cohort has started — application expired",
+  "en:application_expired:heading":   "Your application has expired.",
+  "en:application_expired:welcome":   "",
+  "en:application_expired:body":      "The cohort you applied to has started, but your payment didn't come through in time. Your spot has been released. You can browse upcoming cohorts and apply again at any time.",
+  "en:application_expired:button":    "Browse cohorts",
+  "en:application_expired:link_hint": "Or copy this link to your browser:",
+  "en:application_expired:expires":   "If you intended to pay but ran into a problem, reply to this email and we'll help sort it out.",
+  "en:application_expired:ignore":    "Questions? Reach out to hello@moiraionline.pro.",
+
+  "ru:application_expired:subject":   "Когорта стартовала — заявка истекла",
+  "ru:application_expired:heading":   "Ваша заявка истекла.",
+  "ru:application_expired:welcome":   "",
+  "ru:application_expired:body":      "Когорта, на которую вы подавали заявку, стартовала, но оплата не прошла вовремя. Место освобождено. Вы можете посмотреть ближайшие когорты и подать заявку снова в любой момент.",
+  "ru:application_expired:button":    "Посмотреть когорты",
+  "ru:application_expired:link_hint": "Или скопируйте эту ссылку в браузер:",
+  "ru:application_expired:expires":   "Если хотели оплатить, но столкнулись с проблемой — ответьте на это письмо, разберёмся.",
+  "ru:application_expired:ignore":    "Вопросы? Пишите на hello@moiraionline.pro.",
+
+  // === REFUND PROCESSED (Stage 14u) ===
+  "en:refund_processed:subject":   "Your refund has been processed",
+  "en:refund_processed:heading":   "Refund processed.",
+  "en:refund_processed:welcome":   "",
+  "en:refund_processed:body":      "Your refund has been processed. Depending on your bank, the funds should arrive within 5–14 business days. If you'd like to enroll again later, you can browse the next cohorts anytime.",
+  "en:refund_processed:button":    "Browse cohorts",
+  "en:refund_processed:link_hint": "Or copy this link to your browser:",
+  "en:refund_processed:expires":   "Keep this email for your records — it confirms the refund.",
+  "en:refund_processed:ignore":    "Questions about the refund? Reply to this email or write to hello@moiraionline.pro.",
+
+  "ru:refund_processed:subject":   "Возврат средств выполнен",
+  "ru:refund_processed:heading":   "Возврат выполнен.",
+  "ru:refund_processed:welcome":   "",
+  "ru:refund_processed:body":      "Возврат денежных средств обработан. В зависимости от банка средства поступят в течение 5–14 рабочих дней. Если захотите записаться позже, в любой момент посмотрите ближайшие когорты.",
+  "ru:refund_processed:button":    "Посмотреть когорты",
+  "ru:refund_processed:link_hint": "Или скопируйте эту ссылку в браузер:",
+  "ru:refund_processed:expires":   "Сохраните это письмо — оно подтверждает возврат.",
+  "ru:refund_processed:ignore":    "Вопросы по возврату? Ответьте на это письмо или напишите на hello@moiraionline.pro.",
 
   // === COMMON ===
   "en:common:footer":  "Moirai — Online Filmmaking Program",
