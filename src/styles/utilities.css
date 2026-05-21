@@ -424,6 +424,19 @@
   }
 }
 
+.instructors-grid {
+  display: grid;
+  gap: var(--space-xl);
+  grid-template-columns: 1fr;
+  max-width: var(--container-max);
+  margin: 0 auto;
+}
+@media (min-width: 768px) {
+  .instructors-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 .features-grid {
   display: grid;
   gap: var(--space-2xl);

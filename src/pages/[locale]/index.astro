@@ -21,6 +21,7 @@ import OrganizationSchema from "../../components/schema/OrganizationSchema.astro
 import FaqSchema from "../../components/schema/FaqSchema.astro";
 import CourseSchema from "../../components/schema/CourseSchema.astro";
 import Hero from "../../components/public/Hero.astro";
+import InstructorCard from "../../components/public/InstructorCard.astro";
 import StatsBanner from "../../components/public/StatsBanner.astro";
 import WhoCard from "../../components/public/WhoCard.astro";
 import ProgrammeCard from "../../components/public/ProgrammeCard.astro";
@@ -210,6 +211,18 @@ interface TierCardProps {
   ctaText: string;
   ctaHref: string;
 }
+// Instructor cards (Stage 9): для каждого id из sections.instructors.ids
+// резолвим entry из коллекции `instructors`. Гарантированный порядок ids.
+type InstructorEntry = CollectionEntry<"instructors">;
+const allInstructors = await getCollection("instructors");
+const instructorEntries: InstructorEntry[] = [];
+// sections.instructors.ids доступен через type cast — sections типа any-like
+const sectionInstructorIds = (sections as unknown as { instructors?: { ids?: string[] } }).instructors?.ids ?? [];
+for (const id of sectionInstructorIds) {
+  const entry = allInstructors.find((e: InstructorEntry) => e.id === `${id}.${typedLocale}`);
+  if (entry) instructorEntries.push(entry);
+}
+
 const pricingCards: TierCardProps[] = programmeCards.map((p) => {
   const slug = p.id.replace(`.${typedLocale}`, "");
   const featured = slug === "bundle";
@@ -334,14 +347,26 @@ const ui = typedLocale === "ru"
     </ul>
   </section>
 
-  {/* Instructors — карточки рендерятся из коллекции instructors
-      (vladimir-popov, anastasia-zasypkina) в Stage 9. */}
+  {/* Instructors (Stage 9): рендерится из коллекции `instructors`.
+      Bios — DRAFT, реальные подменяются методистом без code change. */}
   <section class="section section--alt center" aria-labelledby="instructors-title">
     <header class="section__head">
       <p class="eyebrow">{sections.instructors.eyebrow}</p>
       <h2 id="instructors-title" class="h2" set:html={sections.instructors.title}></h2>
     </header>
-    <p class="text-faint">{ui.pendingStage9}</p>
+    {instructorEntries.length > 0 ? (
+      <div class="instructors-grid">
+        {instructorEntries.map((entry: InstructorEntry) => (
+          <InstructorCard
+            name={entry.data.name}
+            role={entry.data.role}
+            body={entry.data.bio_short ?? ""}
+          />
+        ))}
+      </div>
+    ) : (
+      <p class="text-faint">{ui.pendingStage9}</p>
+    )}
   </section>
 
   <section class="section center" aria-labelledby="after-title">
