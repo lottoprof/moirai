@@ -1,0 +1,424 @@
+---
+/*
+ * /{locale}/dashboard/modules/{slug} — страница студента с body модуля.
+ *
+ * Stage 26d. SSR + requireRole('student').
+ *
+ * Logic:
+ *   1. Resolve module через getModuleForStudent (ownership + unlocked check)
+ *   2. Fetch body из R2 (env.MODULE_CONTENT.get(body_r2_key))
+ *   3. Render markdown via marked
+ *   4. markModuleOpened (auto in_progress)
+ *   5. "Mark complete" CTA → POST /api/student/modules/[slug]/complete
+ *
+ * Если модуль locked или не принадлежит студенту → 404 (info-hiding).
+ * Если body не найден в R2 → fallback "Materials coming soon".
+ */
+
+import { marked } from "marked";
+import DashboardLayout from "../../../../layouts/dashboard/Layout.astro";
+import { requireRole } from "../../../../lib/server/guards";
+import {
+  getModuleForStudent,
+  markModuleOpened,
+} from "../../../../lib/server/student-modules";
+
+export const prerender = false;
+
+const { locale, slug } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/dashboard");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+if (!slug || typeof slug !== "string") return new Response(null, { status: 404 });
+
+const userOrRes = await requireRole(Astro, "student");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+const module_ = await getModuleForStudent(env, user.id, slug, typedLocale);
+if (!module_) return new Response(null, { status: 404 });
+if (!module_.unlocked) {
+  return Astro.redirect(`/${typedLocale}/dashboard`);
+}
+
+// Lazy mark in_progress
+if (module_.status !== "done") {
+  await markModuleOpened(env, module_.enrollment_id, module_.slug, typedLocale);
+}
+
+// Fetch body from R2
+let bodyMarkdown: string | null = null;
+let bodyError: string | null = null;
+try {
+  const obj = await env.MODULE_CONTENT.get(module_.body_r2_key);
+  if (obj) {
+    bodyMarkdown = await obj.text();
+  } else {
+    bodyError = "missing";
+  }
+} catch (err) {
+  console.error("[module page] R2 fetch failed:", err);
+  bodyError = "fetch_error";
+}
+
+// Render markdown (body is methodist-controlled, no sanitization needed for MVP)
+marked.setOptions({ gfm: true, breaks: false });
+let bodyHtml = "";
+if (bodyMarkdown) {
+  // Strip frontmatter если есть (--- ... ---)
+  const fmStripped = bodyMarkdown.replace(/^---\n[\s\S]*?\n---\n/, "");
+  bodyHtml = await marked.parse(fmStripped);
+}
+
+// Parse JSON arrays
+let objectives: string[] = [];
+let concepts: string[] = [];
+try {
+  const parsed = JSON.parse(module_.objectives_json);
+  if (Array.isArray(parsed)) objectives = parsed.filter((x): x is string => typeof x === "string");
+} catch { /* ignore */ }
+try {
+  const parsed = JSON.parse(module_.concepts_json);
+  if (Array.isArray(parsed)) concepts = parsed.filter((x): x is string => typeof x === "string");
+} catch { /* ignore */ }
+
+const t = ru
+  ? {
+      backLink: "← Назад к модулям",
+      moduleNum: (n: number) => `Модуль ${String(n).padStart(2, "0")}`,
+      objectivesTitle: "Цели",
+      conceptsTitle: "Понятия",
+      bodyMissing: "Материал ещё не загружен. Методист готовит контент.",
+      bodyError: "Не удалось загрузить материал. Попробуйте обновить страницу.",
+      markCompleteCta: "Отметить как пройденный",
+      alreadyDone: "✓ Пройден",
+      homeworkTitle: "Домашнее задание",
+      seo: {
+        title: `${module_.title} — Moirai`,
+        description: module_.summary ?? `Модуль программы Moirai: ${module_.title}.`,
+      },
+    }
+  : {
+      backLink: "← Back to modules",
+      moduleNum: (n: number) => `Module ${String(n).padStart(2, "0")}`,
+      objectivesTitle: "Objectives",
+      conceptsTitle: "Concepts",
+      bodyMissing: "Material not yet uploaded. The methodist is preparing content.",
+      bodyError: "Failed to load material. Try reloading the page.",
+      markCompleteCta: "Mark as complete",
+      alreadyDone: "✓ Completed",
+      homeworkTitle: "Homework",
+      seo: {
+        title: `${module_.title} — Moirai`,
+        description: module_.summary ?? `Moirai programme module: ${module_.title}.`,
+      },
+    };
+
+// Cache-Control: paid content, per-user — privately
+Astro.response.headers.set("Cache-Control", "private, no-store");
+---
+
+<DashboardLayout
+  locale={typedLocale}
+  seo={{ title: t.seo.title, description: t.seo.description }}
+  currentNavKey="dashboard"
+  userRoles={user.roles}
+>
+  <article class="module-page">
+    <a href={`/${typedLocale}/dashboard`} class="module-page__back">{t.backLink}</a>
+
+    <header class="module-page__head">
+      <p class="module-page__eyebrow">
+        {t.moduleNum(module_.order_idx + 1)}
+        {module_.track && <span class="module-page__track"> · {module_.track.toUpperCase()}</span>}
+      </p>
+      <h1 class="module-page__title">{module_.title}</h1>
+      {module_.summary && <p class="module-page__summary">{module_.summary}</p>}
+    </header>
+
+    {(objectives.length > 0 || concepts.length > 0) && (
+      <section class="module-page__meta">
+        {objectives.length > 0 && (
+          <div>
+            <h2 class="module-page__meta-title">{t.objectivesTitle}</h2>
+            <ul class="module-page__meta-list">
+              {objectives.map((o) => <li>{o}</li>)}
+            </ul>
+          </div>
+        )}
+        {concepts.length > 0 && (
+          <div>
+            <h2 class="module-page__meta-title">{t.conceptsTitle}</h2>
+            <p class="module-page__concepts">{concepts.join(" · ")}</p>
+          </div>
+        )}
+      </section>
+    )}
+
+    <div class="module-page__body prose">
+      {bodyHtml ? (
+        <div set:html={bodyHtml} />
+      ) : bodyError === "missing" ? (
+        <p class="module-page__placeholder">{t.bodyMissing}</p>
+      ) : (
+        <p class="module-page__placeholder">{t.bodyError}</p>
+      )}
+    </div>
+
+    {module_.homework_md && (
+      <section class="module-page__homework">
+        <h2 class="module-page__meta-title">{t.homeworkTitle}</h2>
+        <p>{module_.homework_md}</p>
+      </section>
+    )}
+
+    <footer class="module-page__footer">
+      {module_.status === "done" ? (
+        <span class="module-page__done">{t.alreadyDone}</span>
+      ) : (
+        <button
+          type="button"
+          id="mark-complete-btn"
+          class="module-page__cta"
+          data-slug={module_.slug}
+          data-locale={typedLocale}
+        >{t.markCompleteCta}</button>
+      )}
+    </footer>
+  </article>
+</DashboardLayout>
+
+<style>
+  .module-page {
+    padding: var(--space-2xl) var(--container-pad) var(--space-3xl);
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .module-page__back {
+    display: inline-block;
+    margin-bottom: var(--space-xl);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    color: var(--text-muted);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  .module-page__back:hover {
+    color: var(--amber);
+    border-bottom-color: var(--amber);
+  }
+
+  .module-page__head {
+    margin-bottom: var(--space-2xl);
+  }
+  .module-page__eyebrow {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-accent);
+    margin: 0 0 var(--space-sm);
+  }
+  .module-page__track {
+    color: var(--text-faint);
+  }
+  .module-page__title {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    margin: 0 0 var(--space-md);
+    color: var(--text);
+  }
+  .module-page__summary {
+    font-size: var(--type-body-lg);
+    color: var(--text-muted);
+    line-height: var(--leading-relaxed);
+    margin: 0;
+  }
+
+  .module-page__meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+    padding: var(--space-lg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: var(--bg-elevated);
+    margin-bottom: var(--space-2xl);
+  }
+  .module-page__meta-title {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 var(--space-sm);
+  }
+  .module-page__meta-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+  .module-page__meta-list li {
+    padding-left: var(--space-md);
+    position: relative;
+    margin-bottom: var(--space-2xs);
+  }
+  .module-page__meta-list li::before {
+    content: "—";
+    position: absolute;
+    left: 0;
+    color: var(--amber);
+  }
+  .module-page__concepts {
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .module-page__body {
+    color: var(--text-muted);
+    font-size: var(--type-body-md);
+    line-height: 1.7;
+    margin-bottom: var(--space-2xl);
+  }
+  .module-page__body :global(h2) {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text);
+    margin-top: var(--space-2xl);
+    margin-bottom: var(--space-md);
+  }
+  .module-page__body :global(h3) {
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    font-weight: 500;
+    color: var(--text);
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-sm);
+    letter-spacing: var(--tracking-wide);
+  }
+  .module-page__body :global(p) { margin-bottom: var(--space-md); }
+  .module-page__body :global(ul),
+  .module-page__body :global(ol) {
+    margin: var(--space-md) 0;
+    padding-left: 1.5em;
+  }
+  .module-page__body :global(li) { margin-bottom: var(--space-xs); }
+  .module-page__body :global(a) {
+    color: var(--amber);
+    border-bottom: 1px solid var(--amber-faint);
+  }
+  .module-page__body :global(blockquote) {
+    border-left: 3px solid var(--amber);
+    padding: var(--space-md) var(--space-lg);
+    margin: var(--space-lg) 0;
+    background: var(--bg-elevated);
+    color: var(--text);
+  }
+  .module-page__body :global(code) {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    background: var(--bg-elevated);
+    padding: 1px 6px;
+    border-radius: 2px;
+    color: var(--text);
+  }
+  .module-page__body :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-lg) 0;
+    font-size: var(--type-body-sm);
+  }
+  .module-page__body :global(th),
+  .module-page__body :global(td) {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .module-page__body :global(th) {
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-weight: 500;
+  }
+  .module-page__placeholder {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-lg);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    text-align: center;
+  }
+
+  .module-page__homework {
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-lg);
+    margin-top: var(--space-2xl);
+    color: var(--text);
+  }
+
+  .module-page__footer {
+    margin-top: var(--space-2xl);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+  }
+  .module-page__cta {
+    padding: 12px 24px;
+    background: var(--amber);
+    color: var(--ink);
+    border: none;
+    border-radius: 2px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .module-page__cta:hover { background: var(--amber-light); }
+  .module-page__cta:disabled { opacity: 0.6; cursor: wait; }
+  .module-page__done {
+    color: var(--text-accent);
+    font-size: var(--type-body-md);
+    font-weight: 500;
+  }
+</style>
+
+<script>
+  const btn = document.getElementById("mark-complete-btn");
+  if (btn instanceof HTMLButtonElement) {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      const slug = btn.dataset.slug;
+      const locale = btn.dataset.locale ?? "en";
+      const res = await fetch(`/api/student/modules/${slug}/complete`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale }),
+      });
+      if (res.ok) {
+        // Redirect back to dashboard — visible новый прогресс + следующий unlock
+        window.location.href = `/${locale}/dashboard`;
+        return;
+      }
+      btn.disabled = false;
+      // На фейл — alert (Sprint 2 заменим на inline toast)
+      const msg = locale === "ru" ? "Не удалось отметить. Попробуйте снова." : "Couldn't mark complete. Try again.";
+      alert(msg);
+    });
+  }
+</script>

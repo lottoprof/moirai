@@ -27,6 +27,7 @@ import HomeworkCard from "../../../components/dashboard/HomeworkCard.astro";
 import { requireRole } from "../../../lib/server/guards";
 import { listApplicationsByUser } from "../../../lib/server/applications";
 import { getCohortWithSlot, parseDaysJson, normalizeDayPair, deriveTimeOfDay, computeDurationWeeks, type CohortWithSlot } from "../../../lib/server/cohorts";
+import { listEnrollmentModules, getCurrentEnrollmentProgress, type StudentModuleEntry } from "../../../lib/server/student-modules";
 
 export const prerender = false;
 
@@ -104,7 +105,25 @@ function formatPrice(cents: number, currency: string): string {
 }
 
 // ====================================================================
-// Stub data — только для primaryView='paid' (Sprint 2 replace)
+// Real data для primaryView='paid' (Stage 26c)
+// ====================================================================
+
+const enrollmentProgress = primaryView === "paid"
+  ? await getCurrentEnrollmentProgress(env, user.id)
+  : null;
+
+const enrollmentModules: StudentModuleEntry[] = enrollmentProgress
+  ? await listEnrollmentModules(env, enrollmentProgress.enrollment_id, locale)
+  : [];
+
+// Continue module — current module из progress или первый unlocked
+const continueModuleEntry = enrollmentModules.find((m) => m.slug === enrollmentProgress?.current_module_slug)
+  ?? enrollmentModules.find((m) => m.unlocked && m.status !== "done")
+  ?? null;
+
+// ====================================================================
+// Stub data — fallback (старый dashboard для контекста, удалим после
+// полной верификации paid view; в продакшене не используется)
 // ====================================================================
 const stub = {
   progress: { completed: 3, total: 12 },
@@ -316,10 +335,12 @@ const continueEyebrow = `${ru ? "МОДУЛЬ" : "MODULE"} ${stub.continueModule
         <section class="dashboard-content__stats" aria-label={t.eyebrow}>
           <StatCard
             label={t.paidProgress}
-            value={[stub.progress.completed, String(stub.progress.total)]}
-            sub={t.paidProgressSub(stub.progress.completed)}
-            progress={stub.progress.completed / stub.progress.total}
-            progressLabel={`${t.paidProgress}: ${stub.progress.completed} / ${stub.progress.total}`}
+            value={[enrollmentProgress?.done_modules ?? 0, String(enrollmentProgress?.total_modules ?? 0)]}
+            sub={t.paidProgressSub(enrollmentProgress?.done_modules ?? 0)}
+            progress={enrollmentProgress && enrollmentProgress.total_modules > 0
+              ? enrollmentProgress.done_modules / enrollmentProgress.total_modules
+              : 0}
+            progressLabel={`${t.paidProgress}: ${(enrollmentProgress?.done_modules ?? 0).toString()} / ${(enrollmentProgress?.total_modules ?? 0).toString()}`}
           />
           <StatCard
             label={programme?.data.title ?? "Programme"}
@@ -329,50 +350,47 @@ const continueEyebrow = `${ru ? "МОДУЛЬ" : "MODULE"} ${stub.continueModule
           />
           <StatCard
             label={t.paidHomework}
-            value={[stub.homeworkAwaiting, ""]}
+            value={[0, ""]}
             sub={t.paidHomeworkSub}
           />
         </section>
 
-        <section aria-labelledby="continue-label">
-          <p id="continue-label" class="dashboard-content__section-label">{t.paidContinueLearning}</p>
-          <ContinueCard
-            eyebrowText={continueEyebrow}
-            title={stub.continueModule.title}
-            meta={stub.continueModule.meta}
-            href={`/${locale}/dashboard`}
-            ariaLabel={`${t.paidContinueLearning}: ${stub.continueModule.title}`}
-          />
-        </section>
+        {continueModuleEntry && (
+          <section aria-labelledby="continue-label">
+            <p id="continue-label" class="dashboard-content__section-label">{t.paidContinueLearning}</p>
+            <ContinueCard
+              eyebrowText={`${ru ? "МОДУЛЬ" : "MODULE"} ${String(continueModuleEntry.order_idx + 1).padStart(2, "0")}${continueModuleEntry.track ? ` · ${continueModuleEntry.track.toUpperCase()}` : ""}`}
+              title={continueModuleEntry.title}
+              meta={`${continueModuleEntry.default_lessons.toString()} ${continueModuleEntry.default_lessons === 1 ? (ru ? "занятие" : "lesson") : (ru ? "занятий" : "lessons")}${continueModuleEntry.has_homework ? (ru ? " · домашка" : " · homework") : ""}`}
+              href={`/${locale}/dashboard/modules/${continueModuleEntry.slug}`}
+              ariaLabel={`${t.paidContinueLearning}: ${continueModuleEntry.title}`}
+            />
+          </section>
+        )}
 
         <section aria-labelledby="modules-label">
           <p id="modules-label" class="dashboard-content__section-label">{t.paidAllModules}</p>
           <div class="dashboard-content__modules">
-            {stub.modules.map((m) => (
-              <ModuleCard
-                num={m.num}
-                track={m.track}
-                title={m.title}
-                status={m.status}
-                statusLabel={m.status === "done" ? t.paidStatusDone : m.status === "active" ? t.paidStatusActive : t.paidStatusLocked}
-                href={m.status !== "locked" ? `/${locale}/dashboard` : undefined}
-              />
-            ))}
-          </div>
-        </section>
-
-        <section aria-labelledby="homework-label">
-          <p id="homework-label" class="dashboard-content__section-label">{t.paidHomeworkSection}</p>
-          <div class="dashboard-content__homework">
-            {stub.homework.map((h) => (
-              <HomeworkCard
-                moduleLabel={`${ru ? "Модуль" : "Module"} ${h.num} · ${h.track}`}
-                title={h.title}
-                badgeLabel={h.variant === "review" ? t.paidBadgeReview : t.paidBadgePending}
-                badgeVariant={h.variant}
-                href={`/${locale}/dashboard`}
-              />
-            ))}
+            {enrollmentModules.map((m) => {
+              const uiStatus: "done" | "active" | "locked" =
+                m.status === "done" ? "done"
+                : !m.unlocked ? "locked"
+                : "active";
+              const statusLabel =
+                uiStatus === "done" ? t.paidStatusDone
+                : uiStatus === "active" ? t.paidStatusActive
+                : t.paidStatusLocked;
+              return (
+                <ModuleCard
+                  num={String(m.order_idx + 1).padStart(2, "0")}
+                  track={m.track ?? ""}
+                  title={m.title}
+                  status={uiStatus}
+                  statusLabel={statusLabel}
+                  href={uiStatus !== "locked" ? `/${locale}/dashboard/modules/${m.slug}` : undefined}
+                />
+              );
+            })}
           </div>
         </section>
       </>
