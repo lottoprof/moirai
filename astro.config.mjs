@@ -10,6 +10,13 @@ export default defineConfig({
   adapter: cloudflare({
     platformProxy: { enabled: true },
   }),
+  // Stage 8: inline весь CSS как <style> в HTML — устраняет render-blocking
+  // CSS request'ы на mobile throttle (3×~10KB → ~300-900ms до first paint).
+  // Trade-off: HTML +30KB / gzip +6KB; CSS не кешируется отдельно, но CF edge
+  // cache HTML это покрывает.
+  build: {
+    inlineStylesheets: "always",
+  },
   i18n: {
     defaultLocale: "en",
     locales: ["en", "ru"],
