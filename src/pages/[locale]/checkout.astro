@@ -552,13 +552,14 @@ const totalLabel = formatPrice(totalCents, currency);
    *   - На success: redirect на provider checkout URL
    *   - На error: query-string param ?error=<code>
    */
-  const form = document.getElementById("checkout-form") as HTMLFormElement | null;
-  if (form) {
+  const form = document.getElementById("checkout-form");
+  if (form instanceof HTMLFormElement) {
     // Native browser validation использует locale БРАУЗЕРА (а не <html lang>) —
     // на EN-странице с RU-Chrome подсказки идут на русском. Override через
     // setCustomValidity per field на 'invalid', clear на input/change.
-    const msgs = validationMessages as Record<string, string>;
-    form.querySelectorAll<HTMLInputElement>("[required]").forEach((el) => {
+    const msgs = validationMessages;
+    form.querySelectorAll("[required]").forEach((el) => {
+      if (!(el instanceof HTMLInputElement)) return;
       const msg = msgs[el.id];
       if (!msg) return;
       el.addEventListener("invalid", () => {
@@ -574,8 +575,10 @@ const totalLabel = formatPrice(totalCents, currency);
 
       const fd = new FormData(form);
       const application_id = fd.get("application_id");
-      const password = fd.get("password") as string | null;
-      const password_confirm = fd.get("password_confirm") as string | null;
+      const passwordRaw = fd.get("password");
+      const passwordConfirmRaw = fd.get("password_confirm");
+      const password = typeof passwordRaw === "string" ? passwordRaw : null;
+      const password_confirm = typeof passwordConfirmRaw === "string" ? passwordConfirmRaw : null;
       const accept_terms = fd.get("accept_terms") === "1";
       const age_confirmed = fd.get("age_confirmed") === "1";
       const marketing_opt_in = fd.get("marketing_opt_in") === "1";
@@ -588,8 +591,8 @@ const totalLabel = formatPrice(totalCents, currency);
         return;
       }
 
-      const submitBtn = form.querySelector<HTMLButtonElement>("button[type=submit]");
-      if (submitBtn) submitBtn.disabled = true;
+      const submitBtn = form.querySelector("button[type=submit]");
+      if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = true;
 
       const res = await fetch("/api/checkout/initiate", {
         method: "POST",
@@ -605,8 +608,8 @@ const totalLabel = formatPrice(totalCents, currency);
       });
 
       if (res.ok) {
-        const data = (await res.json()) as { url?: string };
-        if (data.url) {
+        const data = await res.json();
+        if (data && typeof data.url === "string") {
           window.location.href = data.url;
           return;
         }
@@ -614,11 +617,11 @@ const totalLabel = formatPrice(totalCents, currency);
 
       let errCode = "generic";
       try {
-        const body = (await res.json()) as { error?: string };
-        if (body.error) errCode = body.error;
+        const body = await res.json();
+        if (body && typeof body.error === "string") errCode = body.error;
       } catch { /* ignore */ }
 
-      if (submitBtn) submitBtn.disabled = false;
+      if (submitBtn instanceof HTMLButtonElement) submitBtn.disabled = false;
       const url = new URL(window.location.href);
       url.searchParams.set("error", errCode);
       window.location.href = url.toString();
