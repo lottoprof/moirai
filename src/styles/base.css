@@ -36,7 +36,10 @@ body {
   line-height: var(--leading-normal);
   background: var(--bg);
   color: var(--text);
-  overflow-x: hidden;
+  /* overflow-x: clip (а не hidden) — не создаёт scrolling context,
+     поэтому position: sticky на потомках (Nav.astro) работает.
+     hidden ломает sticky в Chrome/Safari при overflow-x без y. */
+  overflow-x: clip;
   min-height: 100vh;
 
   /*

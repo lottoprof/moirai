@@ -91,11 +91,14 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
 </nav>
 
 <style>
+  /* position: sticky — Nav стакается в normal flow после AnnouncementBar
+     (Layout.astro:63-65). До прокрутки бар + nav видны последовательно;
+     после прокрутки бар уезжает наверх, nav прилипает к top:0.
+     Раньше было position: fixed — это накладывало nav поверх бара,
+     ломая верх страницы на mobile (см. screenshot 2026-05-28 18-40-40). */
   .nav {
-    position: fixed;
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
     z-index: 100;
     padding: var(--space-lg) var(--container-pad);
     display: flex;
