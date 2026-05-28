@@ -99,8 +99,12 @@ const cohorts: CohortWithSlot[] = await listActiveCohorts(env, {
 // Group by programme
 const byProgramme = new Map<string, CohortWithSlot[]>();
 for (const c of cohorts) {
-  if (!byProgramme.has(c.programme_id)) byProgramme.set(c.programme_id, []);
-  byProgramme.get(c.programme_id)!.push(c);
+  let arr = byProgramme.get(c.programme_id);
+  if (!arr) {
+    arr = [];
+    byProgramme.set(c.programme_id, arr);
+  }
+  arr.push(c);
 }
 
 // CF edge cache

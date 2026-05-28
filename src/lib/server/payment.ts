@@ -89,9 +89,16 @@ export interface PaymentProvider {
  * verifyWebhookSignature всегда true для mock — нет реальной signature.
  * Production переключение PAYMENT_PROVIDER=lemonsqueezy → swap adapter.
  */
+/*
+ * Mock provider методы — `async` обязателен по контракту PaymentProvider
+ * (Promise<...> возврат), но await внутри не нужен пока нет real-network
+ * вызовов. ESLint require-await отключаем точечно — реальная реализация
+ * (LemonSqueezy adapter в Sprint 2) сразу принесёт fetch и снимет disable.
+ */
 const mockProvider: PaymentProvider = {
   name: "mock",
 
+  // eslint-disable-next-line @typescript-eslint/require-await
   async createCheckoutSession(input) {
     const sessionId = `mock_cs_${crypto.randomUUID()}`;
     // Build URL relative to successUrl origin
@@ -105,7 +112,7 @@ const mockProvider: PaymentProvider = {
     };
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/require-await
   async verifyWebhookSignature(_rawBody, _signature, _env) {
     return true;
   },
@@ -134,8 +141,8 @@ const mockProvider: PaymentProvider = {
     };
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async refund(_env, paymentId, amountCents) {
+  // eslint-disable-next-line @typescript-eslint/require-await
+  async refund(_env, _paymentId, amountCents) {
     return {
       refund_id: `mock_ref_${crypto.randomUUID()}`,
       amount_cents: amountCents ?? 0,

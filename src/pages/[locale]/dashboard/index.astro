@@ -23,7 +23,6 @@ import DashboardHero from "../../../components/dashboard/DashboardHero.astro";
 import StatCard from "../../../components/dashboard/StatCard.astro";
 import ContinueCard from "../../../components/dashboard/ContinueCard.astro";
 import ModuleCard from "../../../components/dashboard/ModuleCard.astro";
-import HomeworkCard from "../../../components/dashboard/HomeworkCard.astro";
 import { requireRole } from "../../../lib/server/guards";
 import { listApplicationsByUser } from "../../../lib/server/applications";
 import { getCohortWithSlot, parseDaysJson, normalizeDayPair, deriveTimeOfDay, computeDurationWeeks, type CohortWithSlot } from "../../../lib/server/cohorts";
@@ -120,33 +119,6 @@ const enrollmentModules: StudentModuleEntry[] = enrollmentProgress
 const continueModuleEntry = enrollmentModules.find((m) => m.slug === enrollmentProgress?.current_module_slug)
   ?? enrollmentModules.find((m) => m.unlocked && m.status !== "done")
   ?? null;
-
-// ====================================================================
-// Stub data — fallback (старый dashboard для контекста, удалим после
-// полной верификации paid view; в продакшене не используется)
-// ====================================================================
-const stub = {
-  progress: { completed: 3, total: 12 },
-  homeworkAwaiting: 1,
-  continueModule: {
-    num: "04",
-    track: "DIRECTING",
-    title: "Visual Language",
-    meta: ru ? "Текст + видео · требуется задание" : "Text + video · homework required",
-  },
-  modules: [
-    { num: "01", track: "DIRECTING",     title: ru ? "Взгляд режиссёра"     : "The Director's Eye",  status: "done"   as const },
-    { num: "02", track: "SCRIPTWRITING", title: ru ? "Структура истории"    : "Story Structure",     status: "done"   as const },
-    { num: "03", track: "EDITING",       title: ru ? "Монтажный кадр"       : "The Cut",             status: "done"   as const },
-    { num: "04", track: "DIRECTING",     title: ru ? "Визуальный язык"      : "Visual Language",     status: "active" as const },
-    { num: "05", track: "PRODUCING",     title: ru ? "Препродакшен"         : "Pre-Production",      status: "locked" as const },
-    { num: "06", track: "SCRIPTWRITING", title: ru ? "Персонаж и конфликт"  : "Character & Conflict", status: "locked" as const },
-  ],
-  homework: [
-    { num: "02", track: "SCRIPTWRITING", title: ru ? "Структура истории" : "Story Structure", variant: "review"  as const },
-    { num: "04", track: "DIRECTING",     title: ru ? "Визуальный язык"   : "Visual Language", variant: "pending" as const },
-  ],
-};
 
 const t = ru
   ? {
@@ -255,8 +227,6 @@ const ppDurationWeeks = programme && programme.data.lessons_total_hint > 0
   ? computeDurationWeeks(programme.data.lessons_total_hint, 2)
   : 0;
 const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.data.price_currency) : "";
-
-const continueEyebrow = `${ru ? "МОДУЛЬ" : "MODULE"} ${stub.continueModule.num} · ${stub.continueModule.track}`;
 ---
 
 <DashboardLayout

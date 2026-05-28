@@ -12,7 +12,6 @@
  */
 
 import type {
-  ModuleProgressRow,
   ModuleProgressStatus,
   Locale,
 } from "../../../db/types";
@@ -40,12 +39,15 @@ export interface StudentModuleEntry {
 
 interface RawJoinRow {
   slug: string;
-  title: string;
+  // LEFT JOIN modules может вернуть NULL для всех полей m.*, если
+  // соответствующего ряда в modules нет (orphan slug). Поэтому полей
+  // m.title / m.track / m.has_* / m.default_lessons — nullable.
+  title: string | null;
   track: string | null;
-  has_video: number;
-  has_external_video: number;
-  has_homework: number;
-  default_lessons: number;
+  has_video: number | null;
+  has_external_video: number | null;
+  has_homework: number | null;
+  default_lessons: number | null;
   order_idx: number;
   status: string | null;
   completed_at: number | null;

@@ -357,7 +357,7 @@ export function deriveTimeOfDay(timeEt: string): "morning" | "evening" {
 /** Parse slots.days_json в массив weekday-кодов. Гарантированно валидно. */
 export function parseDaysJson(daysJson: string): string[] {
   try {
-    const parsed = JSON.parse(daysJson);
+    const parsed: unknown = JSON.parse(daysJson);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((x): x is string => typeof x === "string");
   } catch {
