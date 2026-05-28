@@ -30,32 +30,43 @@ const { items } = Astro.props;
 ---
 
 <section class="stats-banner" aria-label="Key facts">
-  <ul class="stats-banner__list" role="list">
-    {items.map((stat: StatItem) => (
-      <li class="stats-banner__item">
-        <span class:list={["stats-banner__value", { "stats-banner__value--accent": stat.accent }]}>
-          {stat.value}
-        </span>
-        <span class="stats-banner__label">{stat.label}</span>
-      </li>
-    ))}
-  </ul>
+  {/* inner — обрамляет визуальную полоску бордерами и держит её в
+       container-max. Раньше бордеры шли edge-to-edge — выглядело
+       как "растянуто на весь экран" поверх sectional layout остальной
+       страницы. */}
+  <div class="stats-banner__inner">
+    <ul class="stats-banner__list" role="list">
+      {items.map((stat: StatItem) => (
+        <li class="stats-banner__item">
+          <span class:list={["stats-banner__value", { "stats-banner__value--accent": stat.accent }]}>
+            {stat.value}
+          </span>
+          <span class="stats-banner__label">{stat.label}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
 </section>
 
 <style>
   .stats-banner {
+    /* Outer — только вертикальное "дыхание" + горизонтальное container-pad.
+       Бордеры/фон ушли внутрь inner — там же ограничение container-max. */
+    padding: var(--space-xl) var(--container-pad);
+  }
+
+  .stats-banner__inner {
+    max-width: var(--container-max);
+    margin-inline: auto;
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
-    background: var(--bg);
-    padding: var(--space-xl) var(--container-pad);
+    padding-block: var(--space-xl);
   }
 
   .stats-banner__list {
     list-style: none;
     padding: 0;
     margin: 0;
-    max-width: var(--container-max);
-    margin-inline: auto;
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: var(--space-lg);
@@ -107,6 +118,9 @@ const { items } = Astro.props;
   @media (max-width: 640px) {
     .stats-banner {
       padding: var(--space-lg) var(--space-md);
+    }
+    .stats-banner__inner {
+      padding-block: var(--space-lg);
     }
     .stats-banner__list {
       grid-template-columns: repeat(2, 1fr);

@@ -38,15 +38,20 @@ const { badge, title, body, ctaText, ctaHref } = Astro.props;
 
 <style>
   .ai-banner {
-    background: var(--bg-elevated);
-    border-top: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
-    padding: var(--space-md) var(--container-pad);
+    /* Outer — только container-pad для горизонтальной симметрии с остальной
+       страницей. Визуальная "полоска" (бэкграунд + амбер бордеры) ушла
+       внутрь inner, ограниченного container-max. */
+    padding-block: var(--space-md);
+    padding-inline: var(--container-pad);
   }
 
   .ai-banner__inner {
     max-width: var(--container-max);
     margin-inline: auto;
+    background: var(--bg-elevated);
+    border-top: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: var(--space-md) var(--space-lg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -110,10 +115,12 @@ const { badge, title, body, ctaText, ctaHref } = Astro.props;
 
   @media (max-width: 640px) {
     .ai-banner {
-      padding: var(--space-sm) var(--space-md);
+      padding-block: var(--space-sm);
+      padding-inline: var(--space-md);
     }
     .ai-banner__inner {
       gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
     }
     .ai-banner__sep {
       display: none;

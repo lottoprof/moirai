@@ -28,7 +28,14 @@ const { eyebrow, title, lede, ctaText, ctaHref } = Astro.props;
 ---
 
 <section class="hero" aria-labelledby="hero-title">
-  <span class="hero__eyebrow eyebrow">{eyebrow}</span>
+  {/* eyebrow:
+       desktop — статичный, центрированный (align-self: center);
+       mobile — ticker, бегущая строка (дубль для бесшовного loop'a).
+       Дубль скрыт от AT через aria-hidden — читается только первый. */}
+  <div class="hero__eyebrow-wrap">
+    <span class="hero__eyebrow eyebrow">{eyebrow}</span>
+    <span class="hero__eyebrow eyebrow hero__eyebrow--ghost" aria-hidden="true">{eyebrow}</span>
+  </div>
   <h1 id="hero-title" class="hero__title h1" set:html={title}></h1>
   <p class="hero__lede text-muted">{lede}</p>
   <div class="hero__cta">
@@ -48,10 +55,56 @@ const { eyebrow, title, lede, ctaText, ctaHref } = Astro.props;
     margin-inline: auto;
   }
 
-  .hero__eyebrow {
+  .hero__eyebrow-wrap {
+    align-self: center;
     margin-bottom: var(--space-2xl);
     opacity: 0;
     animation: rise var(--duration-rise) 0.2s var(--ease-out) both;
+    max-width: 100%;
+  }
+  .hero__eyebrow {
+    /* На desktop wrap содержит один span (второй ghost спрятан) — обычная
+       inline-block надпись. На mobile активируется ticker (см. ниже). */
+    white-space: normal;
+  }
+  .hero__eyebrow--ghost {
+    display: none;
+  }
+
+  @media (max-width: 640px) {
+    /* Ticker: контейнер обрезает overflow, два eyebrow-span'a выстраиваются
+       в ряд и сдвигаются на -50% за 22s по линейному easing'у. Дубль
+       нужен для бесшовного loop'a (когда первый ушёл слева, второй уже
+       занимает экран). */
+    .hero__eyebrow-wrap {
+      align-self: stretch;
+      width: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-wrap: nowrap;
+      gap: var(--space-2xl);
+    }
+    .hero__eyebrow {
+      flex-shrink: 0;
+      white-space: nowrap;
+      animation: hero-eyebrow-ticker 22s linear infinite;
+    }
+    .hero__eyebrow--ghost {
+      display: inline-block;
+    }
+  }
+
+  @keyframes hero-eyebrow-ticker {
+    from { transform: translateX(0); }
+    /* -100% сдвигает на ширину одного span'a + gap — за это время дубль
+       занимает позицию первого, loop незаметный. */
+    to   { transform: translateX(calc(-100% - var(--space-2xl))); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero__eyebrow {
+      animation: none;
+    }
   }
 
   .hero__title {
