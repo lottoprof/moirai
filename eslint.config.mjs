@@ -11,6 +11,9 @@ export default [
       ".wrangler/**",
       "node_modules/**",
       "worker-configuration.d.ts",
+      // Build/seed/sync скрипты — Node ESM utilities, не в bundle.
+      // Не покрываются tsconfig.eslint.json, лучше не пускать в type-aware lint.
+      "scripts/**/*.mjs",
     ],
   },
   js.configs.recommended,

@@ -4,10 +4,11 @@
     "astro.config.mjs",
     "eslint.config.mjs",
     "worker-configuration.d.ts",
+    ".astro/types.d.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.astro",
     "db/**/*.ts"
   ],
-  "exclude": ["dist", "node_modules", ".wrangler", ".astro"]
+  "exclude": ["dist", "node_modules", ".wrangler"]
 }
