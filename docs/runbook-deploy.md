@@ -70,7 +70,7 @@ pnpm exec wrangler pages dev ./dist
 ## Production-деплой
 
 ```bash
-pnpm deploy
+pnpm release
 ```
 
 Что произойдёт:
@@ -85,14 +85,14 @@ pnpm deploy
 ## Preview-деплой (без затрагивания prod)
 
 ```bash
-pnpm deploy:preview
+pnpm release:preview
 ```
 
 Wrangler возьмёт текущую git-ветку и зальёт как preview-deployment.
 URL вида `https://<branch>.moirai-c6e.pages.dev`. Production и
 custom domain не обновятся.
 
-## Production validation (после `pnpm deploy`)
+## Production validation (после `pnpm release`)
 
 ```bash
 # Root redirect + noindex
@@ -130,7 +130,7 @@ curl -s https://moiraionline.pro/sitemap-index.xml
 
    ```bash
    git checkout <good-sha>
-   pnpm deploy
+   pnpm release
    git checkout main
    ```
 
