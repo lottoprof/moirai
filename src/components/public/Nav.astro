@@ -66,7 +66,7 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
       <span class="nav__auth-sep" aria-hidden="true">/</span>
       <a
         href={`/${locale}/register`}
-        class:list={["nav__auth-item", { "is-active": onRegister }]}
+        class:list={["nav__auth-item nav__auth-item--register", { "is-active": onRegister }]}
         aria-current={onRegister ? "page" : undefined}
       >{labels.signUp}</a>
     </div>
@@ -179,6 +179,22 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
 
   /* JS toggle handles via .hidden attribute */
   [hidden] { display: none !important; }
+
+  /* Mobile (<=640px): скрываем "/ Sign up" — остаётся один Sign in.
+     Регистрация достижима через ссылку "No account? Create one"
+     на /login странице (login.astro:186). */
+  @media (max-width: 640px) {
+    .nav__auth-sep,
+    .nav__auth-item--register {
+      display: none;
+    }
+    .nav {
+      padding: var(--space-md) var(--container-pad);
+    }
+    .nav__right {
+      gap: var(--space-md);
+    }
+  }
 </style>
 
 <script>
