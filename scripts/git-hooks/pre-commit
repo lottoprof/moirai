@@ -15,14 +15,18 @@ fi
 
 # 1) Anti-hardcode price regex (Architecture v0.8.1 §4 anti-hardcode rules).
 #    Цены живут в Content Collections (тиры) и D1 (runs), не в шаблонах.
-#    Игнорируем .md (декларативный контент) и сам hook-каталог.
+#    Игнорируем .md (декларативный контент), сам hook-каталог, docs/,
+#    и бинарные файлы (картинки/шрифты/PDF — их байты случайно матчат
+#    $<digits> или валютные символы).
 code_staged=$(echo "$staged" \
-  | grep -vE '\.md$|^scripts/git-hooks/|^docs/' || true)
+  | grep -vE '\.md$|^scripts/git-hooks/|^docs/|\.(jpg|jpeg|png|gif|webp|svg|ico|woff2?|ttf|otf|eot|pdf|mp4|webm|mov|wasm)$' || true)
 
 if [ -n "$code_staged" ]; then
-  # \$<digits> или {€£¥₽}<digits> — захардкоженная цена в коде
+  # \$<digits> или {€£¥₽}<digits> — захардкоженная цена в коде.
+  # --binary-files=without-match — на случай если новый бинарь не покрылся
+  # whitelist'ом выше; grep пропустит его без false-positive.
   if echo "$code_staged" \
-       | xargs -r grep -nE '(\$[0-9]+|[€£¥₽][0-9]+)' 2>/dev/null; then
+       | xargs -r grep --binary-files=without-match -nE '(\$[0-9]+|[€£¥₽][0-9]+)' 2>/dev/null; then
     echo "[BLOCK] hardcoded price-like literal in staged code." >&2
     echo "       Цены живут в Content Collections (programmes/bundles tiers)" >&2
     echo "       и D1 (runs.price_amount). Не в шаблонах." >&2
