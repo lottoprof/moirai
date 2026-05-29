@@ -16,17 +16,31 @@ interface Props {
   lede: string;
   linkHref: string;
   linkText: string;
-  /** Опц. — meta-строка под lede: "11 модулей · 13 занятий · €399" */
+  /** Опц. — meta-строка под lede (modules count · lessons · price). */
   meta?: string;
+  /** Опц. — массив треков для chips ("Directing", "Editing"...). Берётся
+      из sections.curriculum.levels[].tracks (см. home.mdx). Даёт editorial
+      depth подобно §.tracks в примере клиента (Film_Site_6.html), но
+      сохраняет SEO/CTA структуру programme-card (3 internal deep links +
+      pricing inline). */
+  tracks?: string[];
 }
 
-const { label, title, lede, linkHref, linkText, meta } = Astro.props;
+const { label, title, lede, linkHref, linkText, meta, tracks } = Astro.props;
+const hasTracks = (tracks ?? []).length > 0;
 ---
 
 <article class="programme-card">
   <div class="programme-card__label">{label}</div>
   <h3 class="programme-card__title">{title}</h3>
   <p class="programme-card__lede">{lede}</p>
+  {hasTracks && (
+    <ul class="programme-card__tracks" role="list">
+      {tracks?.map((t) => (
+        <li class="programme-card__track">{t}</li>
+      ))}
+    </ul>
+  )}
   {meta && <p class="programme-card__meta">{meta}</p>}
   <a href={linkHref} class="programme-card__link">
     {linkText}
@@ -74,6 +88,35 @@ const { label, title, lede, linkHref, linkText, meta } = Astro.props;
     font-size: var(--type-micro-md);
     letter-spacing: 0.04em;
     margin-bottom: var(--space-xl);
+  }
+
+  /* Tracks chips — editorial depth внутри карточки. List-style none,
+     каждый chip — pill с тонким border'ом, amber акцент на hover. */
+  .programme-card__tracks {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--space-lg);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2xs);
+  }
+  .programme-card__track {
+    display: inline-block;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-size: var(--type-micro-md);
+    color: var(--text-muted);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    font-weight: 500;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+  .programme-card:hover .programme-card__track {
+    border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+    color: var(--text);
   }
 
   .programme-card__link {

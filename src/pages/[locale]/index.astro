@@ -182,6 +182,25 @@ const fromOurFilmsSection = sections.photo_strips?.from_our_films;
 const behindCameraPhotos = buildStripPhotos(behindCameraSection);
 const fromOurFilmsPhotos = buildStripPhotos(fromOurFilmsSection);
 
+// ============================================================
+// Track chips для ProgrammeCard — editorial depth внутри карточки
+// (как §.tracks в примере клиента Film_Site_6.html). Сохраняем
+// SEO/CTA структуру programme-cards: 3 internal links + price inline.
+// Mapping:
+//   beginner    → curriculum.levels[id=beginner].tracks (3)
+//   intermediate → curriculum.levels[id=intermediate].tracks (4)
+//   bundle      → объединение Beginner+Intermediate tracks (=4 от Int)
+//   individual  → нет track chips (individual modules — не trackbased)
+// ============================================================
+const beginnerLevel = sections.curriculum.levels.find((l) => l.id === "beginner");
+const intermediateLevel = sections.curriculum.levels.find((l) => l.id === "intermediate");
+const tracksBySlug: Record<string, string[]> = {
+  beginner: beginnerLevel?.tracks.map((t) => t.name) ?? [],
+  intermediate: intermediateLevel?.tracks.map((t) => t.name) ?? [],
+  bundle: intermediateLevel?.tracks.map((t) => t.name) ?? [],
+  individual: [],
+};
+
 // Programme cards: фиксированный порядок (Beginner → Intermediate → Bundle → Individual).
 // Читаем programmes коллекцию + фильтруем по локали, потом по slug.
 type ProgrammeEntry = CollectionEntry<"programmes">;
@@ -434,16 +453,20 @@ const ui = typedLocale === "ru"
       <p class="text-muted">{sections.curriculum.intro}</p>
     </header>
     <div class="programme-grid">
-      {programmeCards.map((p) => (
-        <ProgrammeCard
-          label={p.data.marketing.tagline}
-          title={p.data.title}
-          lede={p.data.summary}
-          meta={programmeMeta(p, typedLocale)}
-          linkHref={`/${typedLocale}/programmes/${p.id.replace(`.${typedLocale}`, "")}`}
-          linkText={ui.explore(p.data.title)}
-        />
-      ))}
+      {programmeCards.map((p) => {
+        const slug = p.id.replace(`.${typedLocale}`, "");
+        return (
+          <ProgrammeCard
+            label={p.data.marketing.tagline}
+            title={p.data.title}
+            lede={p.data.summary}
+            meta={programmeMeta(p, typedLocale)}
+            linkHref={`/${typedLocale}/programmes/${slug}`}
+            linkText={ui.explore(p.data.title)}
+            tracks={tracksBySlug[slug]}
+          />
+        );
+      })}
     </div>
   </section>
 
