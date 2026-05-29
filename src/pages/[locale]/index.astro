@@ -21,7 +21,7 @@ import OrganizationSchema from "../../components/schema/OrganizationSchema.astro
 import FaqSchema from "../../components/schema/FaqSchema.astro";
 import CourseSchema from "../../components/schema/CourseSchema.astro";
 import PersonSchema from "../../components/schema/PersonSchema.astro";
-import Hero from "../../components/public/Hero.astro";
+import Hero, { type HeroPlate } from "../../components/public/Hero.astro";
 import InstructorCard from "../../components/public/InstructorCard.astro";
 import StatsBanner from "../../components/public/StatsBanner.astro";
 import WhoCard from "../../components/public/WhoCard.astro";
@@ -82,7 +82,7 @@ interface StatItem {
   accent?: boolean;
 }
 interface HomeSections {
-  hero: { eyebrow: string; title: string; lede: string; cta_text: string; cta_href: string };
+  hero: { eyebrow: string; title: string; lede: string; cta_text: string; cta_href: string; cohort_urgency?: string };
   stats: { items: StatItem[] };
   who: { eyebrow: string; title: string; audiences: CtaItem[] };
   curriculum: { eyebrow: string; title: string; intro: string; levels: CurriculumLevel[] };
@@ -102,6 +102,37 @@ if (!sections) {
 const seo = home.data.seo;
 const faqs: { q: string; a: string }[] = home.data.faqs ?? [];
 
+// ============================================================
+// Hero promo plates (Stage_advertising):
+// читаем active announcements (lifecycle starts_at/ends_at), сортируем
+// по priority desc + starts_at asc — те же правила что были у бывшего
+// top-of-page <AnnouncementBar />. Каждая entry рендерится плашкой
+// под APPLY кнопкой и даёт slug-targeted internal link для SEO.
+// См. ROADMAP — Sprint 2 ssg-sync из D1 заменит manual edits в коллекции.
+// ============================================================
+type AnnouncementEntry = CollectionEntry<"announcements">;
+const nowMs = Date.now();
+const allAnnouncements = await getCollection("announcements");
+const heroPlates: HeroPlate[] = allAnnouncements
+  .filter((e: AnnouncementEntry) => e.id.endsWith(`.${typedLocale}`))
+  .filter((e: AnnouncementEntry) =>
+    e.data.starts_at.getTime() <= nowMs && nowMs <= e.data.ends_at.getTime(),
+  )
+  .sort((a: AnnouncementEntry, b: AnnouncementEntry) => {
+    if (b.data.priority !== a.data.priority) return b.data.priority - a.data.priority;
+    return a.data.starts_at.getTime() - b.data.starts_at.getTime();
+  })
+  .filter((e: AnnouncementEntry): e is AnnouncementEntry & { data: { cta_text: string; cta_href: string } } =>
+    typeof e.data.cta_text === "string" && typeof e.data.cta_href === "string",
+  )
+  .map((e: AnnouncementEntry) => ({
+    kind: e.data.kind,
+    text: e.data.text,
+    cta_text: e.data.cta_text as string,
+    cta_href: e.data.cta_href as string,
+    slug: e.id.replace(/\.(en|ru)$/, ""),
+  }));
+
 // Programme cards: фиксированный порядок (Beginner → Intermediate → Bundle → Individual).
 // Читаем programmes коллекцию + фильтруем по локали, потом по slug.
 type ProgrammeEntry = CollectionEntry<"programmes">;
@@ -115,7 +146,7 @@ const programmeCards = cardOrder
   // ссылке (/programmes/<id>), не появляется в home grid / cards / pricing.
   .filter((p: ProgrammeEntry) => p.data.published !== false);
 
-// Currency formatter — €399.00 → "€399"
+// Currency formatter: cents + currency code → "<symbol><whole units>".
 function formatPrice(cents: number, currency: string, locale: "en" | "ru"): string {
   if (cents === 0) return locale === "ru" ? "по запросу" : "on request";
   const value = Math.round(cents / 100);
@@ -313,6 +344,9 @@ const ui = typedLocale === "ru"
     lede={sections.hero.lede}
     ctaText={sections.hero.cta_text}
     ctaHref={sections.hero.cta_href}
+    cohortUrgency={sections.hero.cohort_urgency}
+    plates={heroPlates}
+    locale={typedLocale}
   />
 
   <StatsBanner items={sections.stats.items} />

@@ -15,6 +15,15 @@
 
 import Btn from "./Btn.astro";
 
+export interface HeroPlate {
+  kind: "cohort" | "soon" | "new" | "promo" | "info";
+  text: string;
+  cta_text: string;
+  cta_href: string;
+  /** id без локали — стабильный slug-идентификатор для аналитики/тестов */
+  slug: string;
+}
+
 interface Props {
   eyebrow: string;
   /** HTML — допускается <em> для амбер-акцента */
@@ -22,9 +31,39 @@ interface Props {
   lede: string;
   ctaText: string;
   ctaHref: string;
+  /** Static fine-print под CTA: cohort/scheduled даты. См. ROADMAP — Sprint 2
+      ssg-sync из D1 cohorts заменит manual edit в home.{locale}.mdx. */
+  cohortUrgency?: string;
+  /** Active promo plates под cohort fine-print. Многоцелевая banner-реклама
+      (was: <AnnouncementBar /> сверху). Stage_advertising: каждая entry —
+      slug-targeted ad для SEO internal linking. См. ROADMAP. */
+  plates?: HeroPlate[];
+  /** Локаль для kind-label'ов чипов плашек. */
+  locale?: "en" | "ru";
 }
 
-const { eyebrow, title, lede, ctaText, ctaHref } = Astro.props;
+const { eyebrow, title, lede, ctaText, ctaHref, cohortUrgency, plates, locale = "en" } = Astro.props;
+
+const ru = locale === "ru";
+const kindLabel: Record<HeroPlate["kind"], string> = ru
+  ? {
+      cohort: "Когорта",
+      soon: "Скоро",
+      new: "Новинка",
+      promo: "Акция",
+      info: "Инфо",
+    }
+  : {
+      cohort: "Cohort",
+      soon: "Coming soon",
+      new: "New",
+      promo: "Promo",
+      info: "Info",
+    };
+
+const platesList: HeroPlate[] = plates ?? [];
+const hasPlates = platesList.length > 0;
+const hasMultiplePlates = platesList.length > 1;
 ---
 
 <section class="hero" aria-labelledby="hero-title">
@@ -40,7 +79,49 @@ const { eyebrow, title, lede, ctaText, ctaHref } = Astro.props;
   <p class="hero__lede text-muted">{lede}</p>
   <div class="hero__cta">
     <Btn href={ctaHref} variant="primary" size="lg" arrow>{ctaText}</Btn>
+    {cohortUrgency && (
+      <p class="hero__urgency">{cohortUrgency}</p>
+    )}
   </div>
+
+  {hasPlates && (
+    <div class="hero__promo" aria-label={ru ? "Активные предложения" : "Active offers"} data-rotate-ms="8000" data-pause-ms="15000">
+      <ul class="hero__promo-list" role="list">
+        {platesList.map((p, i) => (
+          <li
+            class:list={["hero__promo-item", { "is-active": i === 0 }]}
+            data-slug={p.slug}
+            data-index={i.toString()}
+          >
+            <a class="hero__promo-link" href={p.cta_href}>
+              <span class:list={["hero__promo-chip", `hero__promo-chip--${p.kind}`]}>
+                {kindLabel[p.kind]}
+              </span>
+              <span class="hero__promo-text">{p.text}</span>
+              <span class="hero__promo-cta">
+                {p.cta_text}
+                <span class="hero__promo-arrow" aria-hidden="true">→</span>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+
+      {hasMultiplePlates && (
+        <div class="hero__promo-dots" role="group" aria-label={ru ? "Переключение предложений" : "Switch offers"}>
+          {platesList.map((_, i) => (
+            <button
+              type="button"
+              class:list={["hero__promo-dot", { "is-active": i === 0 }]}
+              data-index={i.toString()}
+              aria-label={`${(i + 1).toString()} / ${platesList.length.toString()}`}
+              aria-current={i === 0 ? "true" : undefined}
+            ></button>
+          ))}
+        </div>
+      )}
+    </div>
+  )}
 </section>
 
 <style>
@@ -125,6 +206,164 @@ const { eyebrow, title, lede, ctaText, ctaHref } = Astro.props;
   .hero__cta {
     opacity: 0;
     animation: rise var(--duration-rise) 0.65s var(--ease-out) both;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+  }
+  /* Fine-print рядом/под кнопкой APPLY. На desktop — справа от кнопки;
+     на mobile (flex-wrap) — переносится на новую строку, прижата к началу. */
+  .hero__urgency {
+    margin: 0;
+    color: var(--text-faint);
+    font-size: var(--type-body-sm);
+    font-family: var(--font-body);
+    letter-spacing: var(--tracking-normal);
+  }
+
+  /* Promo plates / rotating banner — секция под cohort-fine-print.
+     Используется вместо top-of-page <AnnouncementBar />: каждая entry
+     даёт slug-targeted internal link для SEO (см. ROADMAP). */
+  .hero__promo {
+    margin-top: var(--space-2xl);
+    max-width: 56ch;
+    opacity: 0;
+    animation: rise var(--duration-rise) 0.8s var(--ease-out) both;
+    position: relative;
+  }
+  .hero__promo-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    position: relative;
+    min-height: 56px;
+  }
+  .hero__promo-item {
+    display: none;
+  }
+  .hero__promo-item.is-active {
+    display: block;
+  }
+  .hero__promo-link {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    padding: 14px 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      background var(--duration-fast) var(--ease-out);
+  }
+  .hero__promo-link:hover {
+    border-color: color-mix(in srgb, var(--amber) 50%, transparent);
+    background: color-mix(in srgb, var(--amber) 4%, var(--bg-elevated));
+  }
+
+  .hero__promo-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .hero__promo-chip--soon {
+    background: var(--amber-faint);
+    color: var(--text-accent);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  }
+  .hero__promo-chip--new {
+    background: var(--amber);
+    color: var(--ink);
+  }
+  .hero__promo-chip--promo {
+    background: var(--amber);
+    color: var(--ink);
+  }
+  .hero__promo-chip--cohort {
+    background: transparent;
+    color: var(--text-accent);
+    border: 1px solid var(--amber);
+  }
+  .hero__promo-chip--info {
+    background: transparent;
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+  }
+
+  .hero__promo-text {
+    color: var(--text);
+    font-size: var(--type-body-sm);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .hero__promo-cta {
+    color: var(--amber);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .hero__promo-arrow {
+    margin-left: 4px;
+    display: inline-block;
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+  .hero__promo-link:hover .hero__promo-arrow {
+    transform: translateX(3px);
+  }
+
+  .hero__promo-dots {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-2xs);
+    margin-top: var(--space-sm);
+  }
+  /* Hit area 24×24, visual 8×8 — WCAG 2.5.5 AA. */
+  .hero__promo-dot {
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .hero__promo-dot::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-strong);
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .hero__promo-dot:hover::before {
+    background: var(--text-muted);
+  }
+  .hero__promo-dot.is-active::before {
+    background: var(--amber);
+  }
+
+  /* Mobile: text переезжает на новую строку под chip (flex-wrap). */
+  @media (max-width: 640px) {
+    .hero__promo-link {
+      gap: var(--space-xs);
+    }
+    .hero__promo-text {
+      flex-basis: 100%;
+    }
   }
 
   @keyframes rise {
@@ -138,3 +377,54 @@ const { eyebrow, title, lede, ctaText, ctaHref } = Astro.props;
     }
   }
 </style>
+
+<script>
+  /*
+   * Hero promo rotation:
+   *   - читает data-rotate-ms / data-pause-ms с корневого .hero__promo
+   *   - переключает .is-active между .hero__promo-item каждые rotate-ms
+   *   - клик по dot → переключение + pause на pause-ms
+   *   - 1 entry → без интервала (rotation no-op)
+   */
+  const promo = document.querySelector<HTMLElement>(".hero__promo");
+  if (promo) {
+    const items = Array.from(promo.querySelectorAll<HTMLElement>(".hero__promo-item"));
+    const dots = Array.from(promo.querySelectorAll<HTMLButtonElement>(".hero__promo-dot"));
+    const rotateMs = Number(promo.dataset.rotateMs ?? "8000");
+    const pauseMs = Number(promo.dataset.pauseMs ?? "15000");
+
+    let current = 0;
+    let pauseUntil = 0;
+
+    function show(next: number): void {
+      items.forEach((it) => it.classList.remove("is-active"));
+      dots.forEach((d) => { d.classList.remove("is-active"); d.removeAttribute("aria-current"); });
+      const item = items[next];
+      const dot = dots[next];
+      if (item) item.classList.add("is-active");
+      if (dot) {
+        dot.classList.add("is-active");
+        dot.setAttribute("aria-current", "true");
+      }
+      current = next;
+    }
+
+    function tick(): void {
+      if (Date.now() < pauseUntil) return;
+      const next = (current + 1) % items.length;
+      show(next);
+    }
+
+    if (items.length > 1) {
+      window.setInterval(tick, rotateMs);
+    }
+
+    dots.forEach((dot) => {
+      dot.addEventListener("click", () => {
+        const idx = Number(dot.dataset.index);
+        show(idx);
+        pauseUntil = Date.now() + pauseMs;
+      });
+    });
+  }
+</script>

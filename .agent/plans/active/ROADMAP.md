@@ -104,6 +104,13 @@ Sprint 2 (новые планы будут):
 - [ ] **CF Cron Trigger** для daily `/api/admin/cron/tick` automation
 - [ ] **PersonSchema** для instructor detail pages когда сделаем `/instructors/[slug]`
 - [ ] **Real instructor bios** (Vladimir + Anastasia подменят DRAFT текст)
+- [ ] **Hero cohort urgency — SSG injection из D1** (booking-pattern). Sprint 1
+  пока статика в `home.{en,ru}.mdx` frontmatter (методист правит руками при
+  смене даты). Sprint 2 — pre-build скрипт `scripts/sync-hero-cohort.mjs`:
+  query D1 `SELECT * FROM cohorts WHERE start_date >= now ORDER BY start_date LIMIT 1`,
+  write to `src/generated/hero-cohort.json` (commit'ится), Hero.astro импортит
+  и рендерит если есть данные. Хук в `package.json` `prerelease` — авто-запуск
+  перед `pnpm release`. Аналог booking `backend/app/services/ssg/render_promo.py`.
 
 ## Documentation / Skills updates
 
