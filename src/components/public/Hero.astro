@@ -77,7 +77,7 @@ const hasMultiplePlates = platesList.length > 1;
       <Image
         src={bgImage}
         alt=""
-        widths={[768, 1200, 1600, 2000]}
+        widths={[768, 1200, 1600, 2000, 2560]}
         sizes="100vw"
         format="webp"
         quality={75}
@@ -85,79 +85,97 @@ const hasMultiplePlates = platesList.length > 1;
       />
     </div>
   )}
-  {/* eyebrow:
-       desktop — статичный, центрированный (align-self: center);
-       mobile — ticker, бегущая строка (дубль для бесшовного loop'a).
-       Дубль скрыт от AT через aria-hidden — читается только первый. */}
-  <div class="hero__eyebrow-wrap">
-    <span class="hero__eyebrow eyebrow">{eyebrow}</span>
-    <span class="hero__eyebrow eyebrow hero__eyebrow--ghost" aria-hidden="true">{eyebrow}</span>
-  </div>
-  <h1 id="hero-title" class="hero__title h1" set:html={title}></h1>
-  <p class="hero__lede text-muted">{lede}</p>
-  <div class="hero__cta">
-    <Btn href={ctaHref} variant="primary" size="lg" arrow>{ctaText}</Btn>
-    {cohortUrgency && (
-      <p class="hero__urgency">{cohortUrgency}</p>
-    )}
-  </div>
-
-  {hasPlates && (
-    <div class="hero__promo" aria-label={ru ? "Активные предложения" : "Active offers"} data-rotate-ms="8000" data-pause-ms="15000">
-      <ul class="hero__promo-list" role="list">
-        {platesList.map((p, i) => (
-          <li
-            class:list={["hero__promo-item", { "is-active": i === 0 }]}
-            data-slug={p.slug}
-            data-index={i.toString()}
-          >
-            <a class="hero__promo-link" href={p.cta_href}>
-              <span class:list={["hero__promo-chip", `hero__promo-chip--${p.kind}`]}>
-                {kindLabel[p.kind]}
-              </span>
-              <span class="hero__promo-text">{p.text}</span>
-              <span class="hero__promo-cta">
-                {p.cta_text}
-                <span class="hero__promo-arrow" aria-hidden="true">→</span>
-              </span>
-            </a>
-          </li>
-        ))}
-      </ul>
-
-      {hasMultiplePlates && (
-        <div class="hero__promo-dots" role="group" aria-label={ru ? "Переключение предложений" : "Switch offers"}>
-          {platesList.map((_, i) => (
-            <button
-              type="button"
-              class:list={["hero__promo-dot", { "is-active": i === 0 }]}
-              data-index={i.toString()}
-              aria-label={`${(i + 1).toString()} / ${platesList.length.toString()}`}
-              aria-current={i === 0 ? "true" : undefined}
-            ></button>
-          ))}
-        </div>
+  {/* Content в inner-container: hero сам full-bleed (bg image идёт
+       edge-to-edge как photo-strips), content же ограничен container-max
+       + container-pad — единый pattern с остальными секциями. */}
+  <div class="hero__inner">
+    {/* eyebrow:
+         desktop — статичный, центрированный (align-self: center);
+         mobile — ticker, бегущая строка (дубль для бесшовного loop'a).
+         Дубль скрыт от AT через aria-hidden — читается только первый. */}
+    <div class="hero__eyebrow-wrap">
+      <span class="hero__eyebrow eyebrow">{eyebrow}</span>
+      <span class="hero__eyebrow eyebrow hero__eyebrow--ghost" aria-hidden="true">{eyebrow}</span>
+    </div>
+    <h1 id="hero-title" class="hero__title h1" set:html={title}></h1>
+    <p class="hero__lede text-muted">{lede}</p>
+    <div class="hero__cta">
+      <Btn href={ctaHref} variant="primary" size="lg" arrow>{ctaText}</Btn>
+      {cohortUrgency && (
+        <p class="hero__urgency">{cohortUrgency}</p>
       )}
     </div>
-  )}
+
+    {hasPlates && (
+      <div class="hero__promo" aria-label={ru ? "Активные предложения" : "Active offers"} data-rotate-ms="8000" data-pause-ms="15000">
+        <ul class="hero__promo-list" role="list">
+          {platesList.map((p, i) => (
+            <li
+              class:list={["hero__promo-item", { "is-active": i === 0 }]}
+              data-slug={p.slug}
+              data-index={i.toString()}
+            >
+              <a class="hero__promo-link" href={p.cta_href}>
+                <span class:list={["hero__promo-chip", `hero__promo-chip--${p.kind}`]}>
+                  {kindLabel[p.kind]}
+                </span>
+                <span class="hero__promo-text">{p.text}</span>
+                <span class="hero__promo-cta">
+                  {p.cta_text}
+                  <span class="hero__promo-arrow" aria-hidden="true">→</span>
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+
+        {hasMultiplePlates && (
+          <div class="hero__promo-dots" role="group" aria-label={ru ? "Переключение предложений" : "Switch offers"}>
+            {platesList.map((_, i) => (
+              <button
+                type="button"
+                class:list={["hero__promo-dot", { "is-active": i === 0 }]}
+                data-index={i.toString()}
+                aria-label={`${(i + 1).toString()} / ${platesList.length.toString()}`}
+                aria-current={i === 0 ? "true" : undefined}
+              ></button>
+            ))}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
 </section>
 
 <style>
+  /* Hero — full-bleed как photo-strips: bg image идёт edge-to-edge.
+     Content в .hero__inner с тем же container-max + container-pad
+     pattern что и другие секции (.center utility). Источник: пример
+     клиента Film_Site_6.html §.hero (padding 80px 60px full-bleed). */
   .hero {
     min-height: 100vh;
     min-height: 100svh;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 120px var(--container-pad) var(--space-4xl);
-    max-width: var(--container-max);
-    margin-inline: auto;
     position: relative;
+    overflow: hidden;
   }
 
-  /* Optional bg image — full-bleed, dimmed brightness(.30), за content layer.
-     Содержимое .hero > * получает position: relative + z-index: 1, чтобы
-     быть поверх. Источник CSS: Film_Site_6.html §.hero-img-bg. */
+  .hero__inner {
+    max-width: var(--container-max);
+    margin-inline: auto;
+    padding: 120px var(--container-pad) var(--space-4xl);
+    width: 100%;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Bg image — absolute inset:0 relative to .hero (теперь full-bleed),
+     brightness(.30) затемнение для читаемости text поверх.
+     Источник CSS: Film_Site_6.html §.hero-img-bg. */
   .hero__bg {
     position: absolute;
     inset: 0;
@@ -170,10 +188,6 @@ const hasMultiplePlates = platesList.length > 1;
     object-fit: cover;
     object-position: center top;
     filter: brightness(0.30);
-  }
-  .hero > *:not(.hero__bg) {
-    position: relative;
-    z-index: 1;
   }
 
   .hero__eyebrow-wrap {
