@@ -151,13 +151,18 @@ const hasMultiplePlates = platesList.length > 1;
   /* Hero — full-bleed как photo-strips: bg image идёт edge-to-edge.
      Content в .hero__inner с тем же container-max + container-pad
      pattern что и другие секции (.center utility). Источник: пример
-     клиента Film_Site_6.html §.hero (padding 80px 60px full-bleed). */
+     клиента Film_Site_6.html §.hero (padding 80px 60px full-bleed).
+
+     justify-content: flex-start + small padding-top → content прижимается
+     к верху, ближе к sticky-nav. Раньше было center + 120px padding-top:
+     content центрировался в 100vh, создавая большой "пустой" gap между
+     nav и eyebrow. */
   .hero {
     min-height: 100vh;
     min-height: 100svh;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     position: relative;
     overflow: hidden;
   }
@@ -165,7 +170,7 @@ const hasMultiplePlates = platesList.length > 1;
   .hero__inner {
     max-width: var(--container-max);
     margin-inline: auto;
-    padding: 120px var(--container-pad) var(--space-4xl);
+    padding: clamp(40px, 5vw, 64px) var(--container-pad) var(--space-4xl);
     width: 100%;
     position: relative;
     z-index: 1;
