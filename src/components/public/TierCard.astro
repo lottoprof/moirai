@@ -60,12 +60,12 @@ const {
     border-color: var(--border-strong);
   }
 
+  /* Featured card — без background invert (раньше был amber bg + black
+     text везде, что давало черный-на-черном на некоторых браузерах).
+     Акцент BEST VALUE — через типографику: bolder weight + amber color
+     на name, увеличенный badge. Border амбер для визуального veight. */
   .tier-card--featured {
-    background: var(--amber);
     border-color: var(--amber);
-  }
-  .tier-card--featured * {
-    color: var(--ink) !important;
   }
 
   .tier-card__badge {
@@ -83,8 +83,9 @@ const {
     white-space: nowrap;
   }
   .tier-card--featured .tier-card__badge {
-    background: var(--ink);
-    color: var(--amber);
+    /* Чуть крупнее + амбер выделение для акцента BEST VALUE */
+    font-size: var(--type-micro-md);
+    padding: 8px 22px;
   }
 
   .tier-card__name {
@@ -129,13 +130,6 @@ const {
     color: var(--amber);
     flex-shrink: 0;
   }
-  .tier-card--featured .tier-card__features li {
-    color: rgba(13, 11, 9, 0.85);
-    border-color: rgba(13, 11, 9, 0.15);
-  }
-  .tier-card--featured .tier-card__features li::before {
-    color: var(--ink);
-  }
 
   .tier-card__cta {
     display: block;
@@ -158,13 +152,15 @@ const {
     border-color: var(--amber);
     color: var(--ink);
   }
+  /* Featured CTA — bolder амбер outline (border амбер) для подчёркивания
+     акцента, без full-invert. На hover работает стандартный flow. */
   .tier-card--featured .tier-card__cta {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--paper);
+    border-color: var(--amber);
+    color: var(--amber);
+    font-weight: 600;
   }
   .tier-card--featured .tier-card__cta:hover {
-    background: transparent;
+    background: var(--amber);
     color: var(--ink);
   }
 </style>

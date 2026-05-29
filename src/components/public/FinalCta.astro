@@ -27,17 +27,20 @@ interface Props {
 const { eyebrow, title, body, ctaText, ctaHref, urgency } = Astro.props;
 ---
 
-<section class="section section--cta section--alt" aria-labelledby="final-cta-title">
+<section class="section section--cta" aria-labelledby="final-cta-title">
   <p class="eyebrow">{eyebrow}</p>
   <h2 id="final-cta-title" class="final-cta__title h2" set:html={title}></h2>
   <p class="final-cta__lede">{body}</p>
-  <Btn href={ctaHref} variant="primary" size="xl" arrow>{ctaText}</Btn>
-  {urgency && (
-    <p class="urgency">
-      <span class="urgency__dot" aria-hidden="true"></span>
-      {urgency}
-    </p>
-  )}
+  {/* Button + urgency inline (как .hero__cta + .hero__urgency).
+       Унификация: финальный CTA выглядит как hero CTA — same pattern,
+       same expectations. Pulse-dot убран — было дополнительной анимацией
+       не вписывающейся в editorial стиль. */}
+  <div class="final-cta__action">
+    <Btn href={ctaHref} variant="primary" size="xl" arrow>{ctaText}</Btn>
+    {urgency && (
+      <p class="final-cta__urgency">{urgency}</p>
+    )}
+  </div>
 </section>
 
 <style>
@@ -53,34 +56,21 @@ const { eyebrow, title, body, ctaText, ctaHref, urgency } = Astro.props;
     max-width: 56ch;
   }
 
-  .urgency {
-    display: inline-flex;
+  /* Action row — button + urgency inline (desktop), wrap на mobile.
+     Идентично .hero__cta + .hero__urgency pattern'у. */
+  .final-cta__action {
+    display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    margin-top: var(--space-2xl);
-    font-size: var(--type-micro-md);
-    letter-spacing: var(--tracking-wider);
-    text-transform: uppercase;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--space-md);
+  }
+
+  .final-cta__urgency {
+    margin: 0;
     color: var(--text-faint);
-  }
-
-  .urgency__dot {
-    width: 6px;
-    height: 6px;
-    background: var(--amber);
-    border-radius: 50%;
-    animation: pulse 2s ease infinite;
-  }
-
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.5;
-      transform: scale(1.3);
-    }
+    font-size: var(--type-body-sm);
+    font-family: var(--font-body);
+    letter-spacing: var(--tracking-normal);
   }
 </style>
