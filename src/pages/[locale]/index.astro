@@ -421,7 +421,7 @@ const ui = typedLocale === "ru"
     />
   )}
 
-  <section class="section section--alt center" aria-labelledby="curriculum-title">
+  <section class="section center" aria-labelledby="curriculum-title">
     <header class="section__head">
       <p class="eyebrow">{sections.curriculum.eyebrow}</p>
       <h2 id="curriculum-title" class="h2">{sections.curriculum.title}</h2>
@@ -455,7 +455,7 @@ const ui = typedLocale === "ru"
 
   {/* Instructors (Stage 9): рендерится из коллекции `instructors`.
       Bios — DRAFT, реальные подменяются методистом без code change. */}
-  <section class="section section--alt center" aria-labelledby="instructors-title">
+  <section class="section center" aria-labelledby="instructors-title">
     <header class="section__head">
       <p class="eyebrow">{sections.instructors.eyebrow}</p>
       <h2 id="instructors-title" class="h2" set:html={sections.instructors.title}></h2>

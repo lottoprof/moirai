@@ -132,15 +132,22 @@
    Section + section header
    ============================================================ */
 
+/* Canvas pattern (Stage_visual): все секции — один container width
+   (1200px max + container-pad), uniform body bg, тонкий border-bottom
+   как разделитель. Без `.section--alt` switch'a (deprecated — пример
+   клиента использует uniform bg + border-bottom dividers). */
 .section {
-  padding-block: clamp(80px, 12vw, 160px);
+  padding-block: clamp(64px, 9vw, 120px);
   position: relative;
+  border-bottom: 1px solid color-mix(in srgb, var(--paper) 7%, transparent);
 }
+/* Deprecated — оставлен no-op для обратной совместимости пока используем
+   class:list в шаблонах. Уберём при следующей правке шаблонов. */
 .section--alt {
-  background: var(--bg-elevated);
+  /* no-op: uniform bg pattern */
 }
 .section--cta {
-  padding-block: clamp(120px, 16vw, 200px);
+  padding-block: clamp(96px, 12vw, 160px);
   text-align: center;
 }
 

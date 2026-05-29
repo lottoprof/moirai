@@ -97,8 +97,13 @@
   /* ============================================
      Layout — container
      ============================================ */
-  --container-max:     1200px;
-  --container-pad:     clamp(20px, 5vw, 48px);
+  /* Canvas: unified container + small consistent margins по образцу
+     клиентского примера (Film_Site_6.html sections padding: 60px).
+     1600px max — на ультрашироких (1920+) даёт читабельный bound,
+     на 1280-1440 наполняет почти всю ширину viewport.
+     Padding: 16px mobile (clean edge) → 64px desktop. */
+  --container-max:     1600px;
+  --container-pad:     clamp(16px, 4vw, 64px);
 
   /* ============================================
      Animation
