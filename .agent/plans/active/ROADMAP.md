@@ -103,7 +103,15 @@ Sprint 2 (новые планы будут):
 - [ ] **Live session player** (Vidstack) когда первая cohort стартует
 - [ ] **CF Cron Trigger** для daily `/api/admin/cron/tick` automation
 - [ ] **PersonSchema** для instructor detail pages когда сделаем `/instructors/[slug]`
-- [ ] **Real instructor bios** (Vladimir + Anastasia подменят DRAFT текст)
+- [ ] **Real instructor bios** (Vladimir + Anastasia подменят DRAFT текст
+  на full ~100-word био — source: пример клиента Film_Site_6.html.
+  Vladimir: TV/радио в подростковом возрасте → film degree → feature-length
+  grad project снят за shoestring → music videos + commercial production →
+  US teaching. Anastasia: film degree → 1st AD on TV series/shorts/
+  commercials → стала directing → festival placements → специализация
+  director's script + actor psychology → US teaching film + theater.
+  Эти long bios идут в /instructors/[slug] detail pages, не на home.
+  Home `bio_short` = 15-30 слов per voice-guide §"Длина текстов").
 - [ ] **Hero cohort urgency — SSG injection из D1** (booking-pattern). Sprint 1
   пока статика в `home.{en,ru}.mdx` frontmatter (методист правит руками при
   смене даты). Sprint 2 — pre-build скрипт `scripts/sync-hero-cohort.mjs`:
