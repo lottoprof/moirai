@@ -80,13 +80,10 @@ const { eyebrow, title, lede, ctaText, ctaHref, cohortUrgency, bgImage } = Astro
      pattern что и другие секции (.center utility). Источник: пример
      клиента Film_Site_6.html §.hero (padding 80px 60px full-bleed).
 
-     justify-content: flex-start + small padding-top → content прижимается
-     к верху, ближе к sticky-nav. Раньше было center + 120px padding-top:
-     content центрировался в 100vh, создавая большой "пустой" gap между
-     nav и eyebrow. */
+     min-height: auto — hero ужимается под content + padding (без пустого
+     "100vh"-space внизу), PromoStrip flush с hero. justify-content:
+     flex-start + small padding-top → content прижимается к sticky-nav. */
   .hero {
-    min-height: 100vh;
-    min-height: 100svh;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -97,7 +94,7 @@ const { eyebrow, title, lede, ctaText, ctaHref, cohortUrgency, bgImage } = Astro
   .hero__inner {
     max-width: var(--container-max);
     margin-inline: auto;
-    padding: clamp(40px, 5vw, 64px) var(--container-pad) var(--space-4xl);
+    padding: clamp(40px, 5vw, 64px) var(--container-pad) clamp(40px, 5vw, 64px);
     width: 100%;
     position: relative;
     z-index: 1;

@@ -86,21 +86,22 @@ const hasMultiple = plates.length > 1;
 )}
 
 <style>
+  /* Strip — full-bleed, content вплотную к краям viewport (без боковых
+     padding). Тонкие top/bottom borders, no vertical margins —
+     полоса прижата к Hero сверху и StatsBanner снизу. */
   .promo-strip {
     width: 100%;
     border-top: 1px solid color-mix(in srgb, var(--paper) 7%, transparent);
     border-bottom: 1px solid color-mix(in srgb, var(--paper) 7%, transparent);
     padding-block: 14px;
-    padding-inline: var(--container-pad);
   }
   .promo-strip__inner {
-    max-width: var(--container-max);
-    margin-inline: auto;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-md);
     min-height: 32px;
+    padding-inline: var(--space-md);
   }
 
   .promo-strip__list {
