@@ -21,7 +21,8 @@ import OrganizationSchema from "../../components/schema/OrganizationSchema.astro
 import FaqSchema from "../../components/schema/FaqSchema.astro";
 import CourseSchema from "../../components/schema/CourseSchema.astro";
 import PersonSchema from "../../components/schema/PersonSchema.astro";
-import Hero, { type HeroPlate } from "../../components/public/Hero.astro";
+import Hero from "../../components/public/Hero.astro";
+import PromoStrip, { type PromoPlate } from "../../components/public/PromoStrip.astro";
 import PhotoStrip, { type PhotoItem } from "../../components/public/PhotoStrip.astro";
 import type { ImageMetadata } from "astro";
 import InstructorCard from "../../components/public/InstructorCard.astro";
@@ -128,7 +129,7 @@ const faqs: { q: string; a: string }[] = home.data.faqs ?? [];
 type AnnouncementEntry = CollectionEntry<"announcements">;
 const nowMs = Date.now();
 const allAnnouncements = await getCollection("announcements");
-const heroPlates: HeroPlate[] = allAnnouncements
+const heroPlates: PromoPlate[] = allAnnouncements
   .filter((e: AnnouncementEntry) => e.id.endsWith(`.${typedLocale}`))
   .filter((e: AnnouncementEntry) =>
     e.data.starts_at.getTime() <= nowMs && nowMs <= e.data.ends_at.getTime(),
@@ -393,10 +394,11 @@ const ui = typedLocale === "ru"
     ctaText={sections.hero.cta_text}
     ctaHref={sections.hero.cta_href}
     cohortUrgency={sections.hero.cohort_urgency}
-    plates={heroPlates}
     locale={typedLocale}
     bgImage={heroBgImage}
   />
+
+  <PromoStrip plates={heroPlates} locale={typedLocale} />
 
   <StatsBanner items={sections.stats.items} />
 

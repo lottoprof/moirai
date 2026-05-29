@@ -1,0 +1,284 @@
+---
+/*
+ * <PromoStrip /> — rotating banner-strip под Hero (Stage_advertising).
+ * Выехал из <Hero> компонента в отдельную секцию по образцу клиентского
+ * примера (Film_Site_6.html §.ticker-wrap — горизонтальная полоса
+ * между hero и следующей секцией).
+ *
+ * Source data — те же активные announcements из коллекции, что Hero
+ * раньше показывал в .hero__promo. SEO ценность сохранена: каждая
+ * entry даёт slug-targeted internal link с home page.
+ *
+ * Layout:
+ *   - Full-bleed strip (как PhotoStrip) с тонкими top/bottom border
+ *   - Inner contained max-width: var(--container-max) + container-pad
+ *   - Single visible plate, остальные display:none + ротация через
+ *     .is-active CSS class + 8s setInterval. Pagination dots
+ *     справа от plate.
+ *
+ * См. ROADMAP — Sprint 2 SSG-sync из D1 cohorts заменит manual
+ * announcements collection для авто-генерации entries.
+ */
+
+export interface PromoPlate {
+  kind: "cohort" | "soon" | "new" | "promo" | "info";
+  text: string;
+  cta_text: string;
+  cta_href: string;
+  /** id без локали — стабильный slug-идентификатор */
+  slug: string;
+}
+
+interface Props {
+  plates: PromoPlate[];
+  locale: "en" | "ru";
+}
+
+const { plates, locale } = Astro.props;
+
+const ru = locale === "ru";
+const kindLabel: Record<PromoPlate["kind"], string> = ru
+  ? { cohort: "Когорта", soon: "Скоро", new: "Новинка", promo: "Акция", info: "Инфо" }
+  : { cohort: "Cohort",  soon: "Coming soon", new: "New", promo: "Promo", info: "Info" };
+
+const hasMultiple = plates.length > 1;
+---
+
+{plates.length > 0 && (
+  <aside class="promo-strip" aria-label={ru ? "Активные предложения" : "Active offers"} data-rotate-ms="8000" data-pause-ms="15000">
+    <div class="promo-strip__inner">
+      <ul class="promo-strip__list" role="list">
+        {plates.map((p, i) => (
+          <li
+            class:list={["promo-strip__item", { "is-active": i === 0 }]}
+            data-slug={p.slug}
+            data-index={i.toString()}
+          >
+            <a class="promo-strip__link" href={p.cta_href}>
+              <span class:list={["promo-strip__chip", `promo-strip__chip--${p.kind}`]}>
+                {kindLabel[p.kind]}
+              </span>
+              <span class="promo-strip__text">{p.text}</span>
+              <span class="promo-strip__cta">
+                {p.cta_text}
+                <span class="promo-strip__arrow" aria-hidden="true">→</span>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+
+      {hasMultiple && (
+        <div class="promo-strip__dots" role="group" aria-label={ru ? "Переключение предложений" : "Switch offers"}>
+          {plates.map((_, i) => (
+            <button
+              type="button"
+              class:list={["promo-strip__dot", { "is-active": i === 0 }]}
+              data-index={i.toString()}
+              aria-label={`${(i + 1).toString()} / ${plates.length.toString()}`}
+              aria-current={i === 0 ? "true" : undefined}
+            ></button>
+          ))}
+        </div>
+      )}
+    </div>
+  </aside>
+)}
+
+<style>
+  .promo-strip {
+    width: 100%;
+    border-top: 1px solid color-mix(in srgb, var(--paper) 7%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--paper) 7%, transparent);
+    padding-block: 14px;
+    padding-inline: var(--container-pad);
+  }
+  .promo-strip__inner {
+    max-width: var(--container-max);
+    margin-inline: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    min-height: 32px;
+  }
+
+  .promo-strip__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+  }
+  .promo-strip__item {
+    display: none;
+  }
+  .promo-strip__item.is-active {
+    display: block;
+  }
+  .promo-strip__link {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    text-decoration: none;
+    transition: opacity var(--duration-fast) var(--ease-out);
+  }
+  .promo-strip__link:hover {
+    opacity: 0.85;
+  }
+
+  .promo-strip__chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .promo-strip__chip--soon {
+    background: var(--amber-faint);
+    color: var(--text-accent);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  }
+  .promo-strip__chip--new {
+    background: var(--amber);
+    color: var(--ink);
+  }
+  .promo-strip__chip--promo {
+    background: var(--amber);
+    color: var(--ink);
+  }
+  .promo-strip__chip--cohort {
+    background: transparent;
+    color: var(--text-accent);
+    border: 1px solid var(--amber);
+  }
+  .promo-strip__chip--info {
+    background: transparent;
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+  }
+
+  .promo-strip__text {
+    color: var(--text);
+    font-size: var(--type-body-sm);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .promo-strip__cta {
+    color: var(--amber);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .promo-strip__arrow {
+    margin-left: 4px;
+    display: inline-block;
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+  .promo-strip__link:hover .promo-strip__arrow {
+    transform: translateX(3px);
+  }
+
+  .promo-strip__dots {
+    display: inline-flex;
+    gap: var(--space-2xs);
+    flex-shrink: 0;
+  }
+  /* Hit area 24×24, visual 8×8 — WCAG 2.5.5 AA. */
+  .promo-strip__dot {
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .promo-strip__dot::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border-strong);
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .promo-strip__dot:hover::before {
+    background: var(--text-muted);
+  }
+  .promo-strip__dot.is-active::before {
+    background: var(--amber);
+  }
+
+  @media (max-width: 640px) {
+    .promo-strip {
+      padding-inline: var(--space-md);
+    }
+    .promo-strip__link {
+      gap: var(--space-xs);
+    }
+    .promo-strip__text {
+      flex-basis: 100%;
+    }
+  }
+</style>
+
+<script>
+  /*
+   * Promo strip rotation (idem ex .hero__promo, перенесено в новый
+   * компонент): 8s tick между .promo-strip__item, pause 15s на dot click.
+   */
+  const strip = document.querySelector<HTMLElement>(".promo-strip");
+  if (strip) {
+    const items = Array.from(strip.querySelectorAll<HTMLElement>(".promo-strip__item"));
+    const dots = Array.from(strip.querySelectorAll<HTMLButtonElement>(".promo-strip__dot"));
+    const rotateMs = Number(strip.dataset.rotateMs ?? "8000");
+    const pauseMs = Number(strip.dataset.pauseMs ?? "15000");
+
+    let current = 0;
+    let pauseUntil = 0;
+
+    function show(next: number): void {
+      items.forEach((it) => it.classList.remove("is-active"));
+      dots.forEach((d) => { d.classList.remove("is-active"); d.removeAttribute("aria-current"); });
+      const item = items[next];
+      const dot = dots[next];
+      if (item) item.classList.add("is-active");
+      if (dot) {
+        dot.classList.add("is-active");
+        dot.setAttribute("aria-current", "true");
+      }
+      current = next;
+    }
+
+    function tick(): void {
+      if (Date.now() < pauseUntil) return;
+      const next = (current + 1) % items.length;
+      show(next);
+    }
+
+    if (items.length > 1) {
+      window.setInterval(tick, rotateMs);
+    }
+
+    dots.forEach((dot) => {
+      dot.addEventListener("click", () => {
+        const idx = Number(dot.dataset.index);
+        show(idx);
+        pauseUntil = Date.now() + pauseMs;
+      });
+    });
+  }
+</script>
