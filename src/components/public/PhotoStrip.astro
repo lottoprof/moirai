@@ -1,0 +1,118 @@
+---
+/*
+ * <PhotoStrip /> — horizontal photo grid section ("Behind the Camera"
+ * / "From Our Films"). Источник CSS: пример клиента Film_Site_6.html
+ * §photo-section.
+ *
+ * Adapted в нашу container/SEO структуру:
+ *   - Astro <Image> для оптимизации (WebP + responsive srcset)
+ *   - Аспект 16:9 через object-fit: cover на разных source-пропорциях
+ *   - Mobile (≤640px): grid 1fr 1fr (2 cols вместо 3/4)
+ *   - Lazy-load (loading="lazy") — все strip'ы below the fold
+ *   - Локализованные alt и label через props (из home.{locale}.mdx)
+ *
+ * Источники изображений — статические ESM импорты из src/assets/home/.
+ * Sprint 2 — миграция в R2 + dynamic loader (см. ROADMAP).
+ */
+
+import { Image, type ImageMetadata } from "astro:assets";
+
+export interface PhotoItem {
+  /** Импортированная ImageMetadata (или строка для remote URL) */
+  src: ImageMetadata;
+  /** Локализованный alt-текст (a11y + SEO) */
+  alt: string;
+}
+
+interface Props {
+  label: string;
+  /** "warm" → амбер, "cool" → текст-faint. Из примера §photo-section-label. */
+  labelTone?: "warm" | "cool";
+  /** Кол-во колонок на desktop. На mobile (≤640px) auto → 2 cols. */
+  cols?: 3 | 4;
+  photos: PhotoItem[];
+}
+
+const { label, labelTone = "warm", cols = 4, photos } = Astro.props;
+---
+
+<section class="photo-section" aria-label={label}>
+  <p class:list={["photo-section__label", `photo-section__label--${labelTone}`]}>{label}</p>
+  <div class:list={["photo-section__grid", `photo-section__grid--cols-${cols.toString()}`]}>
+    {photos.map((p) => (
+      <div class="photo-section__cell">
+        <Image
+          src={p.src}
+          alt={p.alt}
+          widths={[400, 640, 800, 1200]}
+          sizes="(max-width: 640px) 50vw, (max-width: 1200px) 33vw, 25vw"
+          format="webp"
+          loading="lazy"
+          quality={80}
+        />
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  .photo-section {
+    border-bottom: 1px solid color-mix(in srgb, var(--paper) 7%, transparent);
+  }
+
+  .photo-section__label {
+    margin: 0;
+    padding: 24px var(--container-pad) 12px;
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .photo-section__label--warm {
+    color: var(--amber);
+  }
+  .photo-section__label--cool {
+    color: var(--text-faint);
+  }
+
+  .photo-section__grid {
+    display: grid;
+    gap: 2px;
+  }
+  .photo-section__grid--cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .photo-section__grid--cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .photo-section__cell {
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    position: relative;
+  }
+  .photo-section__cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform var(--duration-normal) var(--ease-out),
+                filter var(--duration-normal) var(--ease-out);
+    filter: brightness(0.95);
+  }
+  .photo-section__cell:hover img {
+    transform: scale(1.04);
+    filter: brightness(1);
+  }
+
+  /* Mobile: 2 cols вне зависимости от desktop-варианта (cols-3 / cols-4). */
+  @media (max-width: 640px) {
+    .photo-section__label {
+      padding: 16px var(--space-md) 8px;
+    }
+    .photo-section__grid--cols-3,
+    .photo-section__grid--cols-4 {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>

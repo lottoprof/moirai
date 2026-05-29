@@ -22,6 +22,8 @@ import FaqSchema from "../../components/schema/FaqSchema.astro";
 import CourseSchema from "../../components/schema/CourseSchema.astro";
 import PersonSchema from "../../components/schema/PersonSchema.astro";
 import Hero, { type HeroPlate } from "../../components/public/Hero.astro";
+import PhotoStrip, { type PhotoItem } from "../../components/public/PhotoStrip.astro";
+import type { ImageMetadata } from "astro:assets";
 import InstructorCard from "../../components/public/InstructorCard.astro";
 import StatsBanner from "../../components/public/StatsBanner.astro";
 import WhoCard from "../../components/public/WhoCard.astro";
@@ -81,8 +83,21 @@ interface StatItem {
   label: string;
   accent?: boolean;
 }
+interface PhotoStripSection {
+  label: string;
+  tone: "warm" | "cool";
+  cols: 3 | 4;
+  photos: { src: string; alt: string }[];
+}
 interface HomeSections {
-  hero: { eyebrow: string; title: string; lede: string; cta_text: string; cta_href: string; cohort_urgency?: string };
+  hero: {
+    eyebrow: string; title: string; lede: string; cta_text: string; cta_href: string;
+    cohort_urgency?: string; bg_image?: string;
+  };
+  photo_strips?: {
+    behind_camera: PhotoStripSection;
+    from_our_films: PhotoStripSection;
+  };
   stats: { items: StatItem[] };
   who: { eyebrow: string; title: string; audiences: CtaItem[] };
   curriculum: { eyebrow: string; title: string; intro: string; levels: CurriculumLevel[] };
@@ -132,6 +147,39 @@ const heroPlates: HeroPlate[] = allAnnouncements
     cta_href: e.data.cta_href as string,
     slug: e.id.replace(/\.(en|ru)$/, ""),
   }));
+
+// ============================================================
+// Photo assets (Stage_visual):
+// Bulk-import всех jpg из src/assets/home/, mapping name → ImageMetadata.
+// Источник: пример клиента Film_Site_6.html — 11 фото (1 hero bg + 4
+// "Behind the Camera" + 6 "From Our Films"). Sprint 2 — миграция в R2.
+// ============================================================
+const homeImages = import.meta.glob<{ default: ImageMetadata }>(
+  "../../assets/home/*.jpg",
+  { eager: true },
+);
+
+function resolveImg(name: string): ImageMetadata {
+  const key = `../../assets/home/${name}.jpg`;
+  const mod = homeImages[key];
+  if (!mod) throw new Error(`home image not found: ${name} (expected ${key})`);
+  return mod.default;
+}
+
+const heroBgImage = sections.hero.bg_image ? resolveImg(sections.hero.bg_image) : undefined;
+
+function buildStripPhotos(section: PhotoStripSection | undefined): PhotoItem[] {
+  if (!section) return [];
+  return section.photos.map((p) => ({
+    src: resolveImg(p.src),
+    alt: p.alt,
+  }));
+}
+
+const behindCameraSection = sections.photo_strips?.behind_camera;
+const fromOurFilmsSection = sections.photo_strips?.from_our_films;
+const behindCameraPhotos = buildStripPhotos(behindCameraSection);
+const fromOurFilmsPhotos = buildStripPhotos(fromOurFilmsSection);
 
 // Programme cards: фиксированный порядок (Beginner → Intermediate → Bundle → Individual).
 // Читаем programmes коллекцию + фильтруем по локали, потом по slug.
@@ -347,6 +395,7 @@ const ui = typedLocale === "ru"
     cohortUrgency={sections.hero.cohort_urgency}
     plates={heroPlates}
     locale={typedLocale}
+    bgImage={heroBgImage}
   />
 
   <StatsBanner items={sections.stats.items} />
@@ -362,6 +411,15 @@ const ui = typedLocale === "ru"
       ))}
     </div>
   </section>
+
+  {behindCameraSection && behindCameraPhotos.length > 0 && (
+    <PhotoStrip
+      label={behindCameraSection.label}
+      labelTone={behindCameraSection.tone}
+      cols={behindCameraSection.cols}
+      photos={behindCameraPhotos}
+    />
+  )}
 
   <section class="section section--alt center" aria-labelledby="curriculum-title">
     <header class="section__head">
@@ -416,6 +474,15 @@ const ui = typedLocale === "ru"
       <p class="text-faint">{ui.pendingStage9}</p>
     )}
   </section>
+
+  {fromOurFilmsSection && fromOurFilmsPhotos.length > 0 && (
+    <PhotoStrip
+      label={fromOurFilmsSection.label}
+      labelTone={fromOurFilmsSection.tone}
+      cols={fromOurFilmsSection.cols}
+      photos={fromOurFilmsPhotos}
+    />
+  )}
 
   <section class="section center" aria-labelledby="after-title">
     <header class="section__head">
