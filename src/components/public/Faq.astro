@@ -10,8 +10,10 @@
  */
 
 interface Props {
-  /** Заголовок секции — обычно "Common questions" / "Вопросы и ответы" */
-  title: string;
+  /** Заголовок секции — обычно "Common questions" / "Вопросы и ответы".
+      Optional: для editorial-layout (home page) title рендерится снаружи
+      в `.editorial-layout__head`, компонент только items. */
+  title?: string;
   items: { q: string; a: string }[];
 }
 
@@ -19,7 +21,7 @@ const { title, items } = Astro.props;
 ---
 
 <div class="faq">
-  <h2 class="h2">{title}</h2>
+  {title && <h2 class="h2">{title}</h2>}
   {items.map((qa) => (
     <details class="faq__item">
       <summary class="faq__question">{qa.q}</summary>
@@ -30,8 +32,9 @@ const { title, items } = Astro.props;
 
 <style>
   .faq {
-    max-width: 800px;
-    margin-inline: auto;
+    /* Без max-width — родительский container или .editorial-layout__body
+       контролирует ширину. На /faq standalone странице обёртка задаёт
+       max-width 800px. */
   }
 
   .faq > .h2 {

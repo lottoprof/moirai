@@ -162,6 +162,57 @@
   margin-top: var(--space-lg);
 }
 
+/* Editorial 2-col layout: title left (sticky) + content right.
+   Применяется в Who и FAQ секциях по образцу клиентского примера
+   (Film_Site_6.html §.for-whom + §.faq grid-template-columns: 1fr 2fr).
+   Title прилипает к top при скролле content'a справа — даёт editorial
+   feel. Mobile (≤768px): collapse в single column, title без sticky. */
+.editorial-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: clamp(40px, 6vw, 80px);
+}
+.editorial-layout__head {
+  position: sticky;
+  top: clamp(80px, 10vh, 120px);
+  align-self: start;
+  margin-bottom: 0;
+}
+.editorial-layout__body {
+  min-width: 0;
+}
+@media (max-width: 768px) {
+  .editorial-layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-2xl);
+  }
+  .editorial-layout__head {
+    position: static;
+    margin-bottom: var(--space-2xl);
+  }
+}
+
+/* Curriculum-style header (без sticky): 1fr 1fr split title + intro,
+   align-items: end (как в примере §.curriculum-header). Mobile: stack. */
+.editorial-header-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(40px, 6vw, 80px);
+  align-items: end;
+  margin-bottom: var(--space-4xl);
+  max-width: none;
+}
+.editorial-header-split .eyebrow {
+  margin-bottom: var(--space-md);
+}
+@media (max-width: 768px) {
+  .editorial-header-split {
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+    align-items: start;
+  }
+}
+
 /* ============================================================
    Button (.btn) — BEM-компонент с модификаторами primary/ghost
    и size lg/xl. Используется через <Btn> компонент или напрямую

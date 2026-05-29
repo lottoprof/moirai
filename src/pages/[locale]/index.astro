@@ -401,14 +401,16 @@ const ui = typedLocale === "ru"
   <StatsBanner items={sections.stats.items} />
 
   <section class="section center" aria-labelledby="who-title">
-    <header class="section__head">
-      <p class="eyebrow">{sections.who.eyebrow}</p>
-      <h2 id="who-title" class="h2" set:html={sections.who.title}></h2>
-    </header>
-    <div class="who-grid">
-      {sections.who.audiences.map((a, i) => (
-        <WhoCard num={i + 1} title={a.title} body={a.body} />
-      ))}
+    <div class="editorial-layout">
+      <header class="editorial-layout__head section__head">
+        <p class="eyebrow">{sections.who.eyebrow}</p>
+        <h2 id="who-title" class="h2" set:html={sections.who.title}></h2>
+      </header>
+      <div class="editorial-layout__body who-grid">
+        {sections.who.audiences.map((a, i) => (
+          <WhoCard num={i + 1} title={a.title} body={a.body} />
+        ))}
+      </div>
     </div>
   </section>
 
@@ -422,9 +424,11 @@ const ui = typedLocale === "ru"
   )}
 
   <section class="section center" aria-labelledby="curriculum-title">
-    <header class="section__head">
-      <p class="eyebrow">{sections.curriculum.eyebrow}</p>
-      <h2 id="curriculum-title" class="h2">{sections.curriculum.title}</h2>
+    <header class="editorial-header-split">
+      <div>
+        <p class="eyebrow">{sections.curriculum.eyebrow}</p>
+        <h2 id="curriculum-title" class="h2">{sections.curriculum.title}</h2>
+      </div>
       <p class="text-muted">{sections.curriculum.intro}</p>
     </header>
     <div class="programme-grid">
@@ -531,8 +535,15 @@ const ui = typedLocale === "ru"
   />
 
   {faqs.length > 0 && (
-    <section class="section center">
-      <Faq title={ui.faqHeading} items={faqs} />
+    <section class="section center" aria-labelledby="faq-title">
+      <div class="editorial-layout">
+        <header class="editorial-layout__head section__head">
+          <h2 id="faq-title" class="h2">{ui.faqHeading}</h2>
+        </header>
+        <div class="editorial-layout__body">
+          <Faq items={faqs} />
+        </div>
+      </div>
     </section>
   )}
 

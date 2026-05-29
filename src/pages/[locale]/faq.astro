@@ -104,4 +104,12 @@ const t = typedLocale === "ru"
   .faq-page__head .h1 {
     margin-bottom: var(--space-md);
   }
+
+  /* Faq компонент потерял self-max-width (800px) — на standalone /faq
+     странице ограничиваем wrapper. На home идёт через .editorial-layout
+     и max-width не нужен. */
+  .faq-page :global(.faq) {
+    max-width: 800px;
+    margin-inline: auto;
+  }
 </style>
