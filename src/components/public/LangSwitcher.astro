@@ -2,10 +2,18 @@
 /*
  * <LangSwitcher /> — переключатель локалей в Nav.
  *
- * Базовый вариант — обычные `<a>` со сменой /{locale}/ префикса,
- * работает без JS. JS-апгрейд сохраняет явный выбор в cookie
- * `locale_pref`; middleware на следующем визите корня уважит cookie
- * поверх Accept-Language.
+ * UX-логика: locale auto-detect через middleware (Accept-Language → /{locale}/).
+ * Пользователь чаще всего видит correct locale → показывать обе ("EN / RU")
+ * = visual noise. Поэтому current locale показывается как summary, при клике
+ * раскрывается dropdown с альтернативой(ами).
+ *
+ * Прогрессивное усиление через нативный `<details>` — работает без JS
+ * (browser обрабатывает open/close на клик summary). JS добавляет:
+ *   - click-outside / Escape для close
+ *   - cookie save (locale_pref, 1 год) — middleware respects на следующем
+ *     визите корня поверх Accept-Language
+ *
+ * При 2-х локалях menu = 1 item. При расширении (3+ locales) auto-grows.
  *
  * См. план `.agent/plans/active/sprint0-stage11-language-switcher.md`.
  */
@@ -26,66 +34,127 @@ const items: { code: "en" | "ru"; label: string }[] = [
   { code: "en", label: "EN" },
   { code: "ru", label: "RU" },
 ];
+
+const currentItem = items.find((i) => i.code === current) ?? items[0];
+const altItems = items.filter((i) => i.code !== current);
+
+const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language";
 ---
 
-<div class="lang-switcher" role="group" aria-label="Language">
-  {items.map((item, i) => (
-    <>
-      {i > 0 && <span class="lang-switcher__sep" aria-hidden="true">/</span>}
-      <a
-        href={target(item.code)}
-        class:list={[
-          "lang-switcher__item",
-          { "is-active": current === item.code },
-        ]}
-        hreflang={item.code}
-        lang={item.code}
-        data-locale={item.code}
-        aria-current={current === item.code ? "true" : undefined}
-      >{item.label}</a>
-    </>
-  ))}
-</div>
+<details class="lang-switcher">
+  <summary class="lang-switcher__toggle" aria-label={ariaLabel}>
+    <span>{currentItem.label}</span>
+  </summary>
+  <ul class="lang-switcher__menu" role="menu">
+    {altItems.map((item) => (
+      <li role="none">
+        <a
+          role="menuitem"
+          href={target(item.code)}
+          class="lang-switcher__item"
+          hreflang={item.code}
+          lang={item.code}
+          data-locale={item.code}
+        >{item.label}</a>
+      </li>
+    ))}
+  </ul>
+</details>
 
 <style>
   .lang-switcher {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2xs);
+    position: relative;
+    /* details element не имеет дефолтного inline-block layout — выставим */
+    display: inline-block;
+  }
+
+  /* Toggle = summary. Скрываем нативный disclosure marker (треугольник)
+     через ::-webkit-details-marker (Webkit/Safari) и ::marker (Chromium/FF).
+     Воспринимается как обычный clickable text. */
+  .lang-switcher__toggle {
+    list-style: none;
+    cursor: pointer;
+    color: var(--paper);
+    padding: 2px 4px;
     font-size: var(--type-micro-md);
     font-weight: 500;
     letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
+    transition: color var(--duration-fast) var(--ease-out);
+    user-select: none;
   }
+  .lang-switcher__toggle::-webkit-details-marker { display: none; }
+  .lang-switcher__toggle::marker { content: ""; }
+
+  .lang-switcher__toggle:hover {
+    color: var(--amber);
+  }
+  /* Open-state визуальный indicator — current text становится амбером */
+  .lang-switcher[open] .lang-switcher__toggle {
+    color: var(--amber);
+  }
+
+  /* Menu — абсолютно spawn'ится под toggle, прижата к правому краю
+     (чтобы не выходила за границу viewport на mobile в Nav).
+     z-index выше hero/content. */
+  .lang-switcher__menu {
+    position: absolute;
+    top: calc(100% + var(--space-xs));
+    right: 0;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    list-style: none;
+    margin: 0;
+    padding: var(--space-2xs);
+    min-width: 56px;
+    z-index: 50;
+  }
+
   .lang-switcher__item {
+    display: block;
+    padding: var(--space-xs) var(--space-sm);
     color: var(--text-muted);
-    padding: 2px 4px;
     text-decoration: none;
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    text-align: center;
     transition: color var(--duration-fast) var(--ease-out);
   }
   .lang-switcher__item:hover {
     color: var(--amber);
   }
-  .lang-switcher__item.is-active {
-    color: var(--paper);
-  }
-  .lang-switcher__sep {
-    color: var(--text-faint);
-  }
 </style>
 
 <script>
   /*
-   * Сохраняем явный выбор в cookie `locale_pref` на 1 год.
-   * Middleware на следующем визите корня уважит cookie поверх
-   * Accept-Language. Без JS работает как обычная ссылка.
+   * JS усиление:
+   *   - cookie save (locale_pref, 1 год) при клике на alt-locale.
+   *     Middleware на следующем визите корня респектит этот cookie
+   *     поверх Accept-Language.
+   *   - click-outside → close (нативный <details> сам не закрывается)
+   *   - Escape → close
    */
-  document.querySelectorAll<HTMLAnchorElement>(".lang-switcher__item").forEach((a) => {
-    a.addEventListener("click", () => {
-      const locale = a.dataset.locale;
-      if (locale === "en" || locale === "ru") {
-        document.cookie = `locale_pref=${locale}; path=/; max-age=31536000; samesite=lax; secure`;
+  const switcher = document.querySelector<HTMLDetailsElement>(".lang-switcher");
+  if (switcher) {
+    switcher.querySelectorAll<HTMLAnchorElement>(".lang-switcher__item").forEach((a) => {
+      a.addEventListener("click", () => {
+        const locale = a.dataset.locale;
+        if (locale === "en" || locale === "ru") {
+          document.cookie = `locale_pref=${locale}; path=/; max-age=31536000; samesite=lax; secure`;
+        }
+      });
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!switcher.contains(e.target as Node)) {
+        switcher.open = false;
       }
     });
-  });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") switcher.open = false;
+    });
+  }
 </script>
