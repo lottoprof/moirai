@@ -41,7 +41,13 @@ if (!home) {
   throw new Error(`home.${typedLocale} not found in pages collection`);
 }
 
-const faqs: { q: string; a: string }[] = home.data.faqs ?? [];
+const allFaqs: { q: string; a: string }[] = home.data.faqs ?? [];
+// /faq показывает ВСЕ вопросы (full list для user-facing UI).
+// FaqSchema на /faq — ТОЛЬКО detailed (индексы 6+), чтобы избежать
+// duplicate structured data с home (там FaqSchema индексирует first 6).
+// Source of truth: Home_page_SEO.md §6.9.
+const faqs = allFaqs;
+const schemaFaqs = allFaqs.slice(6);
 
 const t = typedLocale === "ru"
   ? {
@@ -68,7 +74,7 @@ const t = typedLocale === "ru"
 
 <Layout locale={typedLocale} seo={{ title: t.seo.title, description: t.seo.description }}>
   <Fragment slot="schema">
-    <FaqSchema items={faqs} />
+    {schemaFaqs.length > 0 && <FaqSchema items={schemaFaqs} />}
   </Fragment>
 
   <section class="faq-page" aria-labelledby="faq-title">

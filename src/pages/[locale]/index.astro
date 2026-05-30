@@ -116,7 +116,12 @@ if (!sections) {
 }
 
 const seo = home.data.seo;
-const faqs: { q: string; a: string }[] = home.data.faqs ?? [];
+const allFaqs: { q: string; a: string }[] = home.data.faqs ?? [];
+// Home показывает только 6 buying-blocker вопросов (по Home_page_SEO.md
+// §6.9). Полный список (>6) индексируется на /faq standalone странице.
+// Источник единый — home.faqs[] — первые 6 = buying blockers (online/time,
+// experience, camera, time-per-week, outcome, when start), 7+ = детальные.
+const faqs = allFaqs.slice(0, 6);
 
 // ============================================================
 // Hero promo plates (Stage_advertising):
