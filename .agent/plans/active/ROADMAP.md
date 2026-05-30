@@ -93,6 +93,13 @@ Sprint 1 продолжение:
 - [ ] Light theme infrastructure (stage10) — после длинного тела модуля
 
 Sprint 2 (новые планы будут):
+- [ ] **Announcements: Content Collection → D1 + admin UI**. Сейчас
+  `src/content/announcements/*.{en,ru}.mdx` правится в репо (методист
+  не имеет UI). План: миграция в D1 table `announcements` (поля те же:
+  kind, text, cta_*, starts_at, ends_at, priority, dismissible, locale,
+  monolingual), admin CRUD `/admin/announcements`, API
+  `/api/admin/announcements/*`. PromoStrip и AnnouncementBar читают из
+  D1 вместо collection. Эстимейт: ~1 день.
 - [ ] **Real LemonSqueezy adapter** — заменить mock provider после approval
 - [ ] **Stage 14 deferred items**:
   - Admin /applications drawer с audit-timeline + row actions (transfer/cancel)
