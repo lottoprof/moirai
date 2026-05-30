@@ -1,0 +1,229 @@
+---
+/*
+ * /{locale}/contact — статичная контактная страница.
+ *
+ * Простой список methods (Email / Discord / Phone / WhatsApp) с
+ * placeholder'ами для Phone и WhatsApp до получения номеров. Без
+ * формы — направляем в email/Discord. Если позже понадобится
+ * форма — добавим через /api endpoint с Turnstile + Resend.
+ *
+ * SSG (prerender = true) — статика для CDN, минимальная стоимость.
+ */
+
+import Layout from "../../layouts/public/Layout.astro";
+
+export const prerender = true;
+
+export function getStaticPaths() {
+  return [
+    { params: { locale: "en" } },
+    { params: { locale: "ru" } },
+  ];
+}
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  throw new Error(`Unexpected locale: ${String(locale)}`);
+}
+const typedLocale: "en" | "ru" = locale;
+
+interface ContactMethod {
+  label: string;
+  value: string;
+  href: string | null;
+  hint?: string;
+  placeholder?: boolean;
+}
+
+const t: {
+  eyebrow: string;
+  title: string;
+  lede: string;
+  methods: ContactMethod[];
+  seo: { title: string; description: string };
+} = typedLocale === "ru"
+  ? {
+      eyebrow: "Контакты",
+      title: "Связаться с нами.",
+      lede: "Если у вас вопрос — напишите. Отвечаем в течение 24 часов.",
+      methods: [
+        {
+          label: "Email",
+          value: "moiraionlinepro@gmail.com",
+          href: "mailto:moiraionlinepro@gmail.com",
+        },
+        {
+          label: "Discord",
+          value: "moiraionlinepro",
+          href: null,
+          hint: "Найдите по нику в приложении Discord и добавьте в друзья.",
+        },
+        {
+          label: "Телефон",
+          value: "Скоро",
+          href: null,
+          placeholder: true,
+        },
+        {
+          label: "WhatsApp",
+          value: "Скоро",
+          href: null,
+          placeholder: true,
+        },
+      ],
+      seo: {
+        title: "Контакты | Moirai",
+        description: "Свяжитесь с командой Moirai — Email или Discord. Отвечаем в течение 24 часов.",
+      },
+    }
+  : {
+      eyebrow: "Contact",
+      title: "Get in touch.",
+      lede: "If you have a question — write to us. We reply within 24 hours.",
+      methods: [
+        {
+          label: "Email",
+          value: "moiraionlinepro@gmail.com",
+          href: "mailto:moiraionlinepro@gmail.com",
+        },
+        {
+          label: "Discord",
+          value: "moiraionlinepro",
+          href: null,
+          hint: "Find by username in the Discord app and send a friend request.",
+        },
+        {
+          label: "Phone",
+          value: "Coming soon",
+          href: null,
+          placeholder: true,
+        },
+        {
+          label: "WhatsApp",
+          value: "Coming soon",
+          href: null,
+          placeholder: true,
+        },
+      ],
+      seo: {
+        title: "Contact | Moirai",
+        description: "Reach Moirai team via Email or Discord. We reply within 24 hours.",
+      },
+    };
+---
+
+<Layout locale={typedLocale} seo={{ title: t.seo.title, description: t.seo.description }}>
+  <section class="contact-page" aria-labelledby="contact-title">
+    <header class="contact-page__head">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1 id="contact-title" class="h1">{t.title}</h1>
+      <p class="text-muted">{t.lede}</p>
+    </header>
+
+    <dl class="contact-methods">
+      {t.methods.map((m) => (
+        <div class:list={["contact-method", { "contact-method--placeholder": m.placeholder }]}>
+          <dt class="contact-method__label">{m.label}</dt>
+          <dd class="contact-method__value">
+            {m.href ? (
+              <a href={m.href} class="contact-method__link">{m.value}</a>
+            ) : (
+              <span>{m.value}</span>
+            )}
+            {m.hint && <p class="contact-method__hint text-faint">{m.hint}</p>}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  </section>
+</Layout>
+
+<style>
+  .contact-page {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  .contact-page__head {
+    max-width: 720px;
+    margin: 0 auto var(--space-2xl);
+    text-align: center;
+  }
+  .contact-page__head .eyebrow {
+    margin-bottom: var(--space-md);
+  }
+  .contact-page__head .h1 {
+    margin-bottom: var(--space-md);
+  }
+
+  .contact-methods {
+    max-width: 600px;
+    margin: 0 auto;
+    display: grid;
+    gap: 0;
+  }
+
+  /* Каждый method — два колонки на desktop (label слева фикс + value
+     справа), стек на mobile. Тонкий разделитель снизу. */
+  .contact-method {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: var(--space-md);
+    padding: var(--space-md) 0;
+    border-bottom: 1px solid var(--border);
+    align-items: baseline;
+  }
+  .contact-method:last-child {
+    border-bottom: none;
+  }
+
+  .contact-method__label {
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 500;
+  }
+
+  .contact-method__value {
+    margin: 0;
+    font-size: var(--type-body-md);
+    color: var(--text);
+  }
+
+  .contact-method__link {
+    color: var(--amber);
+    text-decoration: underline;
+    text-decoration-color: var(--amber);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
+    transition:
+      text-underline-offset var(--duration-fast) var(--ease-out),
+      opacity var(--duration-fast) var(--ease-out);
+  }
+  .contact-method__link:hover {
+    text-underline-offset: 6px;
+  }
+  .contact-method__link:active {
+    opacity: 0.7;
+  }
+
+  .contact-method__hint {
+    margin: var(--space-2xs) 0 0;
+    font-size: var(--type-body-sm);
+  }
+
+  /* Placeholder method (Phone/WhatsApp пока не настроены) — text-faint
+     для visual hint что не активно. */
+  .contact-method--placeholder .contact-method__value {
+    color: var(--text-faint);
+  }
+
+  @media (max-width: 640px) {
+    .contact-method {
+      grid-template-columns: 1fr;
+      gap: var(--space-2xs);
+    }
+  }
+</style>
