@@ -144,6 +144,15 @@ const t = ru
       spotsAvailable: "Открыта запись",
       spotsLeft: (n: number) => `${n.toString()} ${n === 1 ? "место" : n < 5 ? "места" : "мест"} осталось`,
       individualBonus: "1:1 по цене группы — индивидуальная программа",
+      weeksLabel: (n: number) => {
+        // RU plural: 1 неделя / 2-4 недели / 5+ недель / 11-14 недель
+        const lastTwo = n % 100;
+        if (lastTwo >= 11 && lastTwo <= 14) return `${n.toString()} недель`;
+        const last = n % 10;
+        if (last === 1) return `${n.toString()} неделя`;
+        if (last >= 2 && last <= 4) return `${n.toString()} недели`;
+        return `${n.toString()} недель`;
+      },
       seo: {
         title: "Запись на курс — выберите когорту | Moirai",
         description: "Выберите слот: программа, дни, время. Группы до 10 человек, две сессии в неделю с режиссёрами из Нью-Йорка.",
@@ -178,6 +187,7 @@ const t = ru
       spotsAvailable: "Available",
       spotsLeft: (n: number) => `${n.toString()} ${n === 1 ? "spot" : "spots"} left`,
       individualBonus: "1:1 at group price — individual programme",
+      weeksLabel: (n: number) => `${n.toString()} ${n === 1 ? "week" : "weeks"}`,
       seo: {
         title: "Apply — choose your cohort | Moirai",
         description: "Pick a slot: programme, days, time. Cohorts of up to 10, two sessions a week with New York directors.",
@@ -245,15 +255,27 @@ function cohortDaysLabel(daysJson: string): string {
   return days.map(weekdayLabel).join(ru ? "+" : "+");
 }
 
-function spotBadge(c: CohortWithSlot): { text: string; variant: "available" | "spots_left" | "individual_bonus" } {
+/* Только spots_left badge оставляем — это urgency, conversion-critical.
+   individual_bonus убран (промо → переедет в баннер, отдельная задача).
+   available убран — generic noise, не несёт информации.
+   В итоге badge рендерится только когда мало мест (urgency-only). */
+function spotBadge(c: CohortWithSlot): { text: string; variant: "spots_left" } | null {
   const display = computeSpotDisplay(c.slot.max_students, c.apply_count);
-  if (display.kind === "individual_bonus") {
-    return { text: t.individualBonus, variant: "individual_bonus" };
-  }
   if (display.kind === "spots_left") {
     return { text: t.spotsLeft(display.spotsLeft), variant: "spots_left" };
   }
-  return { text: t.spotsAvailable, variant: "available" };
+  return null;
+}
+
+/* Длительность когорты в неделях. Считается из programme metadata
+   (lessons_total_hint / 2 sessions per week) — это authoritative источник,
+   совпадает с тем, как cohort'ы генерируются в publish-cohorts.mjs. */
+function cohortWeeks(programmeId: string): number | null {
+  const meta = programmeMeta.get(programmeId);
+  if (!meta) return null;
+  const lessons = meta.lessons_total_hint;
+  if (typeof lessons !== "number" || lessons <= 0) return null;
+  return Math.ceil(lessons / 2);
 }
 
 const isEmpty = cohorts.length === 0;
@@ -347,6 +369,7 @@ const isEmpty = cohorts.length === 0;
                 const daysLabel = cohortDaysLabel(c.slot.days_json);
                 const timeOfDay = deriveTimeOfDay(c.slot.time_et);
                 const timeLabel = timeOfDay === "morning" ? t.filterTimeMorning : t.filterTimeEvening;
+                const weeks = cohortWeeks(c.programme_id);
                 return (
                   <li>
                     <a class="apply-cohort-card" href={`/${typedLocale}/apply/contact?cohort=${c.id}`}>
@@ -362,12 +385,20 @@ const isEmpty = cohorts.length === 0;
                           {t.starts}: <strong>{formatDate(c.start_date, true)}</strong>
                           {" · "}
                           {t.ends}: {formatDate(c.end_date)}
+                          {weeks !== null && (
+                            <>
+                              {" · "}
+                              <span class="apply-cohort-card__weeks">{t.weeksLabel(weeks)}</span>
+                            </>
+                          )}
                         </p>
                       </div>
                       <div class="apply-cohort-card__side">
-                        <span class:list={["apply-cohort-card__badge", `apply-cohort-card__badge--${badge.variant}`]}>
-                          {badge.text}
-                        </span>
+                        {badge && (
+                          <span class:list={["apply-cohort-card__badge", `apply-cohort-card__badge--${badge.variant}`]}>
+                            {badge.text}
+                          </span>
+                        )}
                         <span class="apply-cohort-card__cta" aria-hidden="true">{t.apply}</span>
                       </div>
                     </a>
@@ -605,6 +636,10 @@ const isEmpty = cohorts.length === 0;
     margin: 0;
     font-size: var(--type-body-sm);
     color: var(--text-muted);
+  }
+  /* Duration accent — амбер чуть-чуть, чтобы выделить из дат */
+  .apply-cohort-card__weeks {
+    color: var(--text-accent);
   }
 
   .apply-cohort-card__side {
