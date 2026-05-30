@@ -116,25 +116,39 @@ const hasTracks = (tracks ?? []).length > 0;
     color: var(--text);
   }
 
+  /* Link использует text-decoration вместо border-bottom — wraps
+     корректно на mobile (длинное "Explore Beginner + Intermediate"
+     ломалось при inline-flex + border-bottom: underline только под
+     последнюю строку). Текущий text-decoration делает underline
+     per line автоматически. */
   .programme-card__link {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
+    display: inline;
     font-size: var(--type-micro-lg);
     font-weight: 500;
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
     color: var(--amber);
-    border-bottom: 1px solid var(--amber);
-    padding-bottom: 2px;
+    text-decoration: underline;
+    text-decoration-color: var(--amber);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
     transition:
-      gap var(--duration-fast) var(--ease-out),
+      text-underline-offset var(--duration-fast) var(--ease-out),
       opacity var(--duration-fast) var(--ease-out);
   }
   .programme-card__link:hover {
-    gap: var(--space-sm);
+    text-underline-offset: 6px;
   }
   .programme-card__link:active {
     opacity: 0.7;
+  }
+
+  /* Mobile: меньше font + tighter letter-spacing, чтобы "Explore
+     Beginner + Intermediate" компактнее переносился. */
+  @media (max-width: 640px) {
+    .programme-card__link {
+      font-size: var(--type-micro-md);
+      letter-spacing: var(--tracking-normal);
+    }
   }
 </style>
