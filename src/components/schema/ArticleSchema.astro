@@ -1,0 +1,58 @@
+---
+/*
+ * <ArticleSchema /> — Schema.org Article JSON-LD для
+ * /{locale}/journal/[slug] страниц. Помогает попасть в Google
+ * News + rich results.
+ *
+ * Use:
+ *   <Fragment slot="schema">
+ *     <ArticleSchema
+ *       title={...}
+ *       description={...}
+ *       author={...}
+ *       datePublished={...}
+ *       url={Astro.url.href}
+ *       image={...}
+ *     />
+ *   </Fragment>
+ *
+ * См. https://developers.google.com/search/docs/appearance/structured-data/article
+ */
+
+interface Props {
+  title: string;
+  description: string;
+  author: string;
+  datePublished: Date;
+  url: string;
+  image?: string;
+}
+
+const { title, description, author, datePublished, url, image } = Astro.props;
+
+const json: Record<string, unknown> = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  headline: title,
+  description,
+  author: {
+    "@type": "Person",
+    name: author,
+  },
+  publisher: {
+    "@type": "Organization",
+    name: "Moirai",
+    url: "https://moirai.film",
+  },
+  datePublished: datePublished.toISOString(),
+  mainEntityOfPage: {
+    "@type": "WebPage",
+    "@id": url,
+  },
+};
+if (image) {
+  json.image = image;
+}
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(json)} />

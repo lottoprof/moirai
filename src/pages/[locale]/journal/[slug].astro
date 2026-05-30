@@ -1,0 +1,199 @@
+---
+/*
+ * /{locale}/journal/[slug] — отдельный пост журнала.
+ *
+ * Layout: dark hero (eyebrow + h1 + excerpt) → light-theme article body.
+ * Light theme для long-form читаемости (Stage 10 dependency).
+ *
+ * Schema.org Article — для попадания в Google rich results / News.
+ *
+ * Strategy: docs/works-and-journal-strategy.md §2 — long-tail SEO actor,
+ * authority building через имена реальных авторов (никаких "by AI").
+ */
+
+import { getCollection, render, type CollectionEntry } from "astro:content";
+import Layout from "../../../layouts/public/Layout.astro";
+import ArticleSchema from "../../../components/schema/ArticleSchema.astro";
+import { formatDate } from "../../../lib/format-date";
+
+export const prerender = true;
+
+type JournalEntry = CollectionEntry<"journal">;
+
+export async function getStaticPaths() {
+  const all = await getCollection("journal");
+  return all.map((entry: JournalEntry) => {
+    const [slug, locale] = entry.id.split(".");
+    return {
+      params: { locale, slug },
+      props: { entry },
+    };
+  });
+}
+
+interface Props {
+  entry: JournalEntry;
+}
+const { entry } = Astro.props;
+const { locale: paramLocale } = Astro.params;
+const typedLocale: "en" | "ru" = paramLocale === "ru" ? "ru" : "en";
+
+const { Content } = await render(entry);
+
+const t = typedLocale === "ru"
+  ? {
+      backToJournal: "← Все материалы",
+      tagsLabel: "Темы",
+    }
+  : {
+      backToJournal: "← All essays",
+      tagsLabel: "Topics",
+    };
+
+const coverImage = entry.data.cover_r2_key
+  ? `https://media.moiraionline.pro/${entry.data.cover_r2_key}`
+  : undefined;
+---
+
+<Layout locale={typedLocale} seo={entry.data.seo}>
+  <Fragment slot="schema">
+    <ArticleSchema
+      title={entry.data.title}
+      description={entry.data.seo.description}
+      author={entry.data.author}
+      datePublished={entry.data.date}
+      url={Astro.url.href}
+      image={coverImage}
+    />
+  </Fragment>
+
+  <header class="journal-hero">
+    <div class="journal-hero__inner">
+      <p class="journal-hero__back">
+        <a href={`/${typedLocale}/journal`}>{t.backToJournal}</a>
+      </p>
+      <p class="journal-hero__meta">
+        <time datetime={entry.data.date.toISOString()}>{formatDate(entry.data.date, typedLocale)}</time>
+        <span> · {entry.data.author}</span>
+      </p>
+      <h1 class="h1 journal-hero__title">{entry.data.title}</h1>
+      <p class="journal-hero__excerpt text-muted">{entry.data.excerpt}</p>
+    </div>
+  </header>
+
+  <article class="journal-body" data-theme="light">
+    <div class="journal-body__inner prose">
+      <Content />
+    </div>
+
+    {entry.data.tags.length > 0 && (
+      <footer class="journal-body__footer">
+        <h2 class="journal-body__tags-label">{t.tagsLabel}</h2>
+        <ul class="journal-body__tags" role="list">
+          {entry.data.tags.map((tag: string) => (
+            <li class="journal-body__tag">#{tag}</li>
+          ))}
+        </ul>
+      </footer>
+    )}
+  </article>
+</Layout>
+
+<style>
+  /* Hero — на основной dark теме. */
+  .journal-hero {
+    padding: var(--space-3xl) var(--container-pad);
+    border-bottom: 1px solid var(--border);
+  }
+  .journal-hero__inner {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .journal-hero__back {
+    margin: 0 0 var(--space-xl);
+  }
+  .journal-hero__back a {
+    color: var(--text-faint);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .journal-hero__back a:hover {
+    color: var(--amber);
+  }
+  .journal-hero__meta {
+    margin: 0 0 var(--space-md);
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .journal-hero__title {
+    margin: 0 0 var(--space-md);
+  }
+  .journal-hero__excerpt {
+    margin: 0;
+    font-size: var(--type-body-lg);
+    line-height: 1.6;
+  }
+
+  /* Body — light theme для long-form читаемости. */
+  .journal-body {
+    padding: var(--space-3xl) var(--container-pad);
+  }
+  .journal-body__inner {
+    max-width: 680px;
+    margin: 0 auto;
+    font-size: var(--type-body-lg);
+    line-height: 1.75;
+  }
+  .journal-body__inner :global(h2) {
+    margin: var(--space-2xl) 0 var(--space-md);
+  }
+  .journal-body__inner :global(h3) {
+    margin: var(--space-xl) 0 var(--space-sm);
+  }
+  .journal-body__inner :global(p) {
+    margin: 0 0 var(--space-md);
+  }
+  .journal-body__inner :global(ul),
+  .journal-body__inner :global(ol) {
+    margin: 0 0 var(--space-md) var(--space-lg);
+  }
+  .journal-body__inner :global(blockquote) {
+    margin: var(--space-xl) 0;
+    padding-left: var(--space-lg);
+    border-left: 3px solid var(--amber);
+    font-style: italic;
+    color: var(--text-muted);
+  }
+
+  /* Tags footer */
+  .journal-body__footer {
+    max-width: 680px;
+    margin: var(--space-3xl) auto 0;
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--border);
+  }
+  .journal-body__tags-label {
+    margin: 0 0 var(--space-md);
+    color: var(--text-faint);
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+  .journal-body__tags {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+  .journal-body__tag {
+    font-size: var(--type-body-sm);
+    color: var(--text-faint);
+  }
+</style>
