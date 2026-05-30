@@ -195,8 +195,12 @@ const works = defineCollection({
      * Thumbnail — auto от YouTube CDN
      * (img.youtube.com/vi/<id>/maxresdefault.jpg). Detail: см.
      * docs/methodist-works-guide.md §"Добавление новой работы".
+     *
+     * Optional: если работа ещё без видео (placeholder mock или
+     * coming-soon), на index показываем серый блок, на detail
+     * скрываем player.
      */
-    youtube_id: z.string().length(11),
+    youtube_id: z.string().length(11).optional(),
     /** Optional R2 key для custom thumbnail если YouTube auto-thumb не
         подходит (например для festival poster). Default — YouTube CDN. */
     thumbnail_override: z.string().optional(),
