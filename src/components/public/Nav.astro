@@ -149,10 +149,15 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
     color: var(--text-muted);
     padding: 2px 4px;
     text-decoration: none;
-    transition: color var(--duration-fast) var(--ease-out);
+    transition:
+      color var(--duration-fast) var(--ease-out),
+      opacity var(--duration-fast) var(--ease-out);
   }
   .nav__auth-item:hover {
     color: var(--amber);
+  }
+  .nav__auth-item:active {
+    opacity: 0.7;
   }
   .nav__auth-item.is-active {
     color: var(--paper);
@@ -173,11 +178,15 @@ const onRegister = pathname === `/${locale}/register` || pathname.startsWith(`/$
     text-decoration: none;
     transition:
       color var(--duration-fast) var(--ease-out),
-      border-color var(--duration-fast) var(--ease-out);
+      border-color var(--duration-fast) var(--ease-out),
+      opacity var(--duration-fast) var(--ease-out);
   }
   .nav__cta:hover {
     color: var(--amber-light);
     border-bottom-color: var(--amber-light);
+  }
+  .nav__cta:active {
+    opacity: 0.7;
   }
 
   /* JS toggle handles via .hidden attribute */

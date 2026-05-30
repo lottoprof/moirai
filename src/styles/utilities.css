@@ -230,14 +230,21 @@
   text-transform: uppercase;
   padding: 18px 36px;
   border: 1px solid transparent;
+  border-radius: 2px;
   cursor: pointer;
   text-decoration: none;
   transition:
     background var(--duration-fast) var(--ease-out),
     color var(--duration-fast) var(--ease-out),
     gap var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out);
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
   white-space: nowrap;
+}
+/* Active press — tactile feedback. Scale небольшой (0.98) чтобы не
+   ломать layout, transition уже включает transform. */
+.btn:active {
+  transform: scale(0.98);
 }
 
 .btn--primary {

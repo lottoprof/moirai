@@ -89,6 +89,9 @@ const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language"
   .lang-switcher__toggle:hover {
     color: var(--amber);
   }
+  .lang-switcher__toggle:active {
+    opacity: 0.7;
+  }
   /* Open-state визуальный indicator — current text становится амбером */
   .lang-switcher[open] .lang-switcher__toggle {
     color: var(--amber);
@@ -124,6 +127,9 @@ const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language"
   }
   .lang-switcher__item:hover {
     color: var(--amber);
+  }
+  .lang-switcher__item:active {
+    opacity: 0.7;
   }
 </style>
 

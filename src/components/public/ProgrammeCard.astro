@@ -127,9 +127,14 @@ const hasTracks = (tracks ?? []).length > 0;
     color: var(--amber);
     border-bottom: 1px solid var(--amber);
     padding-bottom: 2px;
-    transition: gap var(--duration-fast) var(--ease-out);
+    transition:
+      gap var(--duration-fast) var(--ease-out),
+      opacity var(--duration-fast) var(--ease-out);
   }
   .programme-card__link:hover {
     gap: var(--space-sm);
+  }
+  .programme-card__link:active {
+    opacity: 0.7;
   }
 </style>

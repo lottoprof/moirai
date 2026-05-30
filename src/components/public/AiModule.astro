@@ -105,10 +105,15 @@ const { badge, title, body, ctaText, ctaHref } = Astro.props;
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
     white-space: nowrap;
-    transition: color var(--duration-fast) var(--ease-out);
+    transition:
+      color var(--duration-fast) var(--ease-out),
+      opacity var(--duration-fast) var(--ease-out);
   }
   .ai-banner__cta:hover {
     color: var(--amber-light);
+  }
+  .ai-banner__cta:active {
+    opacity: 0.7;
   }
 
   @media (max-width: 640px) {

@@ -141,16 +141,21 @@ const {
     text-transform: uppercase;
     text-decoration: none;
     border: 1px solid var(--border-strong);
+    border-radius: 2px;
     color: var(--paper);
     transition:
       background var(--duration-fast) var(--ease-out),
       border-color var(--duration-fast) var(--ease-out),
-      color var(--duration-fast) var(--ease-out);
+      color var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
   }
   .tier-card__cta:hover {
     background: var(--amber);
     border-color: var(--amber);
     color: var(--ink);
+  }
+  .tier-card__cta:active {
+    transform: scale(0.98);
   }
   /* Featured CTA — bolder амбер outline (border амбер) для подчёркивания
      акцента, без full-invert. На hover работает стандартный flow. */
