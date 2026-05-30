@@ -79,8 +79,15 @@ const thumbnailUrl = entry.data.thumbnail_override
   : entry.data.youtube_id
     ? `https://img.youtube.com/vi/${entry.data.youtube_id}/maxresdefault.jpg`
     : null;
+/*
+ * Используем youtube.com/embed (а не youtube-nocookie.com):
+ * YouTube чаще показывает "Sign in to confirm you're not a bot" на
+ * nocookie-домене. Privacy mitigation на нашей стороне обеспечивается
+ * lite-load паттерном — iframe вообще не грузится до клика юзера,
+ * cookies не ставятся до взаимодействия.
+ */
 const embedSrc = entry.data.youtube_id
-  ? `https://www.youtube-nocookie.com/embed/${entry.data.youtube_id}?autoplay=1&rel=0`
+  ? `https://www.youtube.com/embed/${entry.data.youtube_id}?autoplay=1&rel=0&playsinline=1`
   : "";
 ---
 
