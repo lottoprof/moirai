@@ -94,9 +94,7 @@ const kindLabel: Record<AnnouncementEntry["data"]["kind"], string> = ru
           </span>
           <span class="announce-bar__text">{entry.data.text}</span>
           {entry.data.cta_text && entry.data.cta_href && (
-            <a class="announce-bar__cta" href={entry.data.cta_href}>
-              {entry.data.cta_text} <span class="announce-bar__cta-arrow" aria-hidden="true">→</span>
-            </a>
+            <a class="announce-bar__cta" href={entry.data.cta_href}>{entry.data.cta_text}</a>
           )}
           {entry.data.dismissible && (
             <button

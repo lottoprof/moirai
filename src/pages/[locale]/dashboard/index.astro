@@ -137,7 +137,7 @@ const t = ru
       ppPriceLabel: "Стоимость",
       ppTimeMorning: "утро",
       ppTimeEvening: "вечер",
-      ppPayCta: "Оплатить и начать →",
+      ppPayCta: "Оплатить и начать",
       ppCurriculumTitle: "Что внутри",
       ppCurriculumLocked: "Доступ к материалам откроется после оплаты",
       ppPasswordBanner: "Сейчас вход — через cookie этого браузера. Хотите задать пароль, чтобы заходить с других устройств?",
@@ -152,14 +152,14 @@ const t = ru
       paidAllModules: "Все модули",
       paidHomeworkSection: "Задания",
       paidStatusDone: "✓ завершено",
-      paidStatusActive: "→ в процессе",
+      paidStatusActive: "в процессе",
       paidStatusLocked: "недоступно",
       paidBadgeReview: "На проверке",
-      paidBadgePending: "Сдать →",
+      paidBadgePending: "Сдать",
       // no_application
       noAppTitle: "Ещё не выбрали программу.",
       noAppLede: "Посмотрите программы и выберите когорту — мы сразу зачислим место.",
-      noAppCta: "Выбрать когорту →",
+      noAppCta: "Выбрать когорту",
       seo: { title: "Личный кабинет — Moirai", description: "Личный кабинет студента Moirai." },
     }
   : {
@@ -177,7 +177,7 @@ const t = ru
       ppPriceLabel: "Price",
       ppTimeMorning: "morning",
       ppTimeEvening: "evening",
-      ppPayCta: "Pay & start →",
+      ppPayCta: "Pay & start",
       ppCurriculumTitle: "What's inside",
       ppCurriculumLocked: "Materials unlock after payment",
       ppPasswordBanner: "You're signed in via this browser's cookie. Set a password to sign in from other devices.",
@@ -191,13 +191,13 @@ const t = ru
       paidAllModules: "All modules",
       paidHomeworkSection: "Homework",
       paidStatusDone: "✓ complete",
-      paidStatusActive: "→ in progress",
+      paidStatusActive: "in progress",
       paidStatusLocked: "locked",
       paidBadgeReview: "Under review",
-      paidBadgePending: "Submit →",
+      paidBadgePending: "Submit",
       noAppTitle: "No programme yet.",
       noAppLede: "Browse programmes and pick a cohort — we'll reserve your spot right away.",
-      noAppCta: "Choose a cohort →",
+      noAppCta: "Choose a cohort",
       seo: { title: "Dashboard — Moirai", description: "Your Moirai student dashboard." },
     };
 
@@ -295,7 +295,7 @@ const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.d
         <p class="pp-password-banner">
           {t.ppPasswordBanner}
           {" "}
-          <a href={`/${locale}/account`}>{t.ppPasswordCta} →</a>
+          <a href={`/${locale}/account`}>{t.ppPasswordCta}</a>
         </p>
       </>
     )}

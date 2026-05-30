@@ -33,20 +33,20 @@ const labels = locale === "ru"
       dashboard: "Кабинет",
       modules: "Модули",
       homework: "Задания",
-      account: "Аккаунт →",
+      account: "Аккаунт",
       site: "На сайт",
-      switchInstructor: "→ Преподавателю",
-      switchAdmin: "→ Админу",
+      switchInstructor: "Преподавателю",
+      switchAdmin: "Админу",
     }
   : {
       aria: "Dashboard navigation",
       dashboard: "Dashboard",
       modules: "Modules",
       homework: "Homework",
-      account: "Account →",
+      account: "Account",
       site: "View site",
-      switchInstructor: "→ Instructor",
-      switchAdmin: "→ Admin",
+      switchInstructor: "Instructor",
+      switchAdmin: "Admin",
     };
 
 const items = [
@@ -70,7 +70,7 @@ if (roles?.has("admin")) {
 <nav class="dashboard-nav" aria-label={labels.aria}>
   <div class="dashboard-nav__brand">
     <a href={`/${locale}/dashboard`} class="dashboard-nav__logo" aria-label="Moirai dashboard"><Logo height={26} /></a>
-    <a href={`/${locale}/`} class="dashboard-nav__site">{labels.site} <span aria-hidden="true">→</span></a>
+    <a href={`/${locale}/`} class="dashboard-nav__site">{labels.site}</a>
   </div>
   <ul class="dashboard-nav__list" role="list">
     {items.map((item) => (

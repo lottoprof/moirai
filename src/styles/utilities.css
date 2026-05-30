@@ -269,13 +269,8 @@
   font-size: var(--type-body-md);
 }
 
-.btn__arrow {
-  display: inline-block;
-  transition: transform var(--duration-fast) var(--ease-out);
-}
-.btn:hover .btn__arrow {
-  transform: translateX(4px);
-}
+/* .btn__arrow deprecated — Btn компонент не рендерит arrow span.
+   См. Btn.astro JSDoc (memory feedback_no_unicode_icons). */
 
 /* ============================================================
    Forms — login / register / password-reset / contact.

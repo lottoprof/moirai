@@ -30,9 +30,7 @@ const { badge, title, body, ctaText, ctaHref } = Astro.props;
     <h2 class="ai-banner__title">{title}</h2>
     <span class="ai-banner__sep" aria-hidden="true">·</span>
     <p class="ai-banner__body">{body}</p>
-    <a href={ctaHref} class="ai-banner__cta">
-      {ctaText} <span aria-hidden="true">→</span>
-    </a>
+    <a href={ctaHref} class="ai-banner__cta">{ctaText}</a>
   </div>
 </section>
 

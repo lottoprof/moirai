@@ -42,10 +42,7 @@ const hasTracks = (tracks ?? []).length > 0;
     </ul>
   )}
   {meta && <p class="programme-card__meta">{meta}</p>}
-  <a href={linkHref} class="programme-card__link">
-    {linkText}
-    <span aria-hidden="true">→</span>
-  </a>
+  <a href={linkHref} class="programme-card__link">{linkText}</a>
 </article>
 
 <style>

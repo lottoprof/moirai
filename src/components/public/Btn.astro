@@ -4,8 +4,15 @@
  * Стили живут в `src/styles/utilities.css` (.btn + модификаторы),
  * этот компонент только композирует правильную разметку.
  *
+ * Editorial style: text-only (без декоративной стрелки). Affordance
+ * через bg color, hover brightness shift. Раньше был `arrow` prop с
+ * Unicode "→" — убран (memory feedback_no_unicode_icons + дублирование
+ * когда cta_text уже содержал trailing "→"). Prop сохранён как
+ * deprecated no-op, чтобы не ломать существующие <Btn arrow>...</Btn>
+ * callers до их cleanup.
+ *
  * Пример:
- *   <Btn href="/en/apply" variant="primary" size="lg" arrow>Apply now</Btn>
+ *   <Btn href="/en/apply" variant="primary" size="lg">Apply now</Btn>
  *   <Btn type="submit">Send</Btn>
  */
 
@@ -16,6 +23,7 @@ interface Props extends Omit<HTMLAttributes<"a">, "type"> {
   variant?: "primary" | "ghost";
   size?: "default" | "lg" | "xl";
   type?: "button" | "submit";
+  /** Deprecated no-op. Раньше добавлял "→". См. JSDoc выше. */
   arrow?: boolean;
 }
 
@@ -24,7 +32,6 @@ const {
   variant = "primary",
   size = "default",
   type = "button",
-  arrow = false,
   class: extraClass,
   ...rest
 } = Astro.props;
@@ -39,20 +46,10 @@ const className = classes.join(" ");
   href ? (
     <a href={href} class={className} {...rest}>
       <slot />
-      {arrow && (
-        <span class="btn__arrow" aria-hidden="true">
-          →
-        </span>
-      )}
     </a>
   ) : (
     <button type={type} class={className} {...rest}>
       <slot />
-      {arrow && (
-        <span class="btn__arrow" aria-hidden="true">
-          →
-        </span>
-      )}
     </button>
   )
 }
