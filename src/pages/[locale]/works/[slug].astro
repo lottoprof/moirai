@@ -1,0 +1,332 @@
+---
+/*
+ * /{locale}/works/[slug] — отдельная страница одной работы.
+ *
+ * Содержит: YouTube embed (lite-load), title, director · year · runtime,
+ * synopsis (mdx body), filmmakers credits, programme link, Schema.org
+ * VideoObject.
+ *
+ * Embed: lite-load pattern — pre-click показываем thumbnail + play
+ * button. На клик загружается youtube-nocookie iframe. До клика страница
+ * лёгкая (1 image + 1 button), после — стандартный YouTube player.
+ *
+ * Detail (workflow добавления): docs/methodist-works-guide.md.
+ */
+
+import { getCollection, getEntry, type CollectionEntry } from "astro:content";
+import Layout from "../../../layouts/public/Layout.astro";
+import VideoObjectSchema from "../../../components/schema/VideoObjectSchema.astro";
+
+export const prerender = true;
+
+type WorkEntry = CollectionEntry<"works">;
+
+export async function getStaticPaths() {
+  const all = await getCollection("works");
+  return all.map((entry: WorkEntry) => {
+    const [slug, locale] = entry.id.split(".");
+    return {
+      params: { locale, slug },
+      props: { entry },
+    };
+  });
+}
+
+interface Props {
+  entry: WorkEntry;
+}
+const { entry } = Astro.props;
+const { locale: paramLocale } = Astro.params;
+const typedLocale: "en" | "ru" = paramLocale === "ru" ? "ru" : "en";
+
+const { Content } = await entry.render();
+
+const t = typedLocale === "ru"
+  ? {
+      directorLabel: "Режиссёр",
+      runtimeLabel: "Длительность",
+      filmmakersLabel: "Съёмочная группа",
+      programmeLabel: "После программы",
+      playLabel: "Смотреть",
+      backToWorks: "← Все работы",
+    }
+  : {
+      directorLabel: "Director",
+      runtimeLabel: "Runtime",
+      filmmakersLabel: "Filmmakers",
+      programmeLabel: "Made after",
+      playLabel: "Play",
+      backToWorks: "← All works",
+    };
+
+const programmeEntry = entry.data.programme_id
+  ? await getEntry("programmes", `${entry.data.programme_id}.${typedLocale}`)
+  : null;
+
+function formatRuntime(seconds: number): string {
+  const min = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  return typedLocale === "ru"
+    ? `${min.toString()} мин ${sec.toString()} сек`
+    : `${min.toString()} min ${sec.toString()} sec`;
+}
+
+const thumbnailUrl = entry.data.thumbnail_override
+  ? `https://media.moiraionline.pro/${entry.data.thumbnail_override}`
+  : `https://img.youtube.com/vi/${entry.data.youtube_id}/maxresdefault.jpg`;
+const embedSrc = `https://www.youtube-nocookie.com/embed/${entry.data.youtube_id}?autoplay=1&rel=0`;
+---
+
+<Layout locale={typedLocale} seo={entry.data.seo}>
+  <Fragment slot="schema">
+    <VideoObjectSchema
+      title={entry.data.title}
+      description={entry.data.seo.description}
+      youtubeId={entry.data.youtube_id}
+      year={entry.data.year}
+      runtimeSeconds={entry.data.runtime_seconds}
+    />
+  </Fragment>
+
+  <article class="work-page">
+    <p class="work-page__back">
+      <a href={`/${typedLocale}/works`}>{t.backToWorks}</a>
+    </p>
+
+    {/* Lite-load YouTube embed — thumbnail + play button до клика,
+        iframe загружается только когда юзер кликает play. */}
+    <div class="work-player" data-youtube-id={entry.data.youtube_id} data-embed-src={embedSrc}>
+      <button type="button" class="work-player__poster" aria-label={t.playLabel}>
+        <img
+          src={thumbnailUrl}
+          alt=""
+          width="1280"
+          height="720"
+          loading="eager"
+        />
+        <span class="work-player__play" aria-hidden="true">
+          <svg viewBox="0 0 64 64" width="64" height="64">
+            <circle cx="32" cy="32" r="32" fill="rgba(13,11,9,0.7)"/>
+            <polygon points="26,20 26,44 46,32" fill="var(--paper)"/>
+          </svg>
+        </span>
+      </button>
+    </div>
+
+    <header class="work-page__head">
+      <h1 class="h1 work-page__title">{entry.data.title}</h1>
+      <p class="work-page__meta text-muted">
+        <span>{t.directorLabel}: <strong>{entry.data.director}</strong></span>
+        <span> · {entry.data.year.toString()}</span>
+        {entry.data.runtime_seconds && (
+          <span> · {formatRuntime(entry.data.runtime_seconds)}</span>
+        )}
+      </p>
+    </header>
+
+    <div class="work-page__synopsis prose">
+      <Content />
+    </div>
+
+    {entry.data.filmmakers.length > 0 && (
+      <section class="work-page__credits" aria-labelledby="filmmakers-label">
+        <h2 id="filmmakers-label" class="h5 work-page__credits-label">{t.filmmakersLabel}</h2>
+        <dl class="work-page__filmmakers">
+          {entry.data.filmmakers.map((f: { role: string; name: string }) => (
+            <div class="work-page__filmmaker">
+              <dt>{f.role}</dt>
+              <dd>{f.name}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    )}
+
+    {programmeEntry && (
+      <section class="work-page__programme">
+        <p class="text-muted">
+          {t.programmeLabel}:
+          {" "}
+          <a href={`/${typedLocale}/programmes/${entry.data.programme_id ?? ""}`} class="work-page__programme-link">
+            {programmeEntry.data.title}
+          </a>
+        </p>
+      </section>
+    )}
+  </article>
+</Layout>
+
+<style>
+  .work-page {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  .work-page__back {
+    margin: 0 0 var(--space-md);
+  }
+  .work-page__back a {
+    color: var(--text-faint);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .work-page__back a:hover {
+    color: var(--amber);
+  }
+
+  /* Lite-load player: pre-click — thumbnail + play overlay.
+     При клике JS заменяет содержимое на <iframe>. */
+  .work-player {
+    aspect-ratio: 16 / 9;
+    background: var(--ink);
+    margin-bottom: var(--space-2xl);
+    position: relative;
+    overflow: hidden;
+  }
+  .work-player__poster {
+    width: 100%;
+    height: 100%;
+    border: none;
+    padding: 0;
+    background: none;
+    cursor: pointer;
+    position: relative;
+    display: block;
+    transition: opacity var(--duration-fast) var(--ease-out);
+  }
+  .work-player__poster:hover {
+    opacity: 0.9;
+  }
+  .work-player__poster:active {
+    opacity: 0.7;
+  }
+  .work-player__poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .work-player__play {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transition: transform var(--duration-normal) var(--ease-out);
+  }
+  .work-player__poster:hover .work-player__play {
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  /* Iframe (после клика) — full size */
+  .work-player iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
+  .work-page__head {
+    margin-bottom: var(--space-xl);
+  }
+  .work-page__title {
+    margin: 0 0 var(--space-md);
+  }
+  .work-page__meta {
+    margin: 0;
+    font-size: var(--type-body-md);
+  }
+
+  .work-page__synopsis {
+    max-width: 65ch;
+    margin: 0 0 var(--space-3xl);
+    font-size: var(--type-body-md);
+    line-height: 1.7;
+    color: var(--text-muted);
+  }
+  .work-page__synopsis :global(p) {
+    margin: 0 0 var(--space-md);
+  }
+
+  .work-page__credits {
+    margin-bottom: var(--space-2xl);
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--border);
+  }
+  .work-page__credits-label {
+    margin: 0 0 var(--space-md);
+    color: var(--text-faint);
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+  }
+  .work-page__filmmakers {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-md);
+    margin: 0;
+  }
+  .work-page__filmmaker {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: var(--space-sm);
+  }
+  .work-page__filmmaker dt {
+    color: var(--text-faint);
+    font-size: var(--type-body-sm);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+  .work-page__filmmaker dd {
+    margin: 0;
+    color: var(--text);
+    font-size: var(--type-body-sm);
+  }
+
+  .work-page__programme {
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--border);
+  }
+  .work-page__programme-link {
+    color: var(--amber);
+    text-decoration: underline;
+    text-decoration-color: var(--amber);
+    text-underline-offset: 4px;
+  }
+  .work-page__programme-link:hover {
+    opacity: 0.85;
+  }
+  .work-page__programme-link:active {
+    opacity: 0.7;
+  }
+
+  @media (max-width: 640px) {
+    .work-page__filmmakers {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script>
+  /*
+   * Lite-load YouTube — на клик poster button заменяет содержимое
+   * на iframe (autoplay=1, чтобы видео сразу запустилось после клика).
+   */
+  document.querySelectorAll<HTMLElement>(".work-player").forEach((player) => {
+    const poster = player.querySelector<HTMLButtonElement>(".work-player__poster");
+    const embedSrc = player.dataset.embedSrc;
+    if (!poster || !embedSrc) return;
+    poster.addEventListener("click", () => {
+      const iframe = document.createElement("iframe");
+      iframe.src = embedSrc;
+      iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+      iframe.allowFullscreen = true;
+      iframe.title = "YouTube video player";
+      player.innerHTML = "";
+      player.appendChild(iframe);
+    });
+  });
+</script>

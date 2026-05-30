@@ -1,0 +1,211 @@
+---
+/*
+ * /{locale}/works — листинг студенческих работ + empty-state.
+ *
+ * Источник: Content Collection works (mdx files).
+ * Empty-state: пока нет работ (до завершения первой когорты) показываем
+ * CTA "Apply now to be among the first".
+ *
+ * Detail: см. docs/methodist-works-guide.md для workflow добавления.
+ */
+
+import { getCollection, type CollectionEntry } from "astro:content";
+import Layout from "../../../layouts/public/Layout.astro";
+
+export const prerender = true;
+
+export function getStaticPaths() {
+  return [
+    { params: { locale: "en" } },
+    { params: { locale: "ru" } },
+  ];
+}
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  throw new Error(`Unexpected locale: ${String(locale)}`);
+}
+const typedLocale: "en" | "ru" = locale;
+
+type WorkEntry = CollectionEntry<"works">;
+const allWorks = await getCollection("works");
+const works = allWorks
+  .filter((w: WorkEntry) => w.id.endsWith(`.${typedLocale}`))
+  .sort((a: WorkEntry, b: WorkEntry) => b.data.year - a.data.year);
+
+const t = typedLocale === "ru"
+  ? {
+      eyebrow: "Из наших фильмов",
+      title: "Студенческие фильмы.",
+      lede: "Короткометражные работы, снятые выпускниками программ Moirai.",
+      emptyTitle: "Первые работы появятся после первой когорты.",
+      emptyLede: "Старт — лето 2026. Подайте заявку, чтобы быть среди первых.",
+      emptyCta: "Подать заявку",
+      directorPrefix: "Реж.",
+      seo: {
+        title: "Студенческие фильмы | Moirai",
+        description: "Короткометражные фильмы, снятые выпускниками программ Moirai — режиссура, монтаж, сценарий с нуля до готового фильма.",
+      },
+    }
+  : {
+      eyebrow: "From Our Films",
+      title: "Student films.",
+      lede: "Short films made by alumni of Moirai programmes.",
+      emptyTitle: "First films coming after the first cohort.",
+      emptyLede: "Starting Summer 2026. Apply now to be among the first.",
+      emptyCta: "Apply now",
+      directorPrefix: "Dir.",
+      seo: {
+        title: "Student Films | Moirai",
+        description: "Short films made by Moirai programme alumni — directing, editing, and screenwriting from scratch to a finished film.",
+      },
+    };
+
+function workThumbnail(w: WorkEntry): string {
+  if (w.data.thumbnail_override) {
+    return `https://media.moiraionline.pro/${w.data.thumbnail_override}`;
+  }
+  return `https://img.youtube.com/vi/${w.data.youtube_id}/maxresdefault.jpg`;
+}
+
+function workHref(w: WorkEntry): string {
+  const slug = w.id.replace(`.${typedLocale}`, "");
+  return `/${typedLocale}/works/${slug}`;
+}
+---
+
+<Layout locale={typedLocale} seo={{ title: t.seo.title, description: t.seo.description }}>
+  <section class="works-page" aria-labelledby="works-title">
+    <header class="works-page__head">
+      <p class="eyebrow">{t.eyebrow}</p>
+      <h1 id="works-title" class="h1">{t.title}</h1>
+      <p class="text-muted">{t.lede}</p>
+    </header>
+
+    {works.length === 0 ? (
+      <div class="works-empty">
+        <h2 class="works-empty__title h3">{t.emptyTitle}</h2>
+        <p class="works-empty__lede text-muted">{t.emptyLede}</p>
+        <a href={`/${typedLocale}/apply`} class="btn btn--primary btn--lg">{t.emptyCta}</a>
+      </div>
+    ) : (
+      <ul class="works-grid" role="list">
+        {works.map((w: WorkEntry) => (
+          <li class="work-card">
+            <a class="work-card__link" href={workHref(w)}>
+              <div class="work-card__thumb">
+                <img
+                  src={workThumbnail(w)}
+                  alt={w.data.title}
+                  width="640"
+                  height="360"
+                  loading="lazy"
+                />
+              </div>
+              <div class="work-card__body">
+                <h2 class="work-card__title h4">{w.data.title}</h2>
+                <p class="work-card__meta">
+                  <span>{t.directorPrefix} {w.data.director}</span>
+                  <span> · {w.data.year.toString()}</span>
+                </p>
+              </div>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+</Layout>
+
+<style>
+  .works-page {
+    padding: var(--space-3xl) var(--container-pad);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+
+  .works-page__head {
+    max-width: 720px;
+    margin: 0 auto var(--space-2xl);
+    text-align: center;
+  }
+  .works-page__head .eyebrow {
+    margin-bottom: var(--space-md);
+  }
+  .works-page__head .h1 {
+    margin-bottom: var(--space-md);
+  }
+
+  /* Empty-state — CTA в центре, направляем на /apply. */
+  .works-empty {
+    text-align: center;
+    padding: var(--space-3xl) 0;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+  .works-empty__title {
+    margin-bottom: var(--space-md);
+  }
+  .works-empty__lede {
+    margin-bottom: var(--space-2xl);
+  }
+
+  /* Grid: 3 col desktop / 2 col tablet / 1 col mobile */
+  .works-grid {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-xl);
+  }
+  @media (max-width: 1024px) {
+    .works-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 640px) {
+    .works-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .work-card__link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    transition: opacity var(--duration-fast) var(--ease-out);
+  }
+  .work-card__link:hover {
+    opacity: 0.85;
+  }
+  .work-card__link:active {
+    opacity: 0.7;
+  }
+
+  .work-card__thumb {
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: var(--bg-elevated);
+    margin-bottom: var(--space-md);
+  }
+  .work-card__thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform var(--duration-normal) var(--ease-out);
+  }
+  .work-card__link:hover .work-card__thumb img {
+    transform: scale(1.04);
+  }
+
+  .work-card__title {
+    margin: 0 0 var(--space-2xs);
+  }
+  .work-card__meta {
+    margin: 0;
+    font-size: var(--type-body-sm);
+    color: var(--text-faint);
+  }
+</style>

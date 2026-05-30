@@ -189,8 +189,17 @@ const works = defineCollection({
         }),
       )
       .default([]),
-    thumbnail_r2_key: z.string().optional(),
-    video_r2_key: z.string().optional(),
+    /**
+     * YouTube video ID (11 chars). Source: видео живёт на YouTube,
+     * embed через youtube-nocookie domain (lite-load + GDPR safe).
+     * Thumbnail — auto от YouTube CDN
+     * (img.youtube.com/vi/<id>/maxresdefault.jpg). Detail: см.
+     * docs/methodist-works-guide.md §"Добавление новой работы".
+     */
+    youtube_id: z.string().length(11),
+    /** Optional R2 key для custom thumbnail если YouTube auto-thumb не
+        подходит (например для festival poster). Default — YouTube CDN. */
+    thumbnail_override: z.string().optional(),
     runtime_seconds: z.number().int().positive().optional(),
     programme_id: z.string().optional(), // ссылка на programme id, опционально
     seo: seoSchema,

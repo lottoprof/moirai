@@ -1,0 +1,59 @@
+---
+/*
+ * <VideoObjectSchema /> — Schema.org VideoObject JSON-LD для
+ * /{locale}/works/[slug] страниц. Помогает попасть в Google
+ * Video Search.
+ *
+ * Use:
+ *   <Fragment slot="schema">
+ *     <VideoObjectSchema
+ *       title={...}
+ *       description={...}
+ *       youtubeId={work.data.youtube_id}
+ *       year={work.data.year}
+ *       runtimeSeconds={work.data.runtime_seconds}
+ *     />
+ *   </Fragment>
+ *
+ * См. Google Video Search docs:
+ *   https://developers.google.com/search/docs/appearance/structured-data/video
+ */
+
+interface Props {
+  title: string;
+  description: string;
+  youtubeId: string;
+  year: number;
+  runtimeSeconds?: number;
+}
+
+const { title, description, youtubeId, year, runtimeSeconds } = Astro.props;
+
+const thumbnailUrl = `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`;
+const embedUrl = `https://www.youtube-nocookie.com/embed/${youtubeId}`;
+const contentUrl = `https://www.youtube.com/watch?v=${youtubeId}`;
+const uploadDate = `${year.toString()}-01-01`;
+
+/** ISO 8601 duration: PT4M23S (4 min 23 sec). */
+function isoDuration(seconds: number): string {
+  const min = Math.floor(seconds / 60);
+  const sec = seconds % 60;
+  return `PT${min.toString()}M${sec.toString()}S`;
+}
+
+const json: Record<string, unknown> = {
+  "@context": "https://schema.org",
+  "@type": "VideoObject",
+  name: title,
+  description,
+  thumbnailUrl,
+  uploadDate,
+  embedUrl,
+  contentUrl,
+};
+if (runtimeSeconds !== undefined) {
+  json.duration = isoDuration(runtimeSeconds);
+}
+---
+
+<script type="application/ld+json" set:html={JSON.stringify(json)} />
