@@ -130,7 +130,6 @@ const t = ru
       filterHorizon90: "3 месяца",
       filterHorizon365: "Год",
       filtersHeading: "Фильтры",
-      filtersSubtitle: "Уточните когорты по программе, расписанию и периоду.",
       filterLabelProgramme: "Программа",
       filterLabelSchedule: "Расписание",
       filterLabelTime: "Время",
@@ -165,7 +164,6 @@ const t = ru
       filterHorizon90: "3 months",
       filterHorizon365: "Year",
       filtersHeading: "Filters",
-      filtersSubtitle: "Refine cohorts by programme, schedule and period.",
       filterLabelProgramme: "Programme",
       filterLabelSchedule: "Schedule",
       filterLabelTime: "Time",
@@ -268,13 +266,12 @@ const isEmpty = cohorts.length === 0;
     <p class="apply-hero__lede">{t.lede}</p>
   </section>
 
-  <section class="apply-filters" aria-labelledby="apply-filters-heading">
+  <section class="apply-filters" aria-label={t.filtersHeading}>
     <header class="apply-filters__head">
       <p class="eyebrow apply-filters__eyebrow">{t.filtersHeading}</p>
-      <h2 id="apply-filters-heading" class="apply-filters__title text-muted">{t.filtersSubtitle}</h2>
     </header>
 
-    <div class="apply-filters__row">
+    <div class="apply-filters__row apply-filters__row--scroll-mobile">
       <span class="apply-filters__label">{t.filterLabelProgramme}</span>
       <div class="apply-filters__chips">
         <a
@@ -420,21 +417,12 @@ const isEmpty = cohorts.length === 0;
     gap: var(--space-md);
   }
 
-  /* Header — eyebrow "Filters" + muted subtitle. Делает блок очевидно
-     identifiable. */
+  /* Header — eyebrow "Filters". Делает блок очевидно identifiable. */
   .apply-filters__head {
     margin-bottom: var(--space-xs);
   }
   .apply-filters__eyebrow {
-    margin: 0 0 var(--space-2xs);
-  }
-  .apply-filters__title {
     margin: 0;
-    font-size: var(--type-body-sm);
-    font-family: var(--font-body);
-    font-weight: 400;
-    letter-spacing: var(--tracking-normal);
-    text-transform: none;
   }
 
   /* Row — label слева (desktop, фикс ширина для выравнивания) + chips
@@ -463,6 +451,32 @@ const isEmpty = cohorts.length === 0;
     .apply-filters__row {
       grid-template-columns: 1fr;
       gap: var(--space-2xs);
+    }
+
+    /* Programme ряд (4 chip'а с длинными названиями) — horizontal scroll
+       с peek соседнего chip'а. Остальные ряды wrap'ятся как раньше
+       (3 коротких chip'a помещаются в 1 строку). */
+    .apply-filters__row--scroll-mobile .apply-filters__chips {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x proximity;
+      padding-bottom: 4px;
+      /* Снимаем default container-pad справа чтобы next chip peek'нул
+         за viewport edge — visual hint что есть scroll. */
+      margin-right: calc(var(--container-pad) * -1);
+      padding-right: var(--container-pad);
+    }
+    .apply-filters__row--scroll-mobile .chip {
+      flex-shrink: 0;
+      scroll-snap-align: start;
+    }
+    /* Тонкий scrollbar — visible affordance что row scrollable. */
+    .apply-filters__row--scroll-mobile .apply-filters__chips::-webkit-scrollbar {
+      height: 2px;
+    }
+    .apply-filters__row--scroll-mobile .apply-filters__chips::-webkit-scrollbar-thumb {
+      background: var(--border);
     }
   }
 
