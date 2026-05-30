@@ -129,6 +129,12 @@ const t = ru
       filterHorizon30: "30 дней",
       filterHorizon90: "3 месяца",
       filterHorizon365: "Год",
+      filtersHeading: "Фильтры",
+      filtersSubtitle: "Уточните когорты по программе, расписанию и периоду.",
+      filterLabelProgramme: "Программа",
+      filterLabelSchedule: "Расписание",
+      filterLabelTime: "Время",
+      filterLabelPeriod: "Период",
       empty: "Под выбранные фильтры нет когорт. Сбросьте фильтры или увеличьте горизонт.",
       emptyReset: "Сбросить фильтры",
       starts: "Старт",
@@ -158,6 +164,12 @@ const t = ru
       filterHorizon30: "30 days",
       filterHorizon90: "3 months",
       filterHorizon365: "Year",
+      filtersHeading: "Filters",
+      filtersSubtitle: "Refine cohorts by programme, schedule and period.",
+      filterLabelProgramme: "Programme",
+      filterLabelSchedule: "Schedule",
+      filterLabelTime: "Time",
+      filterLabelPeriod: "Period",
       empty: "No cohorts match these filters. Reset filters or widen the horizon.",
       emptyReset: "Reset filters",
       starts: "Starts",
@@ -256,40 +268,61 @@ const isEmpty = cohorts.length === 0;
     <p class="apply-hero__lede">{t.lede}</p>
   </section>
 
-  <section class="apply-filters" aria-label="Filters">
+  <section class="apply-filters" aria-labelledby="apply-filters-heading">
+    <header class="apply-filters__head">
+      <p class="eyebrow apply-filters__eyebrow">{t.filtersHeading}</p>
+      <h2 id="apply-filters-heading" class="apply-filters__title text-muted">{t.filtersSubtitle}</h2>
+    </header>
+
     <div class="apply-filters__row">
-      <a
-        href={buildUrl({ p: null })}
-        class:list={["chip", { "chip--active": allProgrammesActive }]}
-      >{t.filterProgrammeAll}</a>
-      {programmeOrder.map((slug) => {
-        const meta = programmeMeta.get(slug);
-        if (!meta) return null;
-        return (
-          <a
-            href={programmeChipUrl(slug)}
-            class:list={["chip", { "chip--active": programmeChipActive(slug) }]}
-          >{meta.title}</a>
-        );
-      })}
+      <span class="apply-filters__label">{t.filterLabelProgramme}</span>
+      <div class="apply-filters__chips">
+        <a
+          href={buildUrl({ p: null })}
+          class:list={["chip", { "chip--active": allProgrammesActive }]}
+        >{t.filterProgrammeAll}</a>
+        {programmeOrder.map((slug) => {
+          const meta = programmeMeta.get(slug);
+          if (!meta) return null;
+          // Bundle title — длинное ("Beginner + Intermediate"), на chip
+          // выходит из ряда на mobile. Override на короткий "Bundle"
+          // для всех viewports — universal industry term.
+          const chipLabel = slug === "bundle" ? "Bundle" : meta.title;
+          return (
+            <a
+              href={programmeChipUrl(slug)}
+              class:list={["chip", { "chip--active": programmeChipActive(slug) }]}
+            >{chipLabel}</a>
+          );
+        })}
+      </div>
     </div>
 
     <div class="apply-filters__row">
-      <a href={buildUrl({ d: null })} class:list={["chip", { "chip--active": dayChipActive(null) }]}>{t.filterDayAll}</a>
-      <a href={buildUrl({ d: "mon-thu" })} class:list={["chip", { "chip--active": dayChipActive("mon-thu") }]}>{weekdayLabel("mon")}+{weekdayLabel("thu")}</a>
-      <a href={buildUrl({ d: "tue-fri" })} class:list={["chip", { "chip--active": dayChipActive("tue-fri") }]}>{weekdayLabel("tue")}+{weekdayLabel("fri")}</a>
+      <span class="apply-filters__label">{t.filterLabelSchedule}</span>
+      <div class="apply-filters__chips">
+        <a href={buildUrl({ d: null })} class:list={["chip", { "chip--active": dayChipActive(null) }]}>{t.filterDayAll}</a>
+        <a href={buildUrl({ d: "mon-thu" })} class:list={["chip", { "chip--active": dayChipActive("mon-thu") }]}>{weekdayLabel("mon")}+{weekdayLabel("thu")}</a>
+        <a href={buildUrl({ d: "tue-fri" })} class:list={["chip", { "chip--active": dayChipActive("tue-fri") }]}>{weekdayLabel("tue")}+{weekdayLabel("fri")}</a>
+      </div>
     </div>
 
     <div class="apply-filters__row">
-      <a href={buildUrl({ t: null })} class:list={["chip", { "chip--active": timeChipActive(null) }]}>{t.filterTimeAll}</a>
-      <a href={buildUrl({ t: "morning" })} class:list={["chip", { "chip--active": timeChipActive("morning") }]}>{t.filterTimeMorning}</a>
-      <a href={buildUrl({ t: "evening" })} class:list={["chip", { "chip--active": timeChipActive("evening") }]}>{t.filterTimeEvening}</a>
+      <span class="apply-filters__label">{t.filterLabelTime}</span>
+      <div class="apply-filters__chips">
+        <a href={buildUrl({ t: null })} class:list={["chip", { "chip--active": timeChipActive(null) }]}>{t.filterTimeAll}</a>
+        <a href={buildUrl({ t: "morning" })} class:list={["chip", { "chip--active": timeChipActive("morning") }]}>{t.filterTimeMorning}</a>
+        <a href={buildUrl({ t: "evening" })} class:list={["chip", { "chip--active": timeChipActive("evening") }]}>{t.filterTimeEvening}</a>
+      </div>
     </div>
 
     <div class="apply-filters__row">
-      <a href={buildUrl({ h: "30" })} class:list={["chip", { "chip--active": horizonChipActive(30) }]}>{t.filterHorizon30}</a>
-      <a href={buildUrl({ h: "90" })} class:list={["chip", { "chip--active": horizonChipActive(90) }]}>{t.filterHorizon90}</a>
-      <a href={buildUrl({ h: "365" })} class:list={["chip", { "chip--active": horizonChipActive(365) }]}>{t.filterHorizon365}</a>
+      <span class="apply-filters__label">{t.filterLabelPeriod}</span>
+      <div class="apply-filters__chips">
+        <a href={buildUrl({ h: "30" })} class:list={["chip", { "chip--active": horizonChipActive(30) }]}>{t.filterHorizon30}</a>
+        <a href={buildUrl({ h: "90" })} class:list={["chip", { "chip--active": horizonChipActive(90) }]}>{t.filterHorizon90}</a>
+        <a href={buildUrl({ h: "365" })} class:list={["chip", { "chip--active": horizonChipActive(365) }]}>{t.filterHorizon365}</a>
+      </div>
     </div>
   </section>
 
@@ -377,20 +410,60 @@ const isEmpty = cohorts.length === 0;
   }
 
   .apply-filters {
-    padding: var(--space-md) var(--container-pad);
+    padding: var(--space-lg) var(--container-pad);
     max-width: var(--container-max);
     margin: 0 auto;
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
+    gap: var(--space-md);
   }
+
+  /* Header — eyebrow "Filters" + muted subtitle. Делает блок очевидно
+     identifiable. */
+  .apply-filters__head {
+    margin-bottom: var(--space-xs);
+  }
+  .apply-filters__eyebrow {
+    margin: 0 0 var(--space-2xs);
+  }
+  .apply-filters__title {
+    margin: 0;
+    font-size: var(--type-body-sm);
+    font-family: var(--font-body);
+    font-weight: 400;
+    letter-spacing: var(--tracking-normal);
+    text-transform: none;
+  }
+
+  /* Row — label слева (desktop, фикс ширина для выравнивания) + chips
+     справа. Mobile: label сверху ряда на отдельной строке. */
   .apply-filters__row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: var(--space-md);
+    align-items: center;
+  }
+  .apply-filters__label {
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .apply-filters__chips {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2xs);
     align-items: center;
+  }
+
+  @media (max-width: 640px) {
+    .apply-filters__row {
+      grid-template-columns: 1fr;
+      gap: var(--space-2xs);
+    }
   }
 
   .chip {
