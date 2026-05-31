@@ -32,6 +32,17 @@ export default defineConfig({
         defaultLocale: "en",
         locales: { en: "en", ru: "ru" },
       },
+      // Исключаем auth-walled, transactional и admin страницы из sitemap.
+      // Sitemap = только публичные SEO-страницы. См. docs/seo-markup-rules.md §3.
+      filter: (page) =>
+        !page.includes("/admin/") &&
+        !page.includes("/dashboard/") &&
+        !page.includes("/checkout/") &&
+        !page.includes("/verify-email-pending/") &&
+        !page.includes("/inactive/") &&
+        !page.includes("/account/") &&
+        !page.includes("/login") &&
+        !page.includes("/register"),
     }),
   ],
 });

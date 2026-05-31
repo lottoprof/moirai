@@ -19,6 +19,8 @@
  * См. https://developers.google.com/search/docs/appearance/structured-data/article
  */
 
+import { SITE } from "../../lib/site-config";
+
 interface Props {
   title: string;
   description: string;
@@ -41,8 +43,8 @@ const json: Record<string, unknown> = {
   },
   publisher: {
     "@type": "Organization",
-    name: "Moirai",
-    url: "https://moirai.film",
+    name: SITE.name,
+    url: SITE.url,
   },
   datePublished: datePublished.toISOString(),
   mainEntityOfPage: {
