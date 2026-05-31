@@ -38,3 +38,6 @@ coverage/
 .agent/worktrees/
 .playwright-mcp/
 *.png
+# Брендированный OG-fallback — единственный коммитнутый PNG в public/.
+# Генерится scripts/generate-og-default.mjs, регенится при rebrand.
+!public/og-default.png
