@@ -9,7 +9,9 @@
  * вокруг этого SeoHead. Stage 6 (см. plans/active/sprint0-stage3...).
  */
 
-const SITE = "https://moiraionline.pro";
+import { SITE as SITE_CONFIG } from "../../lib/site-config";
+
+const SITE = SITE_CONFIG.url;
 const MEDIA_BASE = "https://media.moiraionline.pro";
 const LOCALES = ["en", "ru"] as const;
 type Locale = (typeof LOCALES)[number];
@@ -41,7 +43,16 @@ function altPath(targetLocale: Locale): string {
   return `/${targetLocale}/`;
 }
 
-const ogImageUrl = seo.og_image ? `${MEDIA_BASE}/${seo.og_image}` : undefined;
+/*
+ * og:image fallback chain:
+ *   1. per-page seo.og_image (R2 ключ, absolute через MEDIA_BASE)
+ *   2. глобальный SITE_CONFIG.ogDefault (public/og-default.png) —
+ *      брендированная карточка чтобы Twitter/Discord/Telegram не
+ *      показывали пустой share
+ */
+const ogImageUrl = seo.og_image
+  ? `${MEDIA_BASE}/${seo.og_image}`
+  : `${SITE}${SITE_CONFIG.ogDefault}`;
 
 const ogLocaleMap: Record<Locale, string> = { en: "en_US", ru: "ru_RU" };
 const ogLocale = ogLocaleMap[locale];

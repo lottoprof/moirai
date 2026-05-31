@@ -19,6 +19,12 @@ export const SITE = {
   logo: "https://moiraionline.pro/favicon.svg",
   email: "hello@moiraionline.pro",
   social: [] as string[],
+  /**
+   * Глобальный OG-fallback (1200×630). Используется в SeoHead когда
+   * у страницы нет per-page `seo.og_image`. Генерится через
+   * scripts/generate-og-default.mjs, коммитится в public/.
+   */
+  ogDefault: "/og-default.png",
 } as const;
 
 /** Per-locale описание организации — короткое, для Organization.description. */

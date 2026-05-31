@@ -73,9 +73,12 @@ grep -rn "moirai.film\|moiraionline.pro" src/ docs/ \
   10-70 chars, `seo.description` 50-180 chars).
 - `seo.noindex: true` ставится **на странице** для admin/dashboard/auth/
   checkout/verify-email — НЕ полагаемся только на sitemap exclusion.
-- `og:image` — если нет per-page картинки, используется
-  `${SITE.url}/og-default.png` (1200×630, brand). Это глобальный fallback;
-  без него Twitter/Discord/Telegram показывают пустую карточку.
+- `og:image` — если нет per-page `seo.og_image`, используется
+  `${SITE.url}${SITE.ogDefault}` = `https://moiraionline.pro/og-default.png`
+  (1200×630, ink bg + amber Moirai mark + paper wordmark + tagline +
+  домен). Реализовано в `SeoHead.astro:ogImageUrl`. PNG генерится
+  `scripts/generate-og-default.mjs` через sharp; коммитится в
+  `public/og-default.png` (~10 KB). Регенерим только при rebrand.
 
 ---
 

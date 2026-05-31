@@ -110,6 +110,12 @@ Sprint 2 (новые планы будут):
 - [ ] **Live session player** (Vidstack) когда первая cohort стартует
 - [ ] **CF Cron Trigger** для daily `/api/admin/cron/tick` automation
 - [ ] **PersonSchema** для instructor detail pages когда сделаем `/instructors/[slug]`
+- [ ] **BreadcrumbList Schema** для `/journal/<slug>`, `/works/<slug>`,
+  `/legal/<id>`, `/programmes/<id>`. Deferred: Google в 2024-2026 показывает
+  breadcrumbs в SERP всё реже, наши URL уже короткие. Триггер для реализации —
+  (а) первый реальный трафик в Search Console с CTR-проблемой на детальных
+  страницах, либо (б) делаем `/programmes/<id>` детальные — тогда сразу
+  компонент для всех 4 типов. См. `docs/seo-markup-rules.md §5`.
 - [ ] **Real instructor bios** (Vladimir + Anastasia подменят DRAFT текст
   на full ~100-word био — source: пример клиента Film_Site_6.html.
   Vladimir: TV/радио в подростковом возрасте → film degree → feature-length
