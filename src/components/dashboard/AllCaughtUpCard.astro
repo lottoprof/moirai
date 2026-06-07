@@ -1,0 +1,55 @@
+---
+/*
+ * AllCaughtUpCard — заменяет ContinueCard когда все unlocked модули done,
+ * но есть locked в будущем. Stage B Q1.C review.
+ *
+ * Sprint 2+ — заменим Unicode эмодзи на Phosphor Thin checkmark.
+ * Сейчас без иконок (Stage E добавит).
+ */
+
+interface Props {
+  title: string;
+  /** Подзаголовок: дата следующего unlock или "Programme complete". */
+  meta: string;
+}
+
+const { title, meta } = Astro.props;
+---
+
+<article class="all-caught-up" role="status">
+  <p class="all-caught-up__eyebrow">·</p>
+  <h2 class="all-caught-up__title">{title}</h2>
+  <p class="all-caught-up__meta">{meta}</p>
+</article>
+
+<style>
+  .all-caught-up {
+    background: color-mix(in srgb, var(--amber) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+    border-radius: 4px;
+    padding: var(--space-xl) var(--space-2xl);
+    text-align: center;
+  }
+  .all-caught-up__eyebrow {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-accent);
+    margin: 0 0 var(--space-sm);
+  }
+  .all-caught-up__title {
+    font-family: var(--font-display);
+    font-size: clamp(22px, 3vw, 28px);
+    font-weight: 400;
+    line-height: var(--leading-tight);
+    color: var(--text);
+    margin: 0 0 var(--space-sm);
+  }
+  .all-caught-up__meta {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    margin: 0;
+  }
+</style>

@@ -22,6 +22,7 @@ import DashboardLayout from "../../../layouts/dashboard/Layout.astro";
 import DashboardHero from "../../../components/dashboard/DashboardHero.astro";
 import StatCard from "../../../components/dashboard/StatCard.astro";
 import ContinueCard from "../../../components/dashboard/ContinueCard.astro";
+import AllCaughtUpCard from "../../../components/dashboard/AllCaughtUpCard.astro";
 import ModuleCard from "../../../components/dashboard/ModuleCard.astro";
 import { requireRole } from "../../../lib/server/guards";
 import { listApplicationsByUser } from "../../../lib/server/applications";
@@ -115,10 +116,26 @@ const enrollmentModules: StudentModuleEntry[] = enrollmentProgress
   ? await listEnrollmentModules(env, enrollmentProgress.enrollment_id, locale)
   : [];
 
-// Continue module — current module из progress или первый unlocked
+// Continue module — current module из progress или первый unlocked.
+// Stage B: если all_caught_up → continueModuleEntry будет null,
+// показываем AllCaughtUp card вместо Continue.
 const continueModuleEntry = enrollmentModules.find((m) => m.slug === enrollmentProgress?.current_module_slug)
   ?? enrollmentModules.find((m) => m.unlocked && m.status !== "done")
   ?? null;
+
+// Late enrollment detection (Stage B Q1.D review):
+// если student joined после cohort.start_date → notice banner.
+const isLateEnrollment = primaryView === "paid" && cohort && activeApp
+  ? activeApp.created_at > cohort.start_date
+  : false;
+
+// Format date helper для AllCaughtUp + late banner
+function formatNextUnlockShort(unixSec: number): string {
+  const d = new Date(unixSec * 1000);
+  return new Intl.DateTimeFormat(intlLocale, {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  }).format(d);
+}
 
 const t = ru
   ? {
@@ -156,6 +173,10 @@ const t = ru
       paidStatusLocked: "недоступно",
       paidBadgeReview: "На проверке",
       paidBadgePending: "Сдать",
+      allCaughtUpTitle: "Всё пройдено",
+      allCaughtUpNext: (d: string) => `Следующий модуль откроется ${d}`,
+      allCaughtUpNoNext: "Программа завершена",
+      lateEnrollmentNotice: (d: string) => `Когорта уже идёт. Прошедшие материалы доступны. Ближайшее занятие: ${d}.`,
       // no_application
       noAppTitle: "Ещё не выбрали программу.",
       noAppLede: "Посмотрите программы и выберите когорту — мы сразу зачислим место.",
@@ -195,6 +216,10 @@ const t = ru
       paidStatusLocked: "locked",
       paidBadgeReview: "Under review",
       paidBadgePending: "Submit",
+      allCaughtUpTitle: "All caught up",
+      allCaughtUpNext: (d: string) => `Next module unlocks ${d}`,
+      allCaughtUpNoNext: "Programme complete",
+      lateEnrollmentNotice: (d: string) => `Cohort already in progress. Caught-up materials are available. Next live session: ${d}.`,
       noAppTitle: "No programme yet.",
       noAppLede: "Browse programmes and pick a cohort — we'll reserve your spot right away.",
       noAppCta: "Choose a cohort",
@@ -325,7 +350,13 @@ const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.d
           />
         </section>
 
-        {continueModuleEntry && (
+        {isLateEnrollment && cohort && (
+          <p class="late-enrollment-notice" role="status">
+            {t.lateEnrollmentNotice(formatDate(cohort.start_date))}
+          </p>
+        )}
+
+        {continueModuleEntry ? (
           <section aria-labelledby="continue-label">
             <p id="continue-label" class="dashboard-content__section-label">{t.paidContinueLearning}</p>
             <ContinueCard
@@ -334,6 +365,16 @@ const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.d
               meta={`${continueModuleEntry.default_lessons.toString()} ${continueModuleEntry.default_lessons === 1 ? (ru ? "занятие" : "lesson") : (ru ? "занятий" : "lessons")}${continueModuleEntry.has_homework ? (ru ? " · домашка" : " · homework") : ""}`}
               href={`/${locale}/dashboard/modules/${continueModuleEntry.slug}`}
               ariaLabel={`${t.paidContinueLearning}: ${continueModuleEntry.title}`}
+            />
+          </section>
+        ) : enrollmentProgress?.all_caught_up && (
+          <section aria-labelledby="caught-up-label">
+            <p id="caught-up-label" class="dashboard-content__section-label">{t.paidContinueLearning}</p>
+            <AllCaughtUpCard
+              title={t.allCaughtUpTitle}
+              meta={enrollmentProgress.next_unlock_at
+                ? t.allCaughtUpNext(formatNextUnlockShort(enrollmentProgress.next_unlock_at))
+                : t.allCaughtUpNoNext}
             />
           </section>
         )}
@@ -393,6 +434,16 @@ const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.d
     border-radius: 4px;
     font-size: var(--type-body-sm);
     text-align: center;
+  }
+  .late-enrollment-notice {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--amber);
+    color: var(--text-muted);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: 2px;
+    font-size: var(--type-body-sm);
+    margin: 0;
   }
   .dashboard-content__stats {
     display: grid;
