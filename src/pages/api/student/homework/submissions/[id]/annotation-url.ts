@@ -1,0 +1,60 @@
+/*
+ * GET /api/student/homework/submissions/[id]/annotation-url
+ *
+ * Student LK v2 Stage C/C3d — signed GET URL для instructor's annotated copy.
+ *
+ * ACL: own submission OR lead instructor OR admin.
+ * Returns: { url, expiresAt } или 404 если annotation отсутствует.
+ *
+ * Spec: docs/student-lk-v2-spec.md § 4.2.
+ */
+
+import type { APIRoute } from 'astro';
+import { requireAuth } from '../../../../../../lib/server/guards';
+import { LK_CONFIG } from '../../../../../../lib/config/lk';
+import { getSubmissionForAcl } from '../../../../../../lib/server/homework';
+import { generateGetUrl } from '../../../../../../lib/server/r2-signed';
+
+export const prerender = false;
+
+function jsonError(code: string, status: number): Response {
+  return new Response(JSON.stringify({ error: code }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export const GET: APIRoute = async (ctx) => {
+  const userOrRes = await requireAuth(ctx);
+  if (userOrRes instanceof Response) return userOrRes;
+  const user = userOrRes;
+
+  const submissionId = ctx.params.id;
+  if (!submissionId || typeof submissionId !== 'string') {
+    return jsonError('invalid_id', 400);
+  }
+
+  const env = ctx.locals.runtime.env;
+  const isAdmin = user.roles.has('admin');
+
+  const acl = await getSubmissionForAcl(env, submissionId, user.id, isAdmin);
+  if (!acl) return jsonError('not_found', 404);
+  if (!acl.instructor_annotation_r2_key) return jsonError('no_annotation', 404);
+
+  let signed;
+  try {
+    signed = await generateGetUrl(
+      env,
+      acl.instructor_annotation_r2_key,
+      LK_CONFIG.signed_get_url_ttl_seconds,
+    );
+  } catch (err) {
+    console.error('[annotation-url] R2 sign failed:', err);
+    return jsonError('signing_failed', 500);
+  }
+
+  return new Response(
+    JSON.stringify({ url: signed.url, expiresAt: signed.expiresAt }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  );
+};
