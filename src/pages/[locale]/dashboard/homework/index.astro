@@ -1,0 +1,249 @@
+---
+/*
+ * /{locale}/dashboard/homework — aggregate список всех submissions
+ * student'а across all enrollments (active + completed).
+ *
+ * Student LK v2 Stage C/C6. SSR + requireRole('student').
+ *
+ * Фильтры через query params:
+ *   ?status=pending|needs_revision|approved|auto_approved
+ *   ?late=1   (only late submissions)
+ *
+ * При load — updateHomeworkLastSeen (снимает unread badge).
+ *
+ * Spec: docs/student-lk-v2-spec.md § 4.1.
+ */
+
+import DashboardLayout from "../../../../layouts/dashboard/Layout.astro";
+import SubmissionCard from "../../../../components/dashboard/SubmissionCard.astro";
+import { requireRole } from "../../../../lib/server/guards";
+import {
+  listSubmissionsForStudent,
+  updateHomeworkLastSeen,
+  type ListSubmissionsFilters,
+} from "../../../../lib/server/homework";
+import type { HomeworkStatus } from "../../../../../db/types";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/dashboard/homework");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+
+const userOrRes = await requireRole(Astro, "student");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+// Update last-seen (снимает unread badge на nav)
+await updateHomeworkLastSeen(env, user.id);
+
+// Parse query filters
+const url = Astro.url;
+const statusParam = url.searchParams.get("status");
+const lateParam = url.searchParams.get("late");
+
+const validStatus: HomeworkStatus[] = ["pending", "needs_revision", "approved", "auto_approved"];
+const filters: ListSubmissionsFilters = {};
+if (statusParam && (validStatus as string[]).includes(statusParam)) {
+  filters.status = statusParam as HomeworkStatus;
+}
+if (lateParam === "1") {
+  filters.is_late = true;
+}
+
+const submissions = await listSubmissionsForStudent(env, user.id, typedLocale, filters);
+
+const t = ru
+  ? {
+      eyebrow: "Кабинет",
+      title: "Домашние задания",
+      lede: "Все ваши сданные работы.",
+      filterAll: "Все",
+      filterPending: "На проверке",
+      filterNeedsRevision: "На доработку",
+      filterApproved: "Принято",
+      filterLate: "С опозданием",
+      emptyTitle: "Пока ничего нет",
+      emptyLede: "Откройте модуль и сдайте ДЗ — оно появится здесь.",
+      seo: { title: "Домашние задания — Moirai", description: "Все ваши сданные работы." },
+    }
+  : {
+      eyebrow: "Dashboard",
+      title: "Homework",
+      lede: "All your submissions.",
+      filterAll: "All",
+      filterPending: "Awaiting review",
+      filterNeedsRevision: "Needs revision",
+      filterApproved: "Approved",
+      filterLate: "Late",
+      emptyTitle: "Nothing yet",
+      emptyLede: "Open a module and submit homework — it'll appear here.",
+      seo: { title: "Homework — Moirai", description: "All your submissions." },
+    };
+
+function filterHref(s: HomeworkStatus | "" | "late"): string {
+  if (s === "") return `/${typedLocale}/dashboard/homework`;
+  if (s === "late") return `/${typedLocale}/dashboard/homework?late=1`;
+  return `/${typedLocale}/dashboard/homework?status=${s}`;
+}
+
+function isActive(s: HomeworkStatus | "" | "late"): boolean {
+  if (s === "") return !statusParam && lateParam !== "1";
+  if (s === "late") return lateParam === "1";
+  return statusParam === s;
+}
+
+// Cache-Control: paid content, private
+Astro.response.headers.set("Cache-Control", "private, no-store");
+---
+
+<DashboardLayout
+  locale={typedLocale}
+  seo={t.seo}
+  currentNavKey="homework"
+  userRoles={user.roles}
+>
+  <div class="homework-page">
+    <header class="homework-page__head">
+      <p class="homework-page__eyebrow">{t.eyebrow}</p>
+      <h1 class="homework-page__title">{t.title}</h1>
+      <p class="homework-page__lede">{t.lede}</p>
+    </header>
+
+    <nav class="homework-page__filters" aria-label="Filters">
+      <a href={filterHref("")} class:list={["filter-link", { "filter-link--active": isActive("") }]}>{t.filterAll}</a>
+      <a href={filterHref("pending")} class:list={["filter-link", { "filter-link--active": isActive("pending") }]}>{t.filterPending}</a>
+      <a href={filterHref("needs_revision")} class:list={["filter-link", { "filter-link--active": isActive("needs_revision") }]}>{t.filterNeedsRevision}</a>
+      <a href={filterHref("approved")} class:list={["filter-link", { "filter-link--active": isActive("approved") }]}>{t.filterApproved}</a>
+      <a href={filterHref("late")} class:list={["filter-link", { "filter-link--active": isActive("late") }]}>{t.filterLate}</a>
+    </nav>
+
+    {submissions.length === 0 ? (
+      <div class="homework-page__empty">
+        <h2>{t.emptyTitle}</h2>
+        <p>{t.emptyLede}</p>
+      </div>
+    ) : (
+      <div class="homework-page__list">
+        {submissions.map((s) => (
+          <div class="homework-page__item">
+            {s.module_title && (
+              <p class="homework-page__item-module">
+                <a href={`/${typedLocale}/dashboard/modules/${s.module_slug}`}>{s.module_title}</a>
+              </p>
+            )}
+            <SubmissionCard submission={s} locale={typedLocale} />
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</DashboardLayout>
+
+<style>
+  .homework-page {
+    padding: var(--space-2xl) var(--container-pad) var(--space-3xl);
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+  }
+  .homework-page__head {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: var(--space-lg);
+  }
+  .homework-page__eyebrow {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-accent);
+    margin: 0 0 var(--space-sm);
+  }
+  .homework-page__title {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 5vw, 48px);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0 0 var(--space-sm);
+  }
+  .homework-page__lede {
+    color: var(--text-muted);
+    font-size: var(--type-body-md);
+    margin: 0;
+  }
+  .homework-page__filters {
+    display: flex;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+  }
+  .filter-link {
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-out),
+                border-color var(--duration-fast) var(--ease-out);
+  }
+  .filter-link:hover {
+    color: var(--text);
+    border-color: var(--text);
+  }
+  .filter-link--active {
+    color: var(--ink);
+    background: var(--amber);
+    border-color: var(--amber);
+  }
+  .homework-page__list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+  .homework-page__item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  .homework-page__item-module {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0;
+  }
+  .homework-page__item-module a {
+    color: var(--text-muted);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--border);
+  }
+  .homework-page__item-module a:hover {
+    color: var(--text-accent);
+    border-bottom-color: var(--text-accent);
+  }
+  .homework-page__empty {
+    text-align: center;
+    padding: var(--space-3xl) var(--space-xl);
+    color: var(--text-faint);
+  }
+  .homework-page__empty h2 {
+    font-family: var(--font-display);
+    font-size: clamp(24px, 3vw, 32px);
+    font-weight: 400;
+    color: var(--text-muted);
+    margin: 0 0 var(--space-sm);
+  }
+</style>

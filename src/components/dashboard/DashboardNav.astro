@@ -49,10 +49,12 @@ const labels = locale === "ru"
       switchAdmin: "Admin",
     };
 
+// Stage C: "Homework" link → /dashboard/homework (aggregate page).
+// Stage E удалит "Modules" (drawer заменит) + добавит SVG icons.
 const items = [
   { key: "dashboard", label: labels.dashboard, href: `/${locale}/dashboard` },
   { key: "modules",   label: labels.modules,   href: `/${locale}/dashboard` },
-  { key: "homework",  label: labels.homework,  href: `/${locale}/dashboard` },
+  { key: "homework",  label: labels.homework,  href: `/${locale}/dashboard/homework` },
   { key: "account",   label: labels.account,   href: `/${locale}/account` },
 ] as const;
 
