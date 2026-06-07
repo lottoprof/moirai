@@ -1,0 +1,569 @@
+---
+/*
+ * /{locale}/instructor/homework/{id} — review страница для одного submission.
+ *
+ * Student LK v2 Stage D/D4. SSR + requireRole('instructor').
+ *
+ * Layout: file preview (download через signed URL) + form (status radio +
+ * comment textarea + annotated upload button).
+ *
+ * Spec: docs/student-lk-v2-spec.md § 4.1 + § 4.3.
+ */
+
+import { marked } from "marked";
+import InstructorLayout from "../../../../layouts/instructor/Layout.astro";
+import { requireRole } from "../../../../lib/server/guards";
+import { getSubmissionForReview } from "../../../../lib/server/instructor-homework";
+import { LK_CONFIG } from "../../../../lib/config/lk";
+import { HOMEWORK_ALLOWED_MIME } from "../../../../lib/server/homework";
+
+export const prerender = false;
+
+const { locale, id } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/instructor");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+if (!id || typeof id !== "string") return new Response(null, { status: 404 });
+
+const userOrRes = await requireRole(Astro, "instructor");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+const submission = await getSubmissionForReview(env, user.id, id, typedLocale);
+if (!submission) return new Response(null, { status: 404 });
+
+const intlLocale = ru ? "ru-RU" : "en-US";
+const dateFmt = new Intl.DateTimeFormat(intlLocale, {
+  month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+});
+const uploadedStr = dateFmt.format(new Date(submission.uploaded_at * 1000));
+
+const sizeStr = submission.size_bytes < 1024 * 1024
+  ? `${(submission.size_bytes / 1024).toFixed(0)} KB`
+  : `${(submission.size_bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+// Filename — последний segment R2 path
+const filename = submission.file_r2_key.split("/").pop() ?? submission.file_r2_key;
+
+const studentName = submission.student_name?.trim() || submission.student_email.split("@")[0];
+
+// Determine preview type
+const ctype = submission.content_type;
+const isVideo = ctype.startsWith("video/");
+const isImage = ctype.startsWith("image/");
+const isPdf = ctype === "application/pdf";
+
+// Student comment markdown render
+marked.setOptions({ gfm: true, breaks: false });
+const studentCommentHtml = submission.student_comment
+  ? await marked.parse(submission.student_comment)
+  : null;
+
+const t = ru
+  ? {
+      eyebrow: "Проверка ДЗ",
+      backLink: "← К очереди",
+      moduleLabel: "Модуль",
+      uploadedLabel: "Загружено",
+      sizeLabel: "Размер",
+      attemptsLabel: (n: number) => `Попыток до этой: ${n.toString()}`,
+      lateLabel: "Сдано с опозданием",
+      filePreviewLabel: "Файл",
+      downloadCta: "Скачать",
+      studentCommentLabel: "Комментарий студента",
+      annotatedUploadCta: "Загрузить аннотированную копию",
+      annotatedSetCta: "Заменить аннотированную копию",
+      annotatedDownloadCta: "Скачать annotated",
+      verdictLabel: "Решение",
+      approvedLabel: "Принято",
+      needsRevisionLabel: "На доработку",
+      commentLabel: "Комментарий (markdown)",
+      commentPlaceholder: "Подробный отзыв или ссылки на примеры...",
+      commentRequiredHint: "Для «на доработку» комментарий обязателен.",
+      submitCta: "Отправить отзыв",
+      submitting: "Отправляем...",
+      alreadyReviewed: "Уже проверено",
+      seo: { title: `Review — ${filename}`, description: "Instructor review" },
+    }
+  : {
+      eyebrow: "Homework review",
+      backLink: "← Back to queue",
+      moduleLabel: "Module",
+      uploadedLabel: "Uploaded",
+      sizeLabel: "Size",
+      attemptsLabel: (n: number) => `Prior attempts: ${n.toString()}`,
+      lateLabel: "Late",
+      filePreviewLabel: "File",
+      downloadCta: "Download",
+      studentCommentLabel: "Student comment",
+      annotatedUploadCta: "Upload annotated copy",
+      annotatedSetCta: "Replace annotated copy",
+      annotatedDownloadCta: "Download annotated",
+      verdictLabel: "Verdict",
+      approvedLabel: "Approved",
+      needsRevisionLabel: "Needs revision",
+      commentLabel: "Comment (markdown)",
+      commentPlaceholder: "Detailed feedback or references...",
+      commentRequiredHint: "Comment required for 'needs revision'.",
+      submitCta: "Submit review",
+      submitting: "Submitting...",
+      alreadyReviewed: "Already reviewed",
+      seo: { title: `Review — ${filename}`, description: "Instructor review" },
+    };
+
+const allowedMimes = Array.from(HOMEWORK_ALLOWED_MIME);
+const isReviewed = submission.status !== "pending";
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+---
+
+<InstructorLayout
+  locale={typedLocale}
+  seo={t.seo}
+  currentNavKey="queue"
+  userRoles={user.roles}
+>
+  <div class="review-page" data-submission-id={submission.id}>
+    <a href={`/${typedLocale}/instructor`} class="review-page__back">{t.backLink}</a>
+
+    <header class="review-page__head">
+      <p class="review-page__eyebrow">{t.eyebrow}</p>
+      <h1 class="review-page__title">{studentName}</h1>
+      <p class="review-page__meta">
+        {t.moduleLabel}: <strong>{submission.module_title ?? submission.module_slug}</strong>
+        {" · "}
+        {t.uploadedLabel}: {uploadedStr}
+        {" · "}
+        {t.sizeLabel}: {sizeStr}
+      </p>
+      {submission.prior_count > 0 && (
+        <p class="review-page__attempts">{t.attemptsLabel(submission.prior_count)}</p>
+      )}
+      {Boolean(submission.is_late) && (
+        <span class="badge badge--late">{t.lateLabel}</span>
+      )}
+    </header>
+
+    <section class="review-page__preview">
+      <p class="review-page__section-label">{t.filePreviewLabel}</p>
+      <p class="review-page__filename">{filename} · {ctype}</p>
+      {isVideo && (
+        <video controls class="review-page__video" data-needs-url>
+          <source data-needs-url-src type={ctype} />
+        </video>
+      )}
+      {isImage && (
+        <img class="review-page__image" data-needs-url-img alt={filename} />
+      )}
+      {isPdf && (
+        <iframe class="review-page__iframe" data-needs-url-iframe title="PDF preview"></iframe>
+      )}
+      {!isVideo && !isImage && !isPdf && (
+        <p class="review-page__no-preview">No inline preview. Use download.</p>
+      )}
+      <button type="button" class="review-page__download-btn" data-action="download-file">
+        {t.downloadCta}
+      </button>
+    </section>
+
+    {studentCommentHtml && (
+      <section class="review-page__section">
+        <p class="review-page__section-label">{t.studentCommentLabel}</p>
+        <div class="review-page__prose" set:html={studentCommentHtml} />
+      </section>
+    )}
+
+    <section class="review-page__annotated">
+      <p class="review-page__section-label">Annotated copy</p>
+      {submission.instructor_annotation_r2_key ? (
+        <div class="review-page__annotated-actions">
+          <button type="button" class="review-page__download-btn" data-action="download-annotation">
+            {t.annotatedDownloadCta}
+          </button>
+          <button type="button" class="review-page__upload-btn" data-action="upload-annotation">
+            {t.annotatedSetCta}
+          </button>
+        </div>
+      ) : (
+        <button type="button" class="review-page__upload-btn" data-action="upload-annotation">
+          {t.annotatedUploadCta}
+        </button>
+      )}
+      <input type="file" data-annotation-input hidden
+             accept={allowedMimes.join(",")} />
+      <p class="review-page__annotation-status" hidden data-annotation-status></p>
+    </section>
+
+    <form class="review-page__form" data-review-form>
+      <fieldset class="review-page__fieldset">
+        <legend class="review-page__section-label">{t.verdictLabel}</legend>
+        <label class="review-page__radio">
+          <input type="radio" name="status" value="approved" required />
+          <span>{t.approvedLabel}</span>
+        </label>
+        <label class="review-page__radio">
+          <input type="radio" name="status" value="needs_revision" />
+          <span>{t.needsRevisionLabel}</span>
+        </label>
+      </fieldset>
+
+      <label class="review-page__field">
+        <span class="review-page__section-label">{t.commentLabel}</span>
+        <textarea name="comment" rows="8" maxlength={LK_CONFIG.instructor_comment_max_chars}
+                  placeholder={t.commentPlaceholder}
+                  class="review-page__textarea"></textarea>
+        <span class="review-page__hint">{t.commentRequiredHint}</span>
+      </label>
+
+      <p class="review-page__error" hidden data-review-error></p>
+
+      <button type="submit" class="review-page__submit" data-review-submit disabled={isReviewed}>
+        <span data-review-submit-label>{isReviewed ? t.alreadyReviewed : t.submitCta}</span>
+      </button>
+    </form>
+  </div>
+</InstructorLayout>
+
+<style>
+  .review-page {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+  .review-page__back {
+    color: var(--text-faint);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    text-decoration: none;
+  }
+  .review-page__back:hover { color: var(--text); }
+  .review-page__head {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: var(--space-md);
+  }
+  .review-page__eyebrow {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-accent);
+    margin: 0 0 var(--space-xs);
+  }
+  .review-page__title {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 400;
+    margin: 0 0 var(--space-xs);
+  }
+  .review-page__meta {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    margin: 0 0 var(--space-xs);
+  }
+  .review-page__meta strong { color: var(--text); font-weight: 500; }
+  .review-page__attempts {
+    color: var(--text-faint);
+    font-size: var(--type-micro-md);
+    margin: 0;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    border-radius: 2px;
+    border: 1px dashed var(--border-strong);
+    color: var(--text-faint);
+  }
+  .review-page__preview,
+  .review-page__section,
+  .review-page__annotated,
+  .review-page__form {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: var(--space-md) var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .review-page__section-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0;
+  }
+  .review-page__filename {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    margin: 0;
+  }
+  .review-page__video,
+  .review-page__image,
+  .review-page__iframe {
+    width: 100%;
+    max-height: 500px;
+    background: var(--bg);
+    border-radius: 2px;
+  }
+  .review-page__iframe { height: 500px; }
+  .review-page__no-preview {
+    color: var(--text-faint);
+    font-style: italic;
+    margin: 0;
+  }
+  .review-page__download-btn,
+  .review-page__upload-btn {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    padding: 8px 16px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    cursor: pointer;
+    border-radius: 2px;
+    align-self: flex-start;
+  }
+  .review-page__download-btn:hover,
+  .review-page__upload-btn:hover {
+    color: var(--text); border-color: var(--text);
+  }
+  .review-page__annotated-actions { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+  .review-page__annotation-status {
+    font-size: var(--type-body-sm);
+    color: var(--text-faint);
+    margin: 0;
+  }
+  .review-page__prose {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    line-height: 1.5;
+  }
+  .review-page__fieldset {
+    border: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  .review-page__radio {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    cursor: pointer;
+    padding: var(--space-2xs) 0;
+  }
+  .review-page__field { display: flex; flex-direction: column; gap: var(--space-xs); }
+  .review-page__textarea {
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    border-radius: 2px;
+    min-height: 160px;
+    resize: vertical;
+  }
+  .review-page__hint {
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+  }
+  .review-page__error {
+    color: var(--text-accent);
+    background: var(--amber-faint);
+    border-left: 2px solid var(--amber);
+    padding: var(--space-xs) var(--space-sm);
+    margin: 0;
+    font-size: var(--type-body-sm);
+  }
+  .review-page__submit {
+    background: var(--amber);
+    color: var(--ink);
+    border: none;
+    padding: 12px 24px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    align-self: flex-start;
+  }
+  .review-page__submit:hover { background: var(--amber-light); }
+  .review-page__submit:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+
+<script>
+  interface SignedUrl { url: string; }
+  interface AnnotationUrlResponse { uploadUrl: string; fileR2Key: string; }
+
+  const page = document.querySelector<HTMLElement>(".review-page");
+  if (page) {
+    const submissionId = page.dataset.submissionId ?? "";
+
+    // === File preview: lazy fetch signed URL on demand ===
+    const videoSrc = page.querySelector<HTMLSourceElement>("[data-needs-url-src]");
+    const imgEl = page.querySelector<HTMLImageElement>("[data-needs-url-img]");
+    const iframeEl = page.querySelector<HTMLIFrameElement>("[data-needs-url-iframe]");
+
+    async function getFileUrl(): Promise<string | null> {
+      try {
+        const res = await fetch(`/api/student/homework/submissions/${submissionId}/file-url`, {
+          credentials: "same-origin",
+        });
+        if (!res.ok) return null;
+        const data = await res.json() as SignedUrl;
+        return data.url;
+      } catch { return null; }
+    }
+
+    // Auto-load preview URL on page mount (for inline player/img/iframe)
+    if (videoSrc || imgEl || iframeEl) {
+      getFileUrl().then((url) => {
+        if (!url) return;
+        if (videoSrc) {
+          videoSrc.src = url;
+          const video = videoSrc.parentElement;
+          if (video instanceof HTMLVideoElement) video.load();
+        }
+        if (imgEl) imgEl.src = url;
+        if (iframeEl) iframeEl.src = url;
+      });
+    }
+
+    // Download button
+    page.querySelector<HTMLButtonElement>("[data-action='download-file']")?.addEventListener("click", async () => {
+      const url = await getFileUrl();
+      if (url) window.open(url, "_blank");
+    });
+
+    // Download annotation
+    page.querySelector<HTMLButtonElement>("[data-action='download-annotation']")?.addEventListener("click", async () => {
+      try {
+        const res = await fetch(`/api/student/homework/submissions/${submissionId}/annotation-url`, {
+          credentials: "same-origin",
+        });
+        if (!res.ok) return;
+        const data = await res.json() as SignedUrl;
+        window.open(data.url, "_blank");
+      } catch (e) { console.error(e); }
+    });
+
+    // === Annotation upload ===
+    const annotationInput = page.querySelector<HTMLInputElement>("[data-annotation-input]");
+    const annotationStatus = page.querySelector<HTMLElement>("[data-annotation-status]");
+
+    page.querySelectorAll<HTMLButtonElement>("[data-action='upload-annotation']").forEach((btn) => {
+      btn.addEventListener("click", () => annotationInput?.click());
+    });
+
+    annotationInput?.addEventListener("change", async () => {
+      const file = annotationInput.files?.[0];
+      if (!file || !annotationStatus) return;
+      annotationStatus.hidden = false;
+      annotationStatus.textContent = "Uploading...";
+
+      try {
+        const urlRes = await fetch(
+          `/api/instructor/homework/submissions/${submissionId}/annotation-upload-url`,
+          {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contentType: file.type, sizeBytes: file.size }),
+          },
+        );
+        if (!urlRes.ok) throw new Error("upload_url_failed");
+        const urlData = await urlRes.json() as AnnotationUrlResponse;
+
+        const putRes = await fetch(urlData.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!putRes.ok) throw new Error("put_failed");
+
+        const finRes = await fetch(
+          `/api/instructor/homework/submissions/${submissionId}/annotation-finalize`,
+          {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileR2Key: urlData.fileR2Key }),
+          },
+        );
+        if (!finRes.ok) throw new Error("finalize_failed");
+
+        annotationStatus.textContent = "Annotation uploaded. Reload to see.";
+      } catch (err) {
+        console.error("[annotation upload]", err);
+        annotationStatus.textContent = "Upload failed.";
+      }
+    });
+
+    // === Review form submit ===
+    const form = page.querySelector<HTMLFormElement>("[data-review-form]");
+    const errorEl = page.querySelector<HTMLElement>("[data-review-error]");
+    const submitBtn = page.querySelector<HTMLButtonElement>("[data-review-submit]");
+    const submitLabel = page.querySelector<HTMLElement>("[data-review-submit-label]");
+
+    form?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!errorEl || !submitBtn || !submitLabel) return;
+      errorEl.hidden = true; errorEl.textContent = "";
+
+      const formData = new FormData(form);
+      const status = String(formData.get("status") ?? "");
+      const comment = String(formData.get("comment") ?? "").trim();
+
+      if (status !== "approved" && status !== "needs_revision") return;
+      if (status === "needs_revision" && !comment) {
+        errorEl.hidden = false;
+        errorEl.textContent = "Comment required for 'needs revision'.";
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitLabel.textContent = "Submitting...";
+
+      try {
+        const res = await fetch(`/api/instructor/homework/submissions/${submissionId}/review`, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status, comment: comment || undefined }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => null) as { error?: string } | null;
+          throw new Error(data?.error ?? "submit_failed");
+        }
+        // Success — redirect to queue
+        window.location.href = page.querySelector<HTMLAnchorElement>(".review-page__back")?.href ?? "/";
+      } catch (err) {
+        console.error("[review submit]", err);
+        errorEl.hidden = false;
+        errorEl.textContent = String(err);
+        submitBtn.disabled = false;
+        submitLabel.textContent = "Submit review";
+      }
+    });
+  }
+</script>

@@ -23,6 +23,7 @@ import HwQueueCard from "../../../components/instructor/HwQueueCard.astro";
 import StudentRow from "../../../components/instructor/StudentRow.astro";
 import { requireRole } from "../../../lib/server/guards";
 import { listCohortsByInstructor, parseDaysJson, normalizeDayPair, deriveTimeOfDay, type CohortWithSlot } from "../../../lib/server/cohorts";
+import { getReviewQueue, getReviewMetrics } from "../../../lib/server/instructor-homework";
 import { getEntry } from "astro:content";
 
 export const prerender = false;
@@ -66,58 +67,57 @@ await Promise.all(uniqueProgrammeIds.map(async (slug) => {
   if (entry) programmeTitleMap.set(slug, entry.data.title);
 }));
 
-// ============================================================
-// STUB: эти данные будут из D1 в Sprint 2 (homework, sessions tables)
-// ============================================================
-const stub = {
-  awaitingReview: 5,
-  reviewedThisWeek: 8,
-  avgReviewMin: 18,
-  oldestDays: 3,
-  pending: [
-    { studentName: "s. lee",     module: "MODULE 02 · SCRIPTWRITING", title: locale === "ru" ? "Структура истории" : "Story Structure",  daysWaiting: 3, href: "#" },
-    { studentName: "lotto prof", module: "MODULE 02 · SCRIPTWRITING", title: locale === "ru" ? "Структура истории" : "Story Structure",  daysWaiting: 2, href: "#" },
-    { studentName: "m. reyes",   module: "MODULE 01 · DIRECTING",     title: locale === "ru" ? "Взгляд режиссёра" : "The Director's Eye", daysWaiting: 1, href: "#" },
-    { studentName: "anna k.",    module: "MODULE 07 · EDITING",       title: locale === "ru" ? "Ритм и темп"       : "Rhythm & Pacing",   daysWaiting: 0, href: "#" },
-  ],
-  nextSession: {
-    when: locale === "ru" ? "Пн · 18 мая · 18:00 UTC" : "Mon · May 18 · 18:00 UTC",
-    title: locale === "ru" ? "1:1 с anna k." : "1:1 with anna k.",
-    detail: locale === "ru" ? "Intermediate · Модуль 9" : "Intermediate · Module 9",
-  },
+// Stage D real data — Student LK v2
+const metrics = await getReviewMetrics(env, user.id);
+const queue = await getReviewQueue(env, user.id, locale, { status: "pending" });
+
+const now = Math.floor(Date.now() / 1000);
+const pendingCards = queue.slice(0, 4).map((q) => {
+  const daysWaiting = Math.floor((now - q.uploaded_at) / 86400);
+  const studentName = q.student_name?.trim() || q.student_email.split("@")[0];
+  return {
+    studentName,
+    module: `${q.module_title ?? q.module_slug}`.toUpperCase(),
+    title: q.module_title ?? q.module_slug,
+    daysWaiting,
+    href: `/${locale}/instructor/homework/${q.id}`,
+  };
+});
+
+// Next session widget — Stage D scope не включает sessions list,
+// показываем stub (Stage F или follow-up Instructor LK v2 заменит).
+const nextSessionStub = {
+  when: locale === "ru" ? "—" : "—",
+  title: locale === "ru" ? "Расписание появится после backfill sessions" : "Schedule pending sessions backfill",
+  detail: "",
 };
 
-// Если у инструктора 0 enrollment'ов — показываем сами реальные
-// данные; STUB-students нужны для визуальной полноты mockup'а.
-const students = myEnrollments.results.length > 0
-  ? myEnrollments.results.map((e, i) => {
-      const name = e.student_name?.trim() || e.student_email.split("@")[0];
-      const firstName = name.split(/\s+/)[0];
-      const initials = firstName.slice(0, 2).toUpperCase();
-      return {
-        name,
-        initials,
-        currentModuleNum: String((i % 9) + 1).padStart(2, "0"),
-        progress: [0.25, 0.6, 0.08, 0.45][i % 4],
-        href: `/${locale}/instructor`,
-      };
-    })
-  : [
-      { name: "lotto prof", initials: "LP", currentModuleNum: "04", progress: 0.25, href: "#" },
-      { name: "anna k.",    initials: "AK", currentModuleNum: "09", progress: 0.6,  href: "#" },
-      { name: "m. reyes",   initials: "MR", currentModuleNum: "01", progress: 0.08, href: "#" },
-      { name: "s. lee",     initials: "SL", currentModuleNum: "03", progress: 0.45, href: "#" },
-    ];
+// Если у инструктора 0 enrollment'ов — пустой list (без stub).
+// Stage D — real data only.
+const students = myEnrollments.results.map((e, i) => {
+  const name = e.student_name?.trim() || e.student_email.split("@")[0];
+  const firstName = name.split(/\s+/)[0];
+  const initials = firstName.slice(0, 2).toUpperCase();
+  return {
+    name,
+    initials,
+    // Stage D: progress + currentModule пока ставим placeholder (требует
+    // join на homework_submissions + sessions). Instructor LK v2 — реалии.
+    currentModuleNum: String((i % 9) + 1).padStart(2, "0"),
+    progress: 0,
+    href: `/${locale}/instructor`,  // Instructor LK v2 добавит student detail
+  };
+});
 
 const t = locale === "ru"
   ? {
       eyebrow: "Преподаватель",
       title: "Очередь проверки.",
-      subtitle: `${String(stub.awaitingReview)} работ ждут фидбэка`,
+      subtitle: `${String(metrics.awaiting_review)} работ ждут фидбэка`,
       statAwaiting: "На проверке",
-      statAwaitingSub: (n: number) => `самой старой: ${String(n)} д.`,
+      statAwaitingSub: (n: number | null) => n === null ? "—" : `самой старой: ${String(n)} д.`,
       statReviewed: "Проверено за неделю",
-      statReviewedSub: (n: number) => `в среднем ${String(n)} мин`,
+      statReviewedSub: (n: number) => `авто-принято: ${String(n)}`,
       statStudents: "Мои студенты",
       statStudentsSub: "beginner · intermediate",
       pendingLabel: "Pending feedback",
@@ -136,11 +136,11 @@ const t = locale === "ru"
   : {
       eyebrow: "Instructor",
       title: "Review queue.",
-      subtitle: `${String(stub.awaitingReview)} submissions awaiting feedback`,
+      subtitle: `${String(metrics.awaiting_review)} submissions awaiting feedback`,
       statAwaiting: "Awaiting review",
-      statAwaitingSub: (n: number) => `oldest: ${String(n)} days ago`,
+      statAwaitingSub: (n: number | null) => n === null ? "—" : `oldest: ${String(n)} days ago`,
       statReviewed: "Reviewed this week",
-      statReviewedSub: (n: number) => `avg ${String(n)} min each`,
+      statReviewedSub: (n: number) => `auto-approved: ${String(n)}`,
       statStudents: "My students",
       statStudentsSub: "beginner · intermediate",
       pendingLabel: "Pending feedback",
@@ -170,13 +170,13 @@ const t = locale === "ru"
     <section class="instructor-content__stats" aria-label={t.eyebrow}>
       <StatCard
         label={t.statAwaiting}
-        value={[stub.awaitingReview, ""]}
-        sub={t.statAwaitingSub(stub.oldestDays)}
+        value={[metrics.awaiting_review, ""]}
+        sub={t.statAwaitingSub(metrics.oldest_pending_days)}
       />
       <StatCard
         label={t.statReviewed}
-        value={String(stub.reviewedThisWeek)}
-        sub={t.statReviewedSub(stub.avgReviewMin)}
+        value={String(metrics.reviewed_this_week)}
+        sub={t.statReviewedSub(metrics.auto_approved_this_week)}
       />
       <StatCard
         label={t.statStudents}
@@ -188,7 +188,11 @@ const t = locale === "ru"
     <section class="instructor-content__two-col">
       <div>
         <p class="instructor-content__section-label">{t.pendingLabel}</p>
-        {stub.pending.map((h) => (
+        {pendingCards.length === 0 ? (
+          <p class="instructor-content__empty">
+            {locale === "ru" ? "Очередь пуста." : "Queue empty."}
+          </p>
+        ) : pendingCards.map((h) => (
           <HwQueueCard
             studentName={h.studentName}
             moduleLabel={h.module}
@@ -217,9 +221,9 @@ const t = locale === "ru"
 
         <p class="instructor-content__section-label instructor-content__section-label--top">{t.sessionLabel}</p>
         <div class="next-session">
-          <p class="next-session__when">{stub.nextSession.when}</p>
-          <p class="next-session__title">{stub.nextSession.title}</p>
-          <p class="next-session__detail">{stub.nextSession.detail}</p>
+          <p class="next-session__when">{nextSessionStub.when}</p>
+          <p class="next-session__title">{nextSessionStub.title}</p>
+          <p class="next-session__detail">{nextSessionStub.detail}</p>
         </div>
       </div>
     </section>
@@ -333,6 +337,14 @@ const t = locale === "ru"
     border: 1px solid var(--border);
     border-radius: 3px;
     overflow: hidden;
+  }
+  .instructor-content__empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-md);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    text-align: center;
   }
 
   .next-session {
