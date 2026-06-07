@@ -121,6 +121,16 @@ pnpm build       # astro build (включая wrangler types)
 `wrangler pages secret put` и локальный `.dev.vars` (в `.gitignore`).
 Никаких `.env` в репозитории.
 
+## CF FREE TIER (HARD-RULE)
+
+См. `.agent/rules/cf-free-tier.md`. Кратко: **проект на бесплатных
+тарифах Cloudflare**. Перед любым design-решением, использующим
+CF-сервис (Workers, Pages, D1, R2, KV, Email, Stream, AI, Queues,
+Cron Triggers, etc.) — **обязательно WebFetch актуальной страницы
+limits**. НЕ полагаться на знания из памяти — CF часто меняет лимиты
+и feature gates. Найденные цифры фиксировать со ссылкой на источник
+в обсуждении или комментариях кода.
+
 ## GIT DISCIPLINE
 
 После каждого выполненного этапа из checklist — обязательны
