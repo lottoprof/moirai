@@ -391,6 +391,9 @@ const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.d
                 uiStatus === "done" ? t.paidStatusDone
                 : uiStatus === "active" ? t.paidStatusActive
                 : t.paidStatusLocked;
+              const unlockLabel = uiStatus === "locked" && m.unlock_at
+                ? (ru ? `Откроется ${formatNextUnlockShort(m.unlock_at)}` : `Unlocks ${formatNextUnlockShort(m.unlock_at)}`)
+                : undefined;
               return (
                 <ModuleCard
                   num={String(m.order_idx + 1).padStart(2, "0")}
@@ -398,6 +401,8 @@ const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.d
                   title={m.title}
                   status={uiStatus}
                   statusLabel={statusLabel}
+                  summary={uiStatus === "locked" ? m.summary : null}
+                  unlockLabel={unlockLabel}
                   href={uiStatus !== "locked" ? `/${locale}/dashboard/modules/${m.slug}` : undefined}
                 />
               );

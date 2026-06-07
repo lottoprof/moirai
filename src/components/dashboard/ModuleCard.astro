@@ -18,9 +18,14 @@ interface Props {
   status: "done" | "active" | "locked";
   statusLabel: string;
   href?: string;
+  /** Stage B Q1.B review: summary показывается для locked модулей (motivation),
+   *  скрыт для active/done (там есть другая meta). */
+  summary?: string | null;
+  /** Stage B Q1.B review: дата открытия для locked модулей (formatted). */
+  unlockLabel?: string;
 }
 
-const { num, track, title, status, statusLabel, href } = Astro.props;
+const { num, track, title, status, statusLabel, href, summary, unlockLabel } = Astro.props;
 const isLink = status !== "locked" && href;
 const Tag = isLink ? "a" : "div";
 ---
@@ -34,9 +39,12 @@ const Tag = isLink ? "a" : "div";
   <div class="module-card__body">
     <p class="module-card__track">{track}</p>
     <p class="module-card__title">{title}</p>
+    {status === "locked" && summary && (
+      <p class="module-card__summary">{summary}</p>
+    )}
     <p class:list={["module-card__status", `module-card__status--${status}`]}>
       {status === "locked" && <span class="module-card__lock" aria-hidden="true">🔒</span>}
-      {statusLabel}
+      {status === "locked" && unlockLabel ? unlockLabel : statusLabel}
     </p>
   </div>
 </Tag>
@@ -116,6 +124,18 @@ const Tag = isLink ? "a" : "div";
   }
   .module-card--done .module-card__title {
     color: var(--text-muted);
+  }
+  .module-card__summary {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    line-height: 1.4;
+    margin-top: var(--space-2xs);
+    margin-bottom: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .module-card__status {
