@@ -1,0 +1,192 @@
+---
+/*
+ * PresentationLayout — минимальный layout для Zoom share-screen mode.
+ *
+ * Student LK v2 Stage E/E7.
+ *
+ * Скрывает: DashboardNav, drawer, tabs, homework section.
+ * Оставляет: title (sticky-translate-out при scroll) + Exit button +
+ * presentation content.
+ *
+ * Theme: dark (фиксировано — consistency с остальным сайтом).
+ *
+ * Keyboard:
+ *   ←/→ — prev/next module
+ *   Esc — confirm exit
+ *   F — fullscreen toggle
+ *
+ * Spec: docs/student-lk-v2-spec.md § 5.5.
+ */
+
+import "../../styles/tokens.css";
+import "../../styles/fonts.css";
+import "../../styles/base.css";
+import "../../styles/utilities.css";
+import SeoHead from "../../components/public/SeoHead.astro";
+import ConfirmModal from "../../components/shared/ConfirmModal.astro";
+import X from "../../components/icons/X.astro";
+
+interface Props {
+  locale: "en" | "ru";
+  title: string;
+  /** Slug previous module если есть (← arrow nav). */
+  prevSlug?: string | null;
+  /** Slug next module если есть (→ arrow nav). */
+  nextSlug?: string | null;
+  /** Exit URL — обычно module page (Esc returns here after confirm). */
+  exitUrl: string;
+}
+
+const { locale, title, prevSlug, nextSlug, exitUrl } = Astro.props;
+const pathname = Astro.url.pathname;
+
+const exitConfirmTitle = locale === "ru" ? "Выйти из режима презентации?" : "Exit presentation mode?";
+const exitConfirmBody = locale === "ru"
+  ? "Откроется обычная страница модуля."
+  : "You'll return to the standard module page.";
+const exitConfirmCta = locale === "ru" ? "Выйти" : "Exit";
+const exitCancelCta = locale === "ru" ? "Остаться" : "Stay";
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0D0B09" />
+    <meta name="color-scheme" content="dark" />
+    <SeoHead
+      locale={locale}
+      pathname={pathname}
+      seo={{ title, description: title, noindex: true }}
+    />
+  </head>
+  <body class="present-body">
+    <header class="present-header" data-present-header>
+      <h1 class="present-title">{title}</h1>
+      <button type="button" class="present-exit" data-present-exit aria-label={exitConfirmCta}>
+        <X size={24} />
+      </button>
+    </header>
+
+    <main class="present-main">
+      <slot />
+    </main>
+
+    <ConfirmModal
+      id="present-exit-modal"
+      title={exitConfirmTitle}
+      body={exitConfirmBody}
+      mode="simple"
+      confirmLabel={exitConfirmCta}
+      cancelLabel={exitCancelCta}
+      danger={false}
+    />
+
+    <script define:vars={{ prevSlug, nextSlug, exitUrl, locale }}>
+      // Keyboard nav для presentation mode
+      const prevUrl = prevSlug ? `/${locale}/dashboard/modules/${prevSlug}/present` : null;
+      const nextUrl = nextSlug ? `/${locale}/dashboard/modules/${nextSlug}/present` : null;
+
+      function doExit() {
+        if (typeof window.openConfirmModal === "function") {
+          window.openConfirmModal("present-exit-modal", () => {
+            window.location.href = exitUrl;
+          });
+        } else {
+          window.location.href = exitUrl;
+        }
+      }
+
+      document.querySelector("[data-present-exit]")?.addEventListener("click", doExit);
+
+      document.addEventListener("keydown", (e) => {
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+        if (e.key === "ArrowLeft" && prevUrl) {
+          window.location.href = prevUrl;
+        } else if (e.key === "ArrowRight" && nextUrl) {
+          window.location.href = nextUrl;
+        } else if (e.key === "Escape") {
+          doExit();
+        } else if (e.key === "f" || e.key === "F") {
+          if (document.fullscreenElement) document.exitFullscreen();
+          else document.documentElement.requestFullscreen();
+        }
+      });
+
+      // Sticky title translate-out при scroll
+      const header = document.querySelector("[data-present-header]");
+      let lastY = 0;
+      window.addEventListener("scroll", () => {
+        const y = window.scrollY;
+        if (!header) return;
+        if (y > 50 && y > lastY) {
+          header.classList.add("present-header--hidden");
+        } else {
+          header.classList.remove("present-header--hidden");
+        }
+        lastY = y;
+      });
+    </script>
+
+    <style>
+      .present-body {
+        background: var(--ink);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      .present-header {
+        position: sticky;
+        top: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--space-md) var(--space-2xl);
+        background: var(--ink);
+        z-index: 10;
+        transition: transform var(--duration-normal) var(--ease-out);
+      }
+      .present-header--hidden {
+        transform: translateY(-100%);
+      }
+      .present-title {
+        font-family: var(--font-display);
+        font-size: clamp(20px, 2vw, 28px);
+        font-weight: 400;
+        color: var(--text);
+        margin: 0;
+      }
+      .present-exit {
+        background: transparent;
+        border: 1px solid var(--border-strong);
+        color: var(--text-muted);
+        padding: 8px;
+        cursor: pointer;
+        border-radius: 2px;
+      }
+      .present-exit:hover {
+        color: var(--text);
+        border-color: var(--text);
+      }
+      .present-main {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: var(--space-xl) var(--space-2xl) var(--space-3xl);
+      }
+      /* Large typography для share-screen viewers */
+      .present-main :global(.prose) {
+        font-size: clamp(20px, 2vw, 24px);
+        line-height: 1.7;
+      }
+      .present-main :global(.prose h1) {
+        font-size: clamp(48px, 6vw, 64px);
+      }
+      .present-main :global(.prose h2) {
+        font-size: clamp(36px, 5vw, 48px);
+      }
+      .present-main :global(.prose h3) {
+        font-size: clamp(24px, 3vw, 32px);
+      }
+    </style>
+  </body>
+</html>

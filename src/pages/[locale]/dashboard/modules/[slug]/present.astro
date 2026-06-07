@@ -1,0 +1,97 @@
+---
+/*
+ * /{locale}/dashboard/modules/{slug}/present — presentation mode для
+ * Zoom share-screen.
+ *
+ * Student LK v2 Stage E/E7.
+ *
+ * Renders presentation_r2_key (если есть) либо workbook_r2_key как
+ * fallback. Без dashboard nav / drawer / homework.
+ *
+ * Spec: docs/student-lk-v2-spec.md § 5.5.
+ */
+
+import PresentationLayout from "../../../../../layouts/dashboard/PresentationLayout.astro";
+import MarkdownContent from "../../../../../components/shared/MarkdownContent.astro";
+import { requireRole } from "../../../../../lib/server/guards";
+import {
+  getModuleForStudent,
+  listEnrollmentModules,
+} from "../../../../../lib/server/student-modules";
+
+export const prerender = false;
+
+const { locale, slug } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/dashboard");
+}
+const typedLocale: "en" | "ru" = locale;
+if (!slug || typeof slug !== "string") return new Response(null, { status: 404 });
+
+const userOrRes = await requireRole(Astro, "student");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+const module_ = await getModuleForStudent(env, user.id, slug, typedLocale);
+if (!module_) return new Response(null, { status: 404 });
+if (!module_.unlocked) return Astro.redirect(`/${typedLocale}/dashboard`);
+
+// Fetch presentation content (или workbook fallback)
+const r2Key = module_.presentation_r2_key ?? module_.workbook_r2_key;
+let markdown = "";
+let isMissing = false;
+if (r2Key) {
+  try {
+    const obj = await env.MODULE_CONTENT.get(r2Key);
+    if (obj) markdown = await obj.text();
+    else isMissing = true;
+  } catch (err) {
+    console.error("[present] R2 fetch failed:", err);
+    isMissing = true;
+  }
+} else {
+  isMissing = true;
+}
+
+// Prev/next slugs (unlocked only)
+const allModules = await listEnrollmentModules(env, module_.enrollment_id, typedLocale);
+const currentIdx = allModules.findIndex((m) => m.slug === module_.slug);
+const prevSlug = currentIdx > 0
+  ? allModules.slice(0, currentIdx).reverse().find((m) => m.unlocked)?.slug ?? null
+  : null;
+const nextSlug = currentIdx >= 0 && currentIdx < allModules.length - 1
+  ? allModules.slice(currentIdx + 1).find((m) => m.unlocked)?.slug ?? null
+  : null;
+
+const exitUrl = `/${typedLocale}/dashboard/modules/${module_.slug}`;
+const placeholderText = typedLocale === "ru"
+  ? "Материалы появятся до начала занятия"
+  : "Materials will be available before the live session";
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+---
+
+<PresentationLayout
+  locale={typedLocale}
+  title={module_.title}
+  prevSlug={prevSlug}
+  nextSlug={nextSlug}
+  exitUrl={exitUrl}
+>
+  {isMissing ? (
+    <p class="present-placeholder">{placeholderText}</p>
+  ) : (
+    <MarkdownContent md={markdown} />
+  )}
+</PresentationLayout>
+
+<style>
+  .present-placeholder {
+    color: var(--text-faint);
+    font-style: italic;
+    font-size: clamp(24px, 3vw, 36px);
+    text-align: center;
+    padding: var(--space-3xl);
+  }
+</style>

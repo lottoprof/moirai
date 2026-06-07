@@ -189,6 +189,11 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       </p>
       <h1 class="module-page__title">{module_.title}</h1>
       {module_.summary && <p class="module-page__summary">{module_.summary}</p>}
+      <a class="module-page__present-cta"
+         href={`/${typedLocale}/dashboard/modules/${module_.slug}/present`}
+         target="_blank" rel="noopener">
+        {ru ? "Открыть в режиме презентации" : "Open in presentation mode"}
+      </a>
     </header>
 
     {(objectives.length > 0 || concepts.length > 0) && (
@@ -414,6 +419,23 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
     border: 1px dashed var(--border);
     border-radius: 2px;
     text-align: center;
+  }
+  .module-page__present-cta {
+    display: inline-block;
+    margin-top: var(--space-md);
+    padding: 8px 16px;
+    color: var(--text-accent);
+    border: 1px solid color-mix(in srgb, var(--amber) 40%, transparent);
+    text-decoration: none;
+    border-radius: 2px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+  .module-page__present-cta:hover {
+    background: var(--amber-faint);
+    border-color: var(--amber);
   }
 
   /* Stage C homework section */
