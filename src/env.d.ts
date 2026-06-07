@@ -43,5 +43,14 @@ declare namespace Cloudflare {
     LEMONSQUEEZY_API_KEY?: string;       // Stage 14.5
     LEMONSQUEEZY_STORE_ID?: string;
     LEMONSQUEEZY_WEBHOOK_SECRET?: string;
+
+    // === R2 S3-compatible API (Student LK v2 Stage C) — pre-signed URLs ===
+    // Worker Free plan имеет 10ms CPU per request → upload через worker
+    // proxy не работает. Pre-signed URL pattern: client → R2 напрямую.
+    // Account ID + access keys через `wrangler pages secret put`. Локально
+    // — .dev.vars (gitignored). R2_HOMEWORK_BUCKET — в [vars] (public).
+    R2_ACCOUNT_ID?: string;
+    R2_ACCESS_KEY_ID?: string;
+    R2_SECRET_ACCESS_KEY?: string;
   }
 }

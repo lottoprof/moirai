@@ -53,6 +53,18 @@ id      = "e25c15615afa4732a82fed14e9282636"
 binding     = "MODULE_CONTENT"
 bucket_name = "moirai-content"
 
+# Student LK v2 Stage C: homework submissions bucket. Содержит
+# uploads студентов (видео/PDF/etc до 100 MB) + annotated copies
+# инструкторов. R2 path: 'homework/{enrollment_id}/{submission_id}.<ext>'
+# и 'homework/{enrollment_id}/{submission_id}.annotated.<ext>'.
+# Создать bucket в CF dashboard или через `wrangler r2 bucket create
+# moirai-homework`. Secrets для pre-signed URL (S3-compatible API):
+# R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY + R2_ACCOUNT_ID через
+# `wrangler pages secret put`.
+[[r2_buckets]]
+binding     = "HOMEWORK_BUCKET"
+bucket_name = "moirai-homework"
+
 # ============================================================
 # Public vars — версионируются в репо. Только публичные значения.
 # Секреты — через `wrangler pages secret put` (не сюда).
@@ -62,3 +74,10 @@ bucket_name = "moirai-content"
 # в HTML как <div data-sitekey="...">. Парный TURNSTILE_SECRET для
 # server-side siteverify лежит в wrangler pages secret.
 TURNSTILE_SITE_KEY = "0x4AAAAAADOrL7Hh2geV-KJG"
+
+# Student LK v2 Stage C: R2 bucket name + account ID для pre-signed
+# URL generation. Эти значения публичные (bucket name visible в URL),
+# access key + secret через `wrangler pages secret put`.
+R2_HOMEWORK_BUCKET = "moirai-homework"
+# R2_ACCOUNT_ID — добавить в wrangler secrets, не в [vars] (account ID
+# semi-sensitive; bucket name OK).
