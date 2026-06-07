@@ -44,8 +44,40 @@ export type EnrollmentStatus = "active" | "completed" | "cancelled" | "refunded"
  */
 export type CohortStatus = "open" | "running" | "completed" | "cancelled";
 
-/** module_progress.status — Stage 26 (migration 0010). Per (enrollment, module). */
+/** module_progress.view_status — Stage 26 (migration 0010) renamed in 0016
+ *  (Student LK v2). Stage 26 enum 'in_progress'/'done' upgraded to 'viewed'
+ *  (см. migration 0016).
+ *  После Student LK v2 — completion определяется через homework_submissions
+ *  (практический) или session.scheduled_at + 1h (теоретический). Этот status
+ *  только "был ли open модуль" (audit). */
+export type ModuleViewStatus = "not_started" | "viewed";
+
+/** Stage 26 enum, заменён `ModuleViewStatus` после migration 0016 (Student LK v2).
+ *  TRANSITIONAL: оставлен для существующего student-modules.ts — Stage B удалит. */
 export type ModuleProgressStatus = "not_started" | "in_progress" | "done";
+
+/** sessions.status — расписание live-sessions per cohort
+ *  (migration 0011, Student LK v2 Q4). */
+export type SessionStatus = "scheduled" | "passed" | "cancelled" | "rescheduled";
+
+/** cohorts.meeting_provider — provider live-meeting'a
+ *  (migration 0011, Student LK v2 Q4). */
+export type MeetingProvider = "zoom" | "teams" | "gmeet" | "other";
+
+/** homework_submissions.status — lifecycle ДЗ
+ *  (migration 0014, Student LK v2 Q1+Q2).
+ *  - pending          — uploaded, ждёт review
+ *  - needs_revision   — preпод отверг + обязательный коммент
+ *  - approved         — preпод принял
+ *  - auto_approved    — pending + uploaded_at < next_session.scheduled_at,
+ *                      переключается auto-approve cron'ом */
+export type HomeworkStatus = "pending" | "needs_revision" | "approved" | "auto_approved";
+
+/** homework_submissions.priority — для queue preпода
+ *  (migration 0014, Student LK v2 Q2.C review).
+ *  - normal — обычная submission
+ *  - low    — resubmit после approved (module уже done) — preпод может игнорировать */
+export type HomeworkPriority = "normal" | "low";
 
 /** application.status — lifecycle state machine (FLOW-22 / migration 0009).
  *
@@ -125,6 +157,16 @@ export interface UserRow {
   /** FLOW-31 (migration 0009): marketing email opt-in. 0 = default,
    *  1 = клиент отметил чекбокс на checkout. Unsubscribe → toggle back. */
   marketing_opt_in: number;
+  /** Student LK v2 (migration 0015): GDPR soft-delete timestamp.
+   *  NULL = active. NOT NULL = аккаунт удалён: email/password_hash → NULL,
+   *  auth_methods DELETE, auth_sessions revoked. Login невозможен.
+   *  Stage A: optional (existing queries не SELECT'ят). Stage F (GDPR endpoint)
+   *  обновит SELECT statements. */
+  deleted_at?: number | null;
+  /** Student LK v2 Q2f (migration 0015): email opt-out для feedback notifications.
+   *  Default 1 (включено). 0 = студент opt-out'нулся через /account UI.
+   *  Stage A: optional. */
+  notifications_email?: number;
   created_at: number;
   updated_at: number;
 }
@@ -254,9 +296,22 @@ export interface ModuleRow {
   summary: string | null;
   objectives_json: string;           // JSON-array of strings
   concepts_json: string;             // JSON-array of strings
+  /** Student LK v2 (migration 0013): описание ДЗ переносится в workbook как
+   *  секция `## Домашнее задание`. TRANSITIONAL — Stage B refactor +
+   *  migration 0013 удалят. */
   homework_md: string | null;        // markdown
   // Storage
+  /** Student LK v2 (migration 0013): заменён `workbook_r2_key`.
+   *  TRANSITIONAL — Stage B refactor + migration 0013 удалят. */
   body_r2_key: string;
+  /** Student LK v2 (migration 0012, after backfill M3): короткое полотно
+   *  для live share-screen. Pattern: 'modules/{slug}/presentation.{locale}.md'.
+   *  Nullable пока methodist не загрузил — UI показывает placeholder. */
+  presentation_r2_key: string | null;
+  /** Student LK v2 (migration 0012, after backfill M3): длинный материал
+   *  для самостоятельной работы + секция ДЗ.
+   *  Pattern: 'modules/{slug}/workbook.{locale}.md'. */
+  workbook_r2_key: string | null;
   video_r2_key: string | null;
   source_commit: string | null;
   created_at: number;
@@ -285,6 +340,26 @@ export interface EnrollmentRow {
   enrolled_at: number;
   completed_at: number | null;
   cancelled_at: number | null;
+  /** Student LK v2 (migration 0015): retention archival timestamp.
+   *  NULL = ещё active или в grace window. NOT NULL → cron retention
+   *  обработал: homework_submissions DELETE, files в R2 DELETE,
+   *  enrollment_stats INSERT, curriculum_feedback INSERT (анонимно).
+   *  После archived — все access к enrollment data заблокирован
+   *  (см. ACL § 3 в docs/student-lk-v2-spec.md).
+   *  Stage A: optional (existing queries не SELECT'ят). */
+  archived_at?: number | null;
+  /** Student LK v2 Q10 (migration 0015): GDPR delete request marker.
+   *  Используется в `on_completion` mode (LK_CONFIG default) — флаг
+   *  set при user request, retention triggers immediately после
+   *  completion/cancellation без 30-day grace. */
+  gdpr_delete_requested_at?: number | null;
+  /** Student LK v2 Q10.F (migration 0015): pre-archive warning email
+   *  idempotency. Set cron'ом за 7 дней до archival. */
+  pre_archive_email_sent_at?: number | null;
+  /** Student LK v2 Q2f (migration 0015): timestamp последнего открытия
+   *  /dashboard/homework. Используется для in-app badge: подсветка
+   *  submissions с reviewed_at > homework_last_seen_at. */
+  homework_last_seen_at?: number | null;
   created_at: number;
   updated_at: number;
 }
@@ -303,6 +378,16 @@ export interface EnrollmentModuleRow {
   order_idx: number;
   added_by: string;
   added_at: number;
+  /** Student LK v2 Q1.A review (migration 0015): instructor override unlock.
+   *  Если NOT NULL — модуль unlocked независимо от schedule (обходит
+   *  `unlocked = now >= session.scheduled_at − unlock_lead_hours`).
+   *  Set через explicit instructor action в UI (с confirmation modal).
+   *  Stage A: optional (existing queries не SELECT'ят). Stage D обновит. */
+  unlock_override_at?: number | null;
+  /** Instructor user_id для audit. */
+  unlock_override_by?: string | null;
+  /** Короткий текст для audit (optional). */
+  unlock_override_reason?: string | null;
 }
 
 /**
@@ -323,9 +408,17 @@ export interface ModuleProgressRow {
   enrollment_id: string;
   module_slug: string;
   locale: Locale;
+  /** Student LK v2 (migration 0016): renamed to `view_status`.
+   *  Legacy values 'in_progress'/'done' нормализованы в 'viewed'.
+   *  TRANSITIONAL — Stage B refactor удалит. */
   status: ModuleProgressStatus;
+  /** Student LK v2 (migration 0016): renamed from `status`. Audit only —
+   *  source of truth для completion перенесён в homework_submissions
+   *  (практический) или session.scheduled_at + 1h (теоретический).
+   *  Stage A: optional (Stage 26 код всё ещё читает `status`, Stage B обновит). */
+  view_status?: ModuleViewStatus;
   last_seen_at: number | null;
-  completed_at: number | null;
+  completed_at: number | null;       // legacy, может быть удалён в future
   created_at: number;
   updated_at: number;
 }
@@ -386,6 +479,21 @@ export interface CohortRow {
   status: CohortStatus;
   apply_count: number;
   paid_count: number;
+  /** Student LK v2 Q4 (migration 0011): persistent meeting setup для cohort.
+   *  Provider диктует label "Join Zoom" / "Join Teams" / "Join Google Meet"
+   *  в UI. URLs — opaque (admin responsibility).
+   *  Stage A: optional (existing queries не SELECT'ят). Stage B/C сделают
+   *  required и обновят SELECT statements. */
+  meeting_provider?: MeetingProvider;
+  /** Join URL — видят все участники. NULL → "Link will appear closer to the session". */
+  meeting_url?: string | null;
+  /** Host URL — для instructor (Zoom split host/join, Teams/Meet тоже). NULL → use meeting_url. */
+  meeting_host_url?: string | null;
+  /** Student LK v2 Q4.A review (migration 0011): JSON-stringified array
+   *  ["beg-01-...","beg-02-..."], фиксируется при cohort creation из
+   *  programme.default_modules. Programme changes НЕ каскадят в active cohorts.
+   *  Stage A: optional (см. meeting_provider note). */
+  modules_snapshot_json?: string;
   created_at: number;
   updated_at: number;
 }
@@ -431,6 +539,135 @@ export interface ApplicationRow {
   currency: string | null;
   created_at: number;
   updated_at: number;
+}
+
+// ============================================================
+// Student LK v2 rows (migrations 0011, 0014)
+// ============================================================
+
+/**
+ * sessions — расписание live-sessions per cohort
+ * (migration 0011, Student LK v2 Q4).
+ *
+ * 1:1 mapping `module_slug` (UNIQUE (cohort_id, module_slug)). N:N через
+ * junction table — § 5 Future migrations.
+ *
+ * scheduled_at — UTC unix seconds. Display через Intl.DateTimeFormat
+ * browser-side (locale) + ET label для preподa. Auto-generation учитывает
+ * DST per session date (см. scripts/lib/compute-session-dates.mjs).
+ *
+ * meeting_url / meeting_host_url — overrides. NULL → берётся cohort.meeting_*.
+ *
+ * status lifecycle:
+ *   scheduled → passed (cron при now > scheduled_at)
+ *   scheduled → cancelled (admin action)
+ *   scheduled → rescheduled (admin action — updated scheduled_at)
+ */
+export interface SessionRow {
+  id: string;
+  cohort_id: string;
+  module_slug: string;
+  order_idx: number;
+  scheduled_at: number;
+  meeting_url: string | null;
+  meeting_host_url: string | null;
+  status: SessionStatus;
+  notes: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * homework_submissions — студенческие сдачи ДЗ + instructor review
+ * (migration 0014, Student LK v2 Q2).
+ *
+ * 1 row per upload (resubmit = новая row, не overwrite). file_r2_key
+ * pattern: `homework/{enrollment_id}/{id}.<ext>`.
+ *
+ * idempotency_key — client UUID для retry safety finalize endpoint.
+ * UNIQUE (enrollment_id, idempotency_key) гарантирует one row per
+ * intent.
+ *
+ * status lifecycle — см. HomeworkStatus enum.
+ *
+ * priority — для queue preпода. low = resubmit после approved
+ * (module уже done, preпод может игнорировать без consequences).
+ *
+ * LLM fields (llm_draft_*) — зарезервированы для future. В MVP NULL.
+ *
+ * instructor_annotation_r2_key — optional, preпод может upload
+ * annotated copy рядом с оригиналом.
+ *
+ * feedback_email_sent_at — idempotency для outbound Resend email.
+ */
+export interface HomeworkSubmissionRow {
+  id: string;
+  enrollment_id: string;
+  module_slug: string;
+  idempotency_key: string;
+  // file
+  file_r2_key: string;
+  content_type: string;
+  size_bytes: number;
+  uploaded_at: number;
+  is_late: number;                       // 0 | 1
+  // student
+  student_comment: string | null;        // markdown ≤ 2000 chars
+  // status
+  status: HomeworkStatus;
+  priority: HomeworkPriority;
+  // LLM pre-check (future, reserved)
+  llm_draft_status: "approved" | "needs_revision" | null;
+  llm_draft_comment: string | null;
+  llm_checked_at: number | null;
+  // instructor review
+  reviewed_by: string | null;
+  reviewed_at: number | null;
+  instructor_comment: string | null;     // markdown ≤ 10000 chars
+  instructor_annotation_r2_key: string | null;
+  instructor_annotation_uploaded_at: number | null;
+  // notification state
+  feedback_email_sent_at: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * enrollment_stats — aggregate counters, заполняется при retention
+ * archival (migration 0014, Student LK v2 Q10).
+ *
+ * Без PII. enrollment_id остаётся как FK на soft-archived enrollment
+ * row (которая сама теряет homework files и rows).
+ */
+export interface EnrollmentStatsRow {
+  enrollment_id: string;
+  cohort_id: string;
+  programme_slug: string;
+  total_submissions: number;
+  approved_count: number;
+  needs_revision_count: number;
+  auto_approved_count: number;
+  late_count: number;
+  completed_at: number;
+  archived_at: number;
+}
+
+/**
+ * curriculum_feedback — анонимные instructor comments для curriculum
+ * analysis (migration 0014, Student LK v2 Q10.E review).
+ *
+ * Сохраняются при retention archival. БЕЗ user_id / enrollment_id /
+ * submission_id (анонимизация). cohort_id остаётся как context (per
+ * lottoprof). instructor_id — staff, не PII студента.
+ */
+export interface CurriculumFeedbackRow {
+  id: string;
+  cohort_id: string;
+  module_slug: string;
+  instructor_id: string | null;
+  homework_status: "approved" | "needs_revision" | "auto_approved";
+  comment_text: string;
+  original_at: number;
 }
 
 // ============================================================

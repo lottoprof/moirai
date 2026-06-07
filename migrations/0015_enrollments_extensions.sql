@@ -4,7 +4,6 @@
 --            enrollment_modules extensions).
 -- Stage:     A / M6 (Student LK v2)
 -- Rollback:  (dev only)
---              ALTER TABLE enrollments DROP COLUMN cancelled_at;
 --              ALTER TABLE enrollments DROP COLUMN archived_at;
 --              ALTER TABLE enrollments DROP COLUMN gdpr_delete_requested_at;
 --              ALTER TABLE enrollments DROP COLUMN pre_archive_email_sent_at;
@@ -29,8 +28,8 @@ PRAGMA foreign_keys = ON;
 -- ============================================================
 -- enrollments — retention + GDPR + notification state
 -- ============================================================
--- cancelled_at — set при cancel/refund admin action. Retention
--- trigger использует MIN(completed_at, cancelled_at) + 30 days.
+-- Note: cancelled_at УЖЕ существует с migration 0004 — не дублируем.
+-- Retention trigger использует MIN(completed_at, cancelled_at) + 30 days.
 --
 -- archived_at — set retention cron'ом или manual GDPR delete.
 -- После archived — module pages, homework download — все 404.
@@ -45,7 +44,6 @@ PRAGMA foreign_keys = ON;
 -- homework_last_seen_at — timestamp последнего открытия
 -- /dashboard/homework. Используется для in-app badge: новые
 -- review с reviewed_at > homework_last_seen_at.
-ALTER TABLE enrollments ADD COLUMN cancelled_at              INTEGER;
 ALTER TABLE enrollments ADD COLUMN archived_at               INTEGER;
 ALTER TABLE enrollments ADD COLUMN gdpr_delete_requested_at  INTEGER;
 ALTER TABLE enrollments ADD COLUMN pre_archive_email_sent_at INTEGER;
