@@ -1305,16 +1305,28 @@ for (const row of await db.prepare('SELECT slug, locale, body_r2_key, homework_m
 
 **Verify:** `pnpm check:r2-d1` (validator не upset).
 
-### M4: `0013_modules_cleanup.sql`
+### M4: `scripts/apply-modules-cleanup.mjs` (NOT a migration)
 
-```sql
+**Refactored 2026-06-07:** M4 — НЕ миграция. Wrangler `migrations
+apply` запускает все pending одной командой, поэтому migration 0013
+drop'нула бы columns ДО M3 data migration → data loss.
+
+Script с pre-checks:
+1. presentation_r2_key + workbook_r2_key columns exist.
+2. workbook_r2_key NOT NULL для всех modules (M3 success).
+3. Если old columns уже не существуют — exit 0 (idempotent).
+
+```ts
+// scripts/apply-modules-cleanup.mjs (упрощённо)
 ALTER TABLE modules DROP COLUMN body_r2_key;
 ALTER TABLE modules DROP COLUMN homework_md;
--- Optional: tighten constraints
--- ALTER TABLE modules ADD CHECK (presentation_r2_key IS NOT NULL);  -- D1 не поддерживает CHECK на existing column
 ```
 
-Run **только после** verify M3 success.
+Запускается:
+```bash
+node scripts/apply-modules-cleanup.mjs --local   # после M3 local verify
+node scripts/apply-modules-cleanup.mjs --remote  # после M3 production verify
+```
 
 ### M5: `0014_homework_submissions.sql`
 

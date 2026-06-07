@@ -53,12 +53,23 @@ spec § 2 Data model. После Stage A — existing stage26 код продо�
 - [ ] **M3e.** Verify через `pnpm check:r2-d1` — все workbook keys
   имеют D1 row и R2 object.
 
-### M4 — Drop old columns
+### M4 — Drop old columns (refactored as script)
 
-- [ ] **M4a.** Создать `migrations/0013_modules_cleanup.sql`:
-  - ALTER modules DROP body_r2_key.
-  - ALTER modules DROP homework_md.
-- [ ] **M4b.** Применить на local D1 **после** M3 success verify.
+**ВАЖНО (2026-06-07 update):** M4 — НЕ миграция. Wrangler `migrations
+apply` запускает все pending одной командой, что drop'нет body_r2_key
+ДО M3 data migration → data loss. Поэтому M4 = manual script,
+запускается ПОСЛЕ verify M3 success.
+
+- [x] **M4a.** ~~Создать `migrations/0013_modules_cleanup.sql`~~ →
+      `scripts/apply-modules-cleanup.mjs` (idempotent + pre-checks).
+- [ ] **M4b.** Запустить script на local D1 **после** M3 success verify:
+  ```bash
+  node scripts/apply-modules-cleanup.mjs --local
+  ```
+  Pre-checks внутри script:
+  1. presentation_r2_key + workbook_r2_key columns exist.
+  2. workbook_r2_key NOT NULL для всех modules.
+  3. Если old columns не существуют — exit 0 (already done).
 
 ### M5 — Homework + stats + curriculum_feedback
 

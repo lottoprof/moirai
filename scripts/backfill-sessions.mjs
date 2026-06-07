@@ -57,9 +57,9 @@ const d1Result = spawnSync('corepack', [
   '--json',
   '--command', `
     SELECT c.id AS cohort_id, c.start_date, c.modules_snapshot_json,
-           cs.days_json, cs.time_et
+           s.days_json, s.time_et
       FROM cohorts c
-      JOIN cohort_slots cs ON cs.id = c.slot_id
+      JOIN slots s ON s.id = c.slot_id
      WHERE c.status IN ('open','running')
   `,
 ], { cwd: repoRoot, encoding: 'utf8' });
