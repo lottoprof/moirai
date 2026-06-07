@@ -19,11 +19,18 @@
 
 import { marked } from "marked";
 import DashboardLayout from "../../../../layouts/dashboard/Layout.astro";
+import SubmissionCard from "../../../../components/dashboard/SubmissionCard.astro";
+import SubmissionUploader from "../../../../components/dashboard/SubmissionUploader.astro";
 import { requireRole } from "../../../../lib/server/guards";
 import {
   getModuleForStudent,
   markModuleViewed,
 } from "../../../../lib/server/student-modules";
+import {
+  listSubmissionsForModule,
+  HOMEWORK_ALLOWED_MIME,
+} from "../../../../lib/server/homework";
+import { LK_CONFIG } from "../../../../lib/config/lk";
 
 export const prerender = false;
 
@@ -89,6 +96,12 @@ try {
   if (Array.isArray(parsed)) concepts = parsed.filter((x): x is string => typeof x === "string");
 } catch { /* ignore */ }
 
+// Stage C: homework submissions для этого module
+const submissions = module_.has_homework
+  ? await listSubmissionsForModule(env, module_.enrollment_id, module_.slug, typedLocale)
+  : [];
+const allowedMimes = Array.from(HOMEWORK_ALLOWED_MIME);
+
 const t = ru
   ? {
       backLink: "← Назад к модулям",
@@ -97,6 +110,10 @@ const t = ru
       conceptsTitle: "Понятия",
       bodyMissing: "Материал ещё не загружен. Методист готовит контент.",
       bodyError: "Не удалось загрузить материал. Попробуйте обновить страницу.",
+      homeworkTitle: "Домашнее задание",
+      homeworkNoSubmissions: "Вы ещё не сдали ДЗ для этого модуля.",
+      homeworkAttemptsLabel: (n: number) => `Ваши попытки (${n.toString()})`,
+      homeworkUploadLabel: "Загрузить новую версию",
       seo: {
         title: `${module_.title} — Moirai`,
         description: module_.summary ?? `Модуль программы Moirai: ${module_.title}.`,
@@ -109,6 +126,10 @@ const t = ru
       conceptsTitle: "Concepts",
       bodyMissing: "Material not yet uploaded. The methodist is preparing content.",
       bodyError: "Failed to load material. Try reloading the page.",
+      homeworkTitle: "Homework",
+      homeworkNoSubmissions: "You haven't submitted homework for this module yet.",
+      homeworkAttemptsLabel: (n: number) => `Your attempts (${n.toString()})`,
+      homeworkUploadLabel: "Upload a new version",
       seo: {
         title: `${module_.title} — Moirai`,
         description: module_.summary ?? `Moirai programme module: ${module_.title}.`,
@@ -165,6 +186,30 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
         <p class="module-page__placeholder">{t.bodyError}</p>
       )}
     </div>
+
+    {Boolean(module_.has_homework) && (
+      <section class="module-page__homework" aria-labelledby="hw-label">
+        <h2 id="hw-label" class="module-page__hw-title">{t.homeworkTitle}</h2>
+
+        <SubmissionUploader
+          moduleSlug={module_.slug}
+          locale={typedLocale}
+          capBytes={LK_CONFIG.homework_upload_cap_bytes}
+          allowedMimes={allowedMimes}
+        />
+
+        {submissions.length > 0 ? (
+          <div class="module-page__submissions">
+            <p class="module-page__hw-sublabel">{t.homeworkAttemptsLabel(submissions.length)}</p>
+            {submissions.map((s) => (
+              <SubmissionCard submission={s} locale={typedLocale} />
+            ))}
+          </div>
+        ) : (
+          <p class="module-page__hw-empty">{t.homeworkNoSubmissions}</p>
+        )}
+      </section>
+    )}
 
   </article>
 </DashboardLayout>
@@ -338,4 +383,40 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
     text-align: center;
   }
 
+  /* Stage C homework section */
+  .module-page__homework {
+    margin-top: var(--space-3xl);
+    padding-top: var(--space-xl);
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+  .module-page__hw-title {
+    font-family: var(--font-display);
+    font-size: clamp(24px, 3vw, 32px);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .module-page__hw-sublabel {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0;
+  }
+  .module-page__submissions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .module-page__hw-empty {
+    color: var(--text-faint);
+    font-size: var(--type-body-sm);
+    font-style: italic;
+    margin: 0;
+  }
 </style>
