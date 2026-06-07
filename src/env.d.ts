@@ -52,5 +52,11 @@ declare namespace Cloudflare {
     R2_ACCOUNT_ID?: string;
     R2_ACCESS_KEY_ID?: string;
     R2_SECRET_ACCESS_KEY?: string;
+
+    // === Cron auth (Student LK v2 Stage F) ===
+    // Shared secret для external cron scheduler → /api/internal/cron/run.
+    // Установить через `wrangler pages secret put CRON_SECRET`.
+    // Generate: `openssl rand -hex 32`.
+    CRON_SECRET?: string;
   }
 }

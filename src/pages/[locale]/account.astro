@@ -15,6 +15,7 @@ import DashboardLayout from "../../layouts/dashboard/Layout.astro";
 import InstructorLayout from "../../layouts/instructor/Layout.astro";
 import AdminLayout from "../../layouts/admin/Layout.astro";
 import Btn from "../../components/public/Btn.astro";
+import ConfirmModal from "../../components/shared/ConfirmModal.astro";
 import { requireAuth, primaryRole } from "../../lib/server/guards";
 import { getUserAuthMethods } from "../../lib/server/user-ops";
 
@@ -206,8 +207,52 @@ function methodLabel(kind: string): string {
       )}
 
       <Btn type="button" variant="ghost" size="lg" class="js-signout">{t.signOut}</Btn>
+
+      {/* Stage F: Notifications toggle + GDPR delete */}
+      <div class="form__field">
+        <span class="form__label">
+          {locale === "ru" ? "Email-уведомления" : "Email notifications"}
+        </span>
+        <p class="form__hint">
+          {locale === "ru" ? "Письма о фидбэке преподавателя." : "Receive emails about instructor feedback."}
+        </p>
+        <label style="display:flex; align-items:center; gap:var(--space-xs); cursor:pointer;">
+          <input type="checkbox" id="notifications-toggle"
+                 checked={user.notifications_email !== 0} />
+          <span>{locale === "ru" ? "Включены" : "Enabled"}</span>
+        </label>
+        <p class="form__hint js-notifications-status" hidden></p>
+      </div>
+
+      <div class="form__field" style="border-top: 1px solid var(--border); padding-top: var(--space-lg); margin-top: var(--space-md);">
+        <span class="form__label" style="color: var(--text-accent);">
+          {locale === "ru" ? "Удалить аккаунт" : "Delete account"}
+        </span>
+        <p class="form__hint">
+          {locale === "ru"
+            ? "Удалит все ваши данные навсегда. Это действие необратимо."
+            : "This will delete all your data permanently. Cannot be undone."}
+        </p>
+        <Btn type="button" variant="ghost" size="default" class="js-delete-account">
+          {locale === "ru" ? "Удалить мои данные навсегда" : "Delete my data permanently"}
+        </Btn>
+      </div>
     </div>
   </section>
+
+  <ConfirmModal
+    id="delete-account-modal"
+    title={locale === "ru" ? "Удалить аккаунт?" : "Delete account?"}
+    body={locale === "ru"
+      ? "Это действие необратимо. Введите DELETE для подтверждения."
+      : "This action cannot be undone. Type DELETE to confirm."}
+    mode="typing"
+    confirmCode="DELETE"
+    typingHint={locale === "ru" ? "Введите DELETE для подтверждения" : "Type DELETE to confirm"}
+    confirmLabel={locale === "ru" ? "Удалить навсегда" : "Delete permanently"}
+    cancelLabel={locale === "ru" ? "Отмена" : "Cancel"}
+    danger={true}
+  />
 </Layout>
 
 <style>
@@ -287,6 +332,52 @@ function methodLabel(kind: string): string {
       showInlineError(".js-set-password-error", code);
     });
   }
+
+  // Stage F: Notifications toggle
+  const notifToggle = document.getElementById("notifications-toggle");
+  const notifStatus = document.querySelector(".js-notifications-status");
+  if (notifToggle && notifToggle instanceof HTMLInputElement) {
+    notifToggle.addEventListener("change", async () => {
+      const enabled = notifToggle.checked;
+      try {
+        const res = await fetch("/api/account/notifications-toggle", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled }),
+        });
+        if (!res.ok) throw new Error("toggle_failed");
+        if (notifStatus instanceof HTMLElement) {
+          notifStatus.textContent = "Saved";
+          notifStatus.hidden = false;
+          setTimeout(() => { notifStatus.hidden = true; }, 2000);
+        }
+      } catch (err) {
+        console.error("[notifications-toggle]", err);
+        notifToggle.checked = !enabled; // revert
+      }
+    });
+  }
+
+  // Stage F: GDPR delete account
+  document.querySelectorAll(".js-delete-account").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (typeof window.openConfirmModal !== "function") return;
+      window.openConfirmModal("delete-account-modal", async () => {
+        const res = await fetch("/api/account/delete", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmation: "DELETE" }),
+        });
+        if (res.ok) {
+          window.location.href = "/";
+        } else {
+          alert("Delete failed. Please try again.");
+        }
+      });
+    });
+  });
 
   // Unlink
   document.querySelectorAll(".js-unlink").forEach((btn) => {
