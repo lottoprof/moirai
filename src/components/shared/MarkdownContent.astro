@@ -1,0 +1,181 @@
+---
+/*
+ * MarkdownContent — server-side render markdown с YouTube embed extension.
+ *
+ * Student LK v2 Stage E/E4. Используется в module page tabs (workbook,
+ * presentation) и presentation mode.
+ *
+ * Render:
+ *   - Server-side через `marked` (GFM tables, breaks=false).
+ *   - youtubeExtension auto-detect → lite-load embed placeholder.
+ *   - .prose styles (см. CSS ниже).
+ *
+ * Vanilla JS на странице swap'ит yt-embed div на iframe при клике.
+ *
+ * Spec: docs/student-lk-v2-spec.md § 5.7.
+ */
+
+import { marked } from "marked";
+import { youtubeExtension } from "../../lib/markdown/extensions/youtube";
+
+interface Props {
+  md: string;
+}
+
+const { md } = Astro.props;
+
+// Configure marked + register YT extension (idempotent — multiple
+// MarkdownContent на одной странице используют тот же global state).
+marked.setOptions({ gfm: true, breaks: false });
+marked.use(youtubeExtension);
+
+// Strip frontmatter если есть (--- ... ---)
+const fmStripped = md.replace(/^---\n[\s\S]*?\n---\n/, "");
+const html = await marked.parse(fmStripped);
+---
+
+<div class="prose" set:html={html} />
+
+<style>
+  .prose {
+    color: var(--text-muted);
+    font-size: var(--type-body-md);
+    line-height: 1.7;
+  }
+  .prose :global(h1),
+  .prose :global(h2) {
+    font-family: var(--font-display);
+    font-weight: 400;
+    color: var(--text);
+    margin-top: var(--space-2xl);
+    margin-bottom: var(--space-md);
+  }
+  .prose :global(h1) { font-size: clamp(28px, 4vw, 36px); }
+  .prose :global(h2) { font-size: clamp(24px, 3vw, 28px); }
+  .prose :global(h3) {
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    font-weight: 500;
+    color: var(--text);
+    margin-top: var(--space-xl);
+    margin-bottom: var(--space-sm);
+    letter-spacing: var(--tracking-wide);
+  }
+  .prose :global(p) { margin-bottom: var(--space-md); }
+  .prose :global(ul),
+  .prose :global(ol) { margin: var(--space-md) 0; padding-left: 1.5em; }
+  .prose :global(li) { margin-bottom: var(--space-xs); }
+  .prose :global(a) {
+    color: var(--amber);
+    border-bottom: 1px solid var(--amber-faint);
+    text-decoration: none;
+  }
+  .prose :global(blockquote) {
+    border-left: 3px solid var(--amber);
+    padding: var(--space-md) var(--space-lg);
+    margin: var(--space-lg) 0;
+    background: var(--bg-elevated);
+    color: var(--text);
+  }
+  .prose :global(code) {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    background: var(--bg-elevated);
+    padding: 1px 6px;
+    border-radius: 2px;
+    color: var(--text);
+  }
+  .prose :global(pre) {
+    overflow-x: auto;
+    background: var(--bg-elevated);
+    padding: var(--space-md);
+    border-radius: 2px;
+  }
+  .prose :global(img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: 2px;
+  }
+
+  /* Tables — overflow scroll wrapper */
+  .prose :global(table) {
+    width: 100%;
+    border-collapse: collapse;
+    margin: var(--space-lg) 0;
+    font-size: var(--type-body-sm);
+    display: block;
+    overflow-x: auto;
+  }
+  .prose :global(th),
+  .prose :global(td) {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .prose :global(th) {
+    background: var(--bg-elevated);
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* YouTube lite-load embed */
+  .prose :global(.yt-embed) {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    max-width: 100%;
+    background: var(--bg-elevated);
+    margin: var(--space-lg) 0;
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: 2px;
+  }
+  .prose :global(.yt-embed img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .prose :global(.yt-embed__play) {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 80px;
+    height: 80px;
+    background: rgba(0, 0, 0, 0.65);
+    color: white;
+    border: 2px solid white;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .prose :global(.yt-embed__play:hover) {
+    background: rgba(212, 130, 10, 0.9);
+  }
+  .prose :global(.yt-embed iframe) {
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+</style>
+
+<script>
+  // YT lite-load swap: click on .yt-embed → replace with iframe.
+  // Page-level handler (single attach для всех yt-embed elements).
+  document.querySelectorAll<HTMLElement>(".yt-embed").forEach((el) => {
+    el.addEventListener("click", () => {
+      const id = el.dataset.videoId;
+      if (!id) return;
+      const start = el.dataset.start;
+      const startParam = start ? `&start=${start}` : "";
+      const iframe = document.createElement("iframe");
+      iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1${startParam}`;
+      iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+      iframe.allowFullscreen = true;
+      iframe.title = "YouTube video";
+      el.innerHTML = "";
+      el.appendChild(iframe);
+    });
+  });
+</script>

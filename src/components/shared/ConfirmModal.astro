@@ -1,0 +1,218 @@
+---
+/*
+ * ConfirmModal — generic confirmation dialog.
+ *
+ * Student LK v2 Stage E/E3.
+ *
+ * Modes:
+ *   - simple   — confirm/cancel buttons (presentation exit, override).
+ *   - typing   — user types confirmCode (DELETE, OVERRIDE) для подтверждения.
+ *
+ * API: предоставляет <dialog>-like элемент с data-confirm-modal id.
+ * Trigger через `data-modal-target` на любом элементе. JS API:
+ *   - openModal(id, onConfirm: () => void | Promise<void>)
+ *   - closeModal(id)
+ *
+ * Без deps (native <dialog> с fallback).
+ */
+
+interface Props {
+  id: string;
+  title: string;
+  body: string;
+  /** Mode: 'simple' (just confirm/cancel) или 'typing' (requires typing). */
+  mode?: "simple" | "typing";
+  /** Слово для typing mode (e.g. "DELETE", "OVERRIDE"). */
+  confirmCode?: string;
+  /** Hint text under input для typing mode. */
+  typingHint?: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  /** danger=true → red confirm button. */
+  danger?: boolean;
+}
+
+const {
+  id,
+  title,
+  body,
+  mode = "simple",
+  confirmCode,
+  typingHint,
+  confirmLabel,
+  cancelLabel,
+  danger = false,
+} = Astro.props;
+---
+
+<dialog id={id} class="confirm-modal" data-confirm-modal
+        data-mode={mode}
+        data-confirm-code={confirmCode}>
+  <form method="dialog" class="confirm-modal__form" data-confirm-form>
+    <h2 class="confirm-modal__title">{title}</h2>
+    <p class="confirm-modal__body">{body}</p>
+
+    {mode === "typing" && confirmCode && (
+      <label class="confirm-modal__typing">
+        <span class="confirm-modal__typing-label">
+          {typingHint ?? `Type ${confirmCode} to confirm`}
+        </span>
+        <input type="text" data-confirm-input
+               autocomplete="off" spellcheck="false"
+               class="confirm-modal__input" />
+      </label>
+    )}
+
+    <div class="confirm-modal__actions">
+      <button type="button" data-confirm-cancel class="confirm-modal__btn confirm-modal__btn--cancel">
+        {cancelLabel}
+      </button>
+      <button type="button" data-confirm-ok
+              class:list={["confirm-modal__btn", danger && "confirm-modal__btn--danger"]}
+              disabled={mode === "typing"}>
+        {confirmLabel}
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<style>
+  .confirm-modal {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0;
+    max-width: 500px;
+    width: calc(100% - 32px);
+    color: var(--text);
+  }
+  .confirm-modal::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+  }
+  .confirm-modal__form {
+    padding: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+  .confirm-modal__title {
+    font-family: var(--font-display);
+    font-size: clamp(20px, 3vw, 28px);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .confirm-modal__body {
+    color: var(--text-muted);
+    font-size: var(--type-body-md);
+    margin: 0;
+    line-height: 1.5;
+  }
+  .confirm-modal__typing {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+  }
+  .confirm-modal__typing-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    letter-spacing: var(--tracking-wide);
+  }
+  .confirm-modal__input {
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: var(--font-mono, monospace);
+    font-size: var(--type-body-md);
+    border-radius: 2px;
+  }
+  .confirm-modal__actions {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: flex-end;
+    margin-top: var(--space-sm);
+  }
+  .confirm-modal__btn {
+    padding: 10px 20px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text);
+  }
+  .confirm-modal__btn--cancel {
+    border-color: var(--border);
+    color: var(--text-muted);
+  }
+  .confirm-modal__btn--danger {
+    background: var(--amber);
+    color: var(--ink);
+    border-color: var(--amber);
+  }
+  .confirm-modal__btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+</style>
+
+<script>
+  // Generic confirm-modal handler. JS API на window для use из других scripts:
+  //   window.openConfirmModal(id, onConfirm)
+  declare global {
+    interface Window {
+      openConfirmModal: (id: string, onConfirm: () => void | Promise<void>) => void;
+      closeConfirmModal: (id: string) => void;
+    }
+  }
+
+  window.openConfirmModal = (id: string, onConfirm: () => void | Promise<void>) => {
+    const modal = document.getElementById(id);
+    if (!(modal instanceof HTMLDialogElement)) return;
+    const mode = modal.dataset.mode ?? "simple";
+    const code = modal.dataset.confirmCode ?? "";
+    const input = modal.querySelector<HTMLInputElement>("[data-confirm-input]");
+    const okBtn = modal.querySelector<HTMLButtonElement>("[data-confirm-ok]");
+    const cancelBtn = modal.querySelector<HTMLButtonElement>("[data-confirm-cancel]");
+    if (!okBtn || !cancelBtn) return;
+
+    if (mode === "typing" && input) {
+      input.value = "";
+      okBtn.disabled = true;
+      input.oninput = () => {
+        okBtn.disabled = input.value.trim() !== code;
+      };
+    }
+
+    const cleanup = () => {
+      modal.close();
+      if (input) input.oninput = null;
+    };
+
+    okBtn.onclick = async () => {
+      okBtn.disabled = true;
+      try {
+        await onConfirm();
+        cleanup();
+      } catch (err) {
+        console.error("[confirm-modal] onConfirm failed:", err);
+        okBtn.disabled = false;
+      }
+    };
+    cancelBtn.onclick = cleanup;
+
+    modal.showModal();
+    if (input) input.focus();
+  };
+
+  window.closeConfirmModal = (id: string) => {
+    const modal = document.getElementById(id);
+    if (modal instanceof HTMLDialogElement && modal.open) modal.close();
+  };
+</script>
