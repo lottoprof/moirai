@@ -1,0 +1,61 @@
+-- Migration: 0012_modules_split.sql
+-- Date:      2026-06-07
+-- Spec:      docs/student-lk-v2-spec.md § 2.2 (modules split).
+-- Stage:     A / M2 (Student LK v2)
+-- Rollback:  (dev only)
+--              ALTER TABLE modules DROP COLUMN presentation_r2_key;
+--              ALTER TABLE modules DROP COLUMN workbook_r2_key;
+--
+-- Содержание:
+--   Добавляются 2 nullable колонки для нового layout модуля
+--   (presentation + workbook как два отдельных markdown artifact'а).
+--
+--   Существующий `body_r2_key` остаётся на этой миграции — drop
+--   через 0013_modules_cleanup.sql ПОСЛЕ data migration script
+--   (scripts/migrate-modules-bodies.mjs) verify successful.
+--
+-- Связано с:
+--   - Student LK v2 Q3 (workbook отдельным артефактом, не семантика body)
+--   - Methodist workflow: presentation.md (для live share-screen) +
+--     workbook.md (для самостоятельной работы, содержит секцию ДЗ)
+
+PRAGMA foreign_keys = ON;
+
+-- ============================================================
+-- modules — add presentation_r2_key + workbook_r2_key
+-- ============================================================
+-- presentation_r2_key — короткое полотно для лекции (тезисы +
+-- графики + YT-ссылки-примеры). Студент тоже видит для пересмотра.
+-- Format: 'modules/{slug}/presentation.{locale}.md'.
+--
+-- workbook_r2_key — длинный материал для самостоятельной работы
+-- (текст + графика + таблицы + теоретические объяснения). Содержит
+-- описание ДЗ в финальной секции ## Домашнее задание / ## Homework.
+-- Format: 'modules/{slug}/workbook.{locale}.md'.
+--
+-- Оба nullable на этой миграции — data migration M3 заполнит:
+--   workbook_r2_key = старый body_r2_key + concat(homework_md)
+--   presentation_r2_key = pointer на путь (R2 объект upload'ит
+--                         methodist позже, до того UI показывает
+--                         placeholder "Materials will be available...")
+ALTER TABLE modules ADD COLUMN presentation_r2_key TEXT;
+ALTER TABLE modules ADD COLUMN workbook_r2_key TEXT;
+
+-- ============================================================
+-- Notes
+-- ============================================================
+--
+-- 1. Колонки добавляются NULLABLE — это позволяет:
+--      (a) M2 пройти без data migration синхронно,
+--      (b) M3 script update'ит row-by-row (idempotent),
+--      (c) после M3 verify success — 0013 drop'нет body_r2_key + homework_md.
+--
+-- 2. NOT NULL constraint не добавляем (D1 не поддерживает ALTER COLUMN
+--    SET NOT NULL без table recreate). После M3 + M4 фактически
+--    все rows имеют non-null значения — enforce'им в коде через
+--    runtime check + типы.
+--
+-- 3. Existing `body_r2_key` + `homework_md` остаются после M2 — это
+--    safety net на случай если M3 script упадёт. Production rollout:
+--      M2 → M3 (с dry-run verify) → M3 production run →
+--      M3 verify (pnpm check:r2-d1) → M4 cleanup.
