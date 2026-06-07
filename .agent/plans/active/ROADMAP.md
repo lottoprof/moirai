@@ -85,7 +85,35 @@ Plus checklist 16 других mobile-issues для прохода через 37
 
 ## Что точно следующее (Sprint 1 / 2)
 
-Sprint 1 продолжение:
+### Student ЛК v2 — IN PROGRESS (spec: `docs/student-lk-v2-spec.md`)
+
+Замена stage26 на schedule-based unlock + homework submission flow +
+sessions + retention pipeline. 7 stages, последовательно.
+
+Discovery: `.agent/plans/active/student-lk-v2-discovery.md`
+Спека: `docs/student-lk-v2-spec.md` (10 разделов, финализирована)
+Параллельный: `instructor-lk-v2-discovery.md` (отложен после Student MVP)
+
+- [ ] **Stage A — Schema migrations + backfill.** Plan:
+      `student-lk-v2-stage-a-schema.md`. 7 SQL миграций (M1-M7) +
+      2 data scripts (M8/M9). Blocks все следующие.
+- [ ] **Stage B — Sessions + unlock refactor.** Helpers, удаление
+      Mark complete, "All caught up" card. Depends A.
+- [ ] **Stage C — Homework submission (student-side).** API endpoints +
+      SubmissionUploader + SubmissionCard + `/dashboard/homework`.
+      Depends A, B.
+- [ ] **Stage D — Homework review (instructor minimal).** API endpoints +
+      `/instructor/homework/[id]` + override modal + Resend feedback
+      template. Depends A, B, C.
+- [ ] **Stage E — UI overhaul** (drawer + tabs + presentation mode +
+      Phosphor Thin icons). Depends A.
+- [ ] **Stage F — Cron + retention pipeline** (4 crons + GDPR endpoint).
+      Depends A, C, D.
+- [ ] **Stage G — Polish + production rollout** (Playwright E2E +
+      docs update + production deploy с explicit "go").
+
+### Прочие задачи Sprint 1
+
 - [ ] `/contact` page (stage15 tail) — лёгкий quick win
 - [ ] Удалить broken footer links (works/journal) до их реализации —
   предотвращает 404 на live-сайте
@@ -139,5 +167,5 @@ Sprint 2 (новые планы будут):
   R2 keys / Sprint 2 roadmap)
 - ✅ `docs/apply-flow-spec.md` — спека Apply flow (FLOW-1..31)
 - ✅ `.agent/skills/common/git.md` — GitHub SSH alias `github-lottoprof`
-- ⏳ `docs/student-lk-spec.md` — нет; Student ЛК пока без формальной спеки
-  (но stage26 plan покрывает что сделано)
+- ✅ `docs/student-lk-v2-spec.md` — финальная спека Student ЛК v2
+  (10 разделов, 7 stages, миграции M1-M9). Замена stage26 plan'у.
