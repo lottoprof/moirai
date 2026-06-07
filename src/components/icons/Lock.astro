@@ -1,0 +1,15 @@
+---
+/*
+ * Phosphor Thin Lock icon (MIT) — SVG path копия из @phosphor-icons/core.
+ * Stage E icon set, Student LK v2.
+ */
+interface Props { size?: number; class?: string; }
+const { size = 20, class: className } = Astro.props;
+---
+<svg width={size} height={size} viewBox="0 0 256 256" fill="none"
+     stroke="currentColor" stroke-width="8"
+     stroke-linecap="round" stroke-linejoin="round"
+     class={className} aria-hidden="true">
+  <rect x="40" y="88" width="176" height="128" rx="8"/>
+  <path d="M88 88V56a40 40 0 0 1 80 0v32"/>
+</svg>

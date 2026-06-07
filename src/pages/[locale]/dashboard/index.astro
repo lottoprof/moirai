@@ -24,6 +24,7 @@ import StatCard from "../../../components/dashboard/StatCard.astro";
 import ContinueCard from "../../../components/dashboard/ContinueCard.astro";
 import AllCaughtUpCard from "../../../components/dashboard/AllCaughtUpCard.astro";
 import ModuleCard from "../../../components/dashboard/ModuleCard.astro";
+import Lock from "../../../components/icons/Lock.astro";
 import { requireRole } from "../../../lib/server/guards";
 import { listApplicationsByUser } from "../../../lib/server/applications";
 import { getCohortWithSlot, parseDaysJson, normalizeDayPair, deriveTimeOfDay, computeDurationWeeks, type CohortWithSlot } from "../../../lib/server/cohorts";
@@ -168,7 +169,7 @@ const t = ru
       paidContinueLearning: "Продолжить",
       paidAllModules: "Все модули",
       paidHomeworkSection: "Задания",
-      paidStatusDone: "✓ завершено",
+      paidStatusDone: "Завершено",
       paidStatusActive: "в процессе",
       paidStatusLocked: "недоступно",
       paidBadgeReview: "На проверке",
@@ -211,7 +212,7 @@ const t = ru
       paidContinueLearning: "Continue learning",
       paidAllModules: "All modules",
       paidHomeworkSection: "Homework",
-      paidStatusDone: "✓ complete",
+      paidStatusDone: "Complete",
       paidStatusActive: "in progress",
       paidStatusLocked: "locked",
       paidBadgeReview: "Under review",
@@ -311,7 +312,7 @@ const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.d
               <div class="pp-module-stub">
                 <span class="pp-module-stub__num">{String(i + 1).padStart(2, "0")}</span>
                 <span class="pp-module-stub__title">{modSlug}</span>
-                <span class="pp-module-stub__lock" aria-hidden="true">🔒</span>
+                <Lock size={14} class="pp-module-stub__lock" />
               </div>
             ))}
           </div>

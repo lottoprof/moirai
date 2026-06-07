@@ -7,9 +7,11 @@
  *   - active — текущий; полный контраст + amber accent на статусе
  *   - locked — недоступен; <div aria-disabled="true">, не ссылка
  *
- * Locked рисуется НЕ через opacity: 0.3 (ломает text contrast ниже AA),
- * а через приглушённые токены + lock-иконка (Unicode lock symbol).
+ * Stage E: Unicode emoji заменены на Phosphor Thin SVG icons.
  */
+
+import Lock from "../icons/Lock.astro";
+import Check from "../icons/Check.astro";
 
 interface Props {
   num: string;
@@ -43,8 +45,9 @@ const Tag = isLink ? "a" : "div";
       <p class="module-card__summary">{summary}</p>
     )}
     <p class:list={["module-card__status", `module-card__status--${status}`]}>
-      {status === "locked" && <span class="module-card__lock" aria-hidden="true">🔒</span>}
-      {status === "locked" && unlockLabel ? unlockLabel : statusLabel}
+      {status === "locked" && <Lock size={12} class="module-card__icon" />}
+      {status === "done" && <Check size={12} class="module-card__icon" />}
+      <span>{status === "locked" && unlockLabel ? unlockLabel : statusLabel}</span>
     </p>
   </div>
 </Tag>
@@ -151,7 +154,7 @@ const Tag = isLink ? "a" : "div";
   .module-card__status--active { color: var(--text-accent); }
   .module-card__status--locked { color: var(--text-faint); }
 
-  .module-card__lock {
-    font-size: 11px;
+  .module-card__icon {
+    flex-shrink: 0;
   }
 </style>
