@@ -1,0 +1,341 @@
+---
+/*
+ * SubmissionUploader — pre-signed URL flow для upload ДЗ.
+ *
+ * Student LK v2 Stage C/C4b.
+ *
+ * Flow (vanilla JS):
+ *   1. User selects file + (опц.) комментарий.
+ *   2. Generate idempotency_key (crypto.randomUUID) client-side.
+ *   3. POST /api/student/homework/upload-url → { uploadUrl, fileR2Key, submissionId }.
+ *   4. PUT R2 (с прогресс-баром через XMLHttpRequest).
+ *   5. POST /api/student/homework/submissions (finalize).
+ *   6. Reload страницы (новая submission появляется в списке).
+ *
+ * Validation на client side — only quick check (size + mime). Server
+ * re-validate в API endpoints.
+ *
+ * Stage E refactor в Homework tab + Phosphor icons.
+ */
+
+interface Props {
+  moduleSlug: string;
+  locale: "en" | "ru";
+  /** Cap размера в bytes (из LK_CONFIG). */
+  capBytes: number;
+  /** Allowed mime types (из HOMEWORK_ALLOWED_MIME). */
+  allowedMimes: string[];
+}
+
+const { moduleSlug, locale, capBytes, allowedMimes } = Astro.props;
+const ru = locale === "ru";
+
+const t = ru
+  ? {
+      title: "Загрузить работу",
+      hint: "До 100 МБ. Сжимайте видео перед отправкой.",
+      fileLabel: "Файл",
+      filePlaceholder: "Не выбран",
+      filePick: "Выбрать файл",
+      commentLabel: "Комментарий (необязательно)",
+      commentPlaceholder: "Например: переделал по замечаниям, переснял сцену 3...",
+      submit: "Отправить",
+      submitting: "Загрузка...",
+      errFileTooLarge: "Файл слишком большой (макс. 100 МБ)",
+      errUnsupportedType: "Неподдерживаемый тип файла",
+      errUploadFailed: "Не удалось загрузить. Попробуйте снова.",
+      errFinalizeFailed: "Файл загружен, но не зарегистрирован. Обновите страницу.",
+      progressLabel: (p: number) => `${p.toString()}%`,
+    }
+  : {
+      title: "Upload submission",
+      hint: "Up to 100 MB. Compress videos before uploading.",
+      fileLabel: "File",
+      filePlaceholder: "None selected",
+      filePick: "Choose file",
+      commentLabel: "Comment (optional)",
+      commentPlaceholder: "e.g.: reworked per notes, reshot scene 3...",
+      submit: "Submit",
+      submitting: "Uploading...",
+      errFileTooLarge: "File too large (max 100 MB)",
+      errUnsupportedType: "Unsupported file type",
+      errUploadFailed: "Upload failed. Try again.",
+      errFinalizeFailed: "File uploaded but not registered. Refresh the page.",
+      progressLabel: (p: number) => `${p.toString()}%`,
+    };
+---
+
+<section class="uploader" data-module-slug={moduleSlug} data-cap={capBytes}
+         data-mimes={allowedMimes.join(",")}
+         data-locale={locale}>
+  <h3 class="uploader__title">{t.title}</h3>
+  <p class="uploader__hint">{t.hint}</p>
+
+  <form class="uploader__form" data-uploader-form>
+    <label class="uploader__field">
+      <span class="uploader__label">{t.fileLabel}</span>
+      <input type="file" name="file" required class="uploader__input"
+             accept={allowedMimes.join(",")} />
+    </label>
+
+    <label class="uploader__field">
+      <span class="uploader__label">{t.commentLabel}</span>
+      <textarea name="comment" rows="3" maxlength="2000"
+                placeholder={t.commentPlaceholder}
+                class="uploader__textarea"></textarea>
+    </label>
+
+    <div class="uploader__progress" hidden data-uploader-progress>
+      <div class="uploader__bar"><div class="uploader__bar-fill" style="width: 0%"></div></div>
+      <p class="uploader__progress-text">0%</p>
+    </div>
+
+    <p class="uploader__error" hidden data-uploader-error></p>
+
+    <button type="submit" class="uploader__submit" data-uploader-submit>
+      <span data-uploader-submit-label>{t.submit}</span>
+    </button>
+  </form>
+</section>
+
+<style>
+  .uploader {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: var(--space-lg);
+  }
+  .uploader__title {
+    font-family: var(--font-display);
+    font-size: var(--type-body-lg);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0 0 var(--space-2xs);
+  }
+  .uploader__hint {
+    color: var(--text-faint);
+    font-size: var(--type-body-sm);
+    margin: 0 0 var(--space-md);
+  }
+  .uploader__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+  .uploader__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  .uploader__label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .uploader__input,
+  .uploader__textarea {
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    border-radius: 2px;
+  }
+  .uploader__textarea {
+    resize: vertical;
+    min-height: 60px;
+  }
+  .uploader__progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  .uploader__bar {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .uploader__bar-fill {
+    height: 100%;
+    background: var(--amber);
+    transition: width 0.2s ease-out;
+  }
+  .uploader__progress-text {
+    font-family: var(--font-mono, monospace);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    margin: 0;
+    text-align: right;
+  }
+  .uploader__error {
+    color: var(--text-accent);
+    font-size: var(--type-body-sm);
+    margin: 0;
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--amber-faint);
+    border-left: 2px solid var(--amber);
+  }
+  .uploader__submit {
+    background: var(--amber);
+    color: var(--ink);
+    border: none;
+    padding: 12px 24px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    align-self: flex-start;
+  }
+  .uploader__submit:hover { background: var(--amber-light); }
+  .uploader__submit:disabled { opacity: 0.6; cursor: wait; }
+</style>
+
+<script>
+  interface UploadUrlResponse { submissionId: string; uploadUrl: string; fileR2Key: string; }
+
+  document.querySelectorAll<HTMLElement>(".uploader").forEach((wrap) => {
+    const form = wrap.querySelector<HTMLFormElement>("[data-uploader-form]");
+    const submitBtn = wrap.querySelector<HTMLButtonElement>("[data-uploader-submit]");
+    const submitLabel = wrap.querySelector<HTMLElement>("[data-uploader-submit-label]");
+    const errorEl = wrap.querySelector<HTMLElement>("[data-uploader-error]");
+    const progressWrap = wrap.querySelector<HTMLElement>("[data-uploader-progress]");
+    const progressFill = wrap.querySelector<HTMLElement>(".uploader__bar-fill");
+    const progressText = wrap.querySelector<HTMLElement>(".uploader__progress-text");
+
+    if (!form || !submitBtn || !submitLabel || !errorEl || !progressWrap || !progressFill || !progressText) return;
+
+    const moduleSlug = wrap.dataset.moduleSlug ?? "";
+    const cap = Number.parseInt(wrap.dataset.cap ?? "0", 10);
+    const allowedMimes = new Set((wrap.dataset.mimes ?? "").split(","));
+    const locale = wrap.dataset.locale ?? "en";
+
+    const labels = locale === "ru"
+      ? {
+          submit: "Отправить",
+          submitting: "Загрузка...",
+          errFileTooLarge: "Файл слишком большой (макс. 100 МБ)",
+          errUnsupportedType: "Неподдерживаемый тип файла",
+          errUploadFailed: "Не удалось загрузить. Попробуйте снова.",
+          errFinalizeFailed: "Файл загружен, но не зарегистрирован. Обновите страницу.",
+        }
+      : {
+          submit: "Submit",
+          submitting: "Uploading...",
+          errFileTooLarge: "File too large (max 100 MB)",
+          errUnsupportedType: "Unsupported file type",
+          errUploadFailed: "Upload failed. Try again.",
+          errFinalizeFailed: "File uploaded but not registered. Refresh the page.",
+        };
+
+    function showError(msg: string) {
+      if (!errorEl) return;
+      errorEl.textContent = msg;
+      errorEl.hidden = false;
+    }
+    function clearError() {
+      if (!errorEl) return;
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+    }
+    function setProgress(pct: number) {
+      if (!progressFill || !progressText || !progressWrap) return;
+      progressWrap.hidden = false;
+      progressFill.style.width = `${pct.toString()}%`;
+      progressText.textContent = `${Math.round(pct).toString()}%`;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearError();
+
+      const fileInput = form.querySelector<HTMLInputElement>("input[name=file]");
+      const commentInput = form.querySelector<HTMLTextAreaElement>("textarea[name=comment]");
+      if (!fileInput?.files?.[0]) return;
+      const file = fileInput.files[0];
+
+      // Client-side checks
+      if (file.size > cap) { showError(labels.errFileTooLarge); return; }
+      if (!allowedMimes.has(file.type)) { showError(labels.errUnsupportedType); return; }
+
+      submitBtn.disabled = true;
+      submitLabel.textContent = labels.submitting;
+
+      const idempotencyKey = crypto.randomUUID();
+
+      try {
+        // Step 1: request signed PUT URL
+        const urlRes = await fetch("/api/student/homework/upload-url", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            moduleSlug,
+            contentType: file.type,
+            sizeBytes: file.size,
+            idempotencyKey,
+          }),
+        });
+
+        if (!urlRes.ok) {
+          const errBody = await urlRes.json().catch(() => null) as { error?: string } | null;
+          throw new Error(errBody?.error ?? "upload_url_failed");
+        }
+        const urlData = await urlRes.json() as UploadUrlResponse;
+
+        // Step 2: PUT R2 with progress
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", urlData.uploadUrl);
+          xhr.setRequestHeader("Content-Type", file.type);
+          xhr.upload.addEventListener("progress", (ev) => {
+            if (ev.lengthComputable) setProgress((ev.loaded / ev.total) * 100);
+          });
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else reject(new Error(`PUT ${xhr.status.toString()}`));
+          });
+          xhr.addEventListener("error", () => reject(new Error("PUT network")));
+          xhr.send(file);
+        });
+
+        // Step 3: finalize
+        const finRes = await fetch("/api/student/homework/submissions", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            submissionId: urlData.submissionId,
+            moduleSlug,
+            fileR2Key: urlData.fileR2Key,
+            contentType: file.type,
+            sizeBytes: file.size,
+            studentComment: commentInput?.value || undefined,
+            idempotencyKey,
+          }),
+        });
+
+        if (!finRes.ok) {
+          throw new Error("finalize_failed");
+        }
+
+        // Success — reload page
+        window.location.reload();
+      } catch (err) {
+        console.error("[uploader] error:", err);
+        const msg = String(err);
+        if (msg.includes("finalize")) showError(labels.errFinalizeFailed);
+        else showError(labels.errUploadFailed);
+        submitBtn.disabled = false;
+        submitLabel.textContent = labels.submit;
+      }
+    });
+  });
+</script>

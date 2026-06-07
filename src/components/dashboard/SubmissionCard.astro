@@ -1,0 +1,301 @@
+---
+/*
+ * SubmissionCard — отображение одной homework_submission.
+ *
+ * Student LK v2 Stage C/C4a.
+ *
+ * Состояния по status:
+ *   - pending          — приглушённый, "Ожидает проверки"
+ *   - needs_revision   — amber border, "На доработку" + instructor_comment
+ *   - approved         — обычный, "Принято" + опц. instructor_comment
+ *   - auto_approved    — обычный, "Автоматически принято" (тихая метка)
+ *
+ * Поля:
+ *   filename + size + uploaded_at, status badge, late badge,
+ *   student_comment, instructor_comment (markdown rendered),
+ *   download links через signed URL (lazy fetch on click).
+ *
+ * Phosphor icons + Vidstack player — Stage E.
+ */
+
+import { marked } from "marked";
+import type { SubmissionDisplay } from "../../lib/server/homework";
+
+interface Props {
+  submission: SubmissionDisplay;
+  locale: "en" | "ru";
+}
+
+const { submission, locale } = Astro.props;
+const ru = locale === "ru";
+
+// Filename = последний segment R2 path
+const filename = submission.file_r2_key.split("/").pop() ?? submission.file_r2_key;
+
+const sizeStr = submission.size_bytes < 1024 * 1024
+  ? `${(submission.size_bytes / 1024).toFixed(0)} KB`
+  : `${(submission.size_bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+const intlLocale = ru ? "ru-RU" : "en-US";
+const dateFmt = new Intl.DateTimeFormat(intlLocale, {
+  month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+});
+const uploadedStr = dateFmt.format(new Date(submission.uploaded_at * 1000));
+const reviewedStr = submission.reviewed_at
+  ? dateFmt.format(new Date(submission.reviewed_at * 1000))
+  : null;
+
+const statusLabel = ru
+  ? {
+      pending: "Ожидает проверки",
+      needs_revision: "На доработку",
+      approved: "Принято",
+      auto_approved: "Автоматически принято",
+    }
+  : {
+      pending: "Awaiting review",
+      needs_revision: "Needs revision",
+      approved: "Approved",
+      auto_approved: "Auto-approved",
+    };
+
+const lateLabel = ru ? "Сдано с опозданием" : "Late";
+const downloadLabel = ru ? "Скачать" : "Download";
+const annotatedLabel = ru ? "С пометками преподавателя" : "Annotated by instructor";
+const studentCommentLabel = ru ? "Ваш комментарий" : "Your comment";
+const reviewerLabel = ru ? "Проверил" : "Reviewed by";
+
+// Render instructor_comment как markdown (если есть)
+marked.setOptions({ gfm: true, breaks: false });
+const instructorCommentHtml = submission.instructor_comment
+  ? await marked.parse(submission.instructor_comment)
+  : null;
+const studentCommentHtml = submission.student_comment
+  ? await marked.parse(submission.student_comment)
+  : null;
+---
+
+<article class:list={["submission-card", `submission-card--${submission.status}`]}
+         data-submission-id={submission.id}>
+  <header class="submission-card__head">
+    <div class="submission-card__meta">
+      <p class="submission-card__filename">{filename}</p>
+      <p class="submission-card__sub">{sizeStr} · {uploadedStr}</p>
+    </div>
+    <div class="submission-card__badges">
+      {Boolean(submission.is_late) && (
+        <span class="badge badge--late">{lateLabel}</span>
+      )}
+      <span class:list={["badge", `badge--${submission.status}`]}>
+        {statusLabel[submission.status]}
+      </span>
+    </div>
+  </header>
+
+  {studentCommentHtml && (
+    <section class="submission-card__section">
+      <p class="submission-card__section-label">{studentCommentLabel}</p>
+      <div class="submission-card__prose" set:html={studentCommentHtml} />
+    </section>
+  )}
+
+  {instructorCommentHtml && (
+    <section class="submission-card__section submission-card__section--instructor">
+      <p class="submission-card__section-label">
+        {reviewerLabel}{submission.reviewer_name ? `: ${submission.reviewer_name}` : ""}
+        {reviewedStr && <span class="submission-card__reviewed-at"> · {reviewedStr}</span>}
+      </p>
+      <div class="submission-card__prose" set:html={instructorCommentHtml} />
+    </section>
+  )}
+
+  <footer class="submission-card__actions">
+    <button type="button" class="submission-card__download" data-action="download-file">
+      {downloadLabel}
+    </button>
+    {submission.instructor_annotation_r2_key && (
+      <button type="button" class="submission-card__download submission-card__download--annotated"
+              data-action="download-annotation">
+        {annotatedLabel} · {downloadLabel}
+      </button>
+    )}
+  </footer>
+</article>
+
+<style>
+  .submission-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: var(--space-md) var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .submission-card--needs_revision {
+    border-color: color-mix(in srgb, var(--amber) 50%, transparent);
+  }
+
+  .submission-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-md);
+  }
+  .submission-card__meta { min-width: 0; flex: 1; }
+  .submission-card__filename {
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    color: var(--text);
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .submission-card__sub {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    margin: var(--space-2xs) 0 0;
+  }
+
+  .submission-card__badges {
+    display: inline-flex;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--paper) 3%, transparent);
+  }
+  .badge--needs_revision {
+    color: var(--text-accent);
+    border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+    background: var(--amber-faint);
+  }
+  .badge--approved {
+    color: var(--text);
+  }
+  .badge--late {
+    color: var(--text-faint);
+    border-style: dashed;
+  }
+
+  .submission-card__section {
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-sm);
+  }
+  .submission-card__section--instructor {
+    background: color-mix(in srgb, var(--paper) 2%, transparent);
+    margin: 0 calc(-1 * var(--space-lg));
+    padding: var(--space-sm) var(--space-lg);
+    border-top: 1px solid var(--border);
+  }
+  .submission-card__section-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 var(--space-xs);
+  }
+  .submission-card__reviewed-at {
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .submission-card__prose {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    line-height: 1.5;
+  }
+  .submission-card__prose :global(p) { margin: 0 0 var(--space-xs); }
+  .submission-card__prose :global(p:last-child) { margin: 0; }
+  .submission-card__prose :global(ul),
+  .submission-card__prose :global(ol) { margin: var(--space-xs) 0; padding-left: 1.5em; }
+
+  .submission-card__actions {
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+  .submission-card__download {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    padding: 6px 12px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: color var(--duration-fast) var(--ease-out),
+                border-color var(--duration-fast) var(--ease-out);
+  }
+  .submission-card__download:hover {
+    color: var(--text);
+    border-color: var(--text);
+  }
+  .submission-card__download--annotated {
+    color: var(--text-accent);
+    border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+  }
+</style>
+
+<script>
+  // Lazy signed URL fetch на click. Idempotent — каждый click новый URL.
+  // Workflow:
+  //   1. fetch /api/student/homework/submissions/{id}/file-url (or annotation-url)
+  //   2. open URL в новом окне (download trigger через <a download>)
+  document.querySelectorAll<HTMLElement>(".submission-card").forEach((card) => {
+    const id = card.dataset.submissionId;
+    if (!id) return;
+
+    card.querySelectorAll<HTMLButtonElement>("[data-action='download-file']").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          const res = await fetch(`/api/student/homework/submissions/${id}/file-url`, {
+            credentials: "same-origin",
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status.toString()}`);
+          const data = await res.json() as { url: string };
+          window.open(data.url, "_blank");
+        } catch (err) {
+          console.error("[submission-card] download failed:", err);
+          alert("Failed to fetch download link");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+
+    card.querySelectorAll<HTMLButtonElement>("[data-action='download-annotation']").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          const res = await fetch(`/api/student/homework/submissions/${id}/annotation-url`, {
+            credentials: "same-origin",
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status.toString()}`);
+          const data = await res.json() as { url: string };
+          window.open(data.url, "_blank");
+        } catch (err) {
+          console.error("[submission-card] annotation download failed:", err);
+          alert("Failed to fetch annotation link");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  });
+</script>
