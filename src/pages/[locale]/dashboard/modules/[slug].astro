@@ -21,16 +21,19 @@ import { marked } from "marked";
 import DashboardLayout from "../../../../layouts/dashboard/Layout.astro";
 import SubmissionCard from "../../../../components/dashboard/SubmissionCard.astro";
 import SubmissionUploader from "../../../../components/dashboard/SubmissionUploader.astro";
+import ModulesDrawer from "../../../../components/dashboard/ModulesDrawer.astro";
 import { requireRole } from "../../../../lib/server/guards";
 import {
   getModuleForStudent,
   markModuleViewed,
+  listEnrollmentModules,
 } from "../../../../lib/server/student-modules";
 import {
   listSubmissionsForModule,
   HOMEWORK_ALLOWED_MIME,
 } from "../../../../lib/server/homework";
 import { LK_CONFIG } from "../../../../lib/config/lk";
+import { getEntry } from "astro:content";
 
 export const prerender = false;
 
@@ -102,6 +105,21 @@ const submissions = module_.has_homework
   : [];
 const allowedMimes = Array.from(HOMEWORK_ALLOWED_MIME);
 
+// Stage E: drawer data
+const drawerModules = await listEnrollmentModules(env, module_.enrollment_id, typedLocale);
+const drawerDone = drawerModules.filter((m) => m.status === "done").length;
+
+// Find programme_slug → title для drawer header
+const programmeRow = await env.DB.prepare(
+  `SELECT programme_slug FROM enrollments WHERE id = ? LIMIT 1`,
+)
+  .bind(module_.enrollment_id)
+  .first<{ programme_slug: string }>();
+const programmeEntry = programmeRow
+  ? await getEntry("programmes", `${programmeRow.programme_slug}.${typedLocale}`)
+  : null;
+const programmeTitle = programmeEntry?.data.title ?? "Programme";
+
 const t = ru
   ? {
       backLink: "← Назад к модулям",
@@ -145,7 +163,22 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
   seo={{ title: t.seo.title, description: t.seo.description }}
   currentNavKey="dashboard"
   userRoles={user.roles}
+  showDrawerTrigger={true}
 >
+  <ModulesDrawer
+    slot="drawer"
+    locale={typedLocale}
+    programmeTitle={programmeTitle}
+    modules={drawerModules.map((m) => ({
+      slug: m.slug,
+      title: m.title,
+      orderIdx: m.order_idx,
+      status: m.status === "done" ? "done" as const : !m.unlocked ? "locked" as const : "active" as const,
+    }))}
+    doneCount={drawerDone}
+    totalCount={drawerModules.length}
+    currentSlug={module_.slug}
+  />
   <article class="module-page">
     <a href={`/${typedLocale}/dashboard`} class="module-page__back">{t.backLink}</a>
 

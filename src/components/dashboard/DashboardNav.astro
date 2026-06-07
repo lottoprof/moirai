@@ -16,6 +16,7 @@
 
 import type { Role } from "../../../db/types";
 import Logo from "../shared/Logo.astro";
+import List from "../icons/List.astro";
 
 interface Props {
   locale: "en" | "ru";
@@ -23,9 +24,11 @@ interface Props {
   /** Дополнительные роли user'a — для zone-switcher. Если undefined,
    *  zone-switcher не рендерится (страница не передала roles). */
   roles?: Set<Role>;
+  /** Show drawer hamburger trigger. Default false. */
+  showDrawerTrigger?: boolean;
 }
 
-const { locale, currentKey, roles } = Astro.props;
+const { locale, currentKey, roles, showDrawerTrigger = false } = Astro.props;
 
 const labels = locale === "ru"
   ? {
@@ -49,11 +52,10 @@ const labels = locale === "ru"
       switchAdmin: "Admin",
     };
 
-// Stage C: "Homework" link → /dashboard/homework (aggregate page).
-// Stage E удалит "Modules" (drawer заменит) + добавит SVG icons.
+// Stage C: "Homework" link → /dashboard/homework.
+// Stage E: "Modules" удалён — drawer заменяет (hamburger trigger в nav).
 const items = [
   { key: "dashboard", label: labels.dashboard, href: `/${locale}/dashboard` },
-  { key: "modules",   label: labels.modules,   href: `/${locale}/dashboard` },
   { key: "homework",  label: labels.homework,  href: `/${locale}/dashboard/homework` },
   { key: "account",   label: labels.account,   href: `/${locale}/account` },
 ] as const;
@@ -71,6 +73,12 @@ if (roles?.has("admin")) {
 
 <nav class="dashboard-nav" aria-label={labels.aria}>
   <div class="dashboard-nav__brand">
+    {showDrawerTrigger && (
+      <button type="button" class="dashboard-nav__drawer-trigger" data-drawer-trigger
+              aria-label="Toggle modules drawer">
+        <List size={20} />
+      </button>
+    )}
     <a href={`/${locale}/dashboard`} class="dashboard-nav__logo" aria-label="Moirai dashboard"><Logo height={26} /></a>
     <a href={`/${locale}/`} class="dashboard-nav__site">{labels.site}</a>
   </div>
@@ -106,6 +114,20 @@ if (roles?.has("admin")) {
     display: inline-flex;
     align-items: baseline;
     gap: var(--space-md);
+  }
+  .dashboard-nav__drawer-trigger {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    align-self: center;
+    margin-right: var(--space-xs);
+  }
+  .dashboard-nav__drawer-trigger:hover { color: var(--text); }
+  /* Hide drawer trigger on desktop (drawer is permanent there) */
+  @media (min-width: 1024px) {
+    .dashboard-nav__drawer-trigger { display: none; }
   }
 
   .dashboard-nav__logo {

@@ -31,9 +31,12 @@ interface Props {
   /** Roles user'a для zone-switcher в Nav. Если undefined — switcher
    *  не показывается (страница не передала roles). */
   userRoles?: Set<Role>;
+  /** Show drawer hamburger trigger в nav. Default false. Set true
+   *  на pages где drawer есть (paid dashboard, module page). */
+  showDrawerTrigger?: boolean;
 }
 
-const { locale, seo, currentNavKey, userRoles } = Astro.props;
+const { locale, seo, currentNavKey, userRoles, showDrawerTrigger = false } = Astro.props;
 const pathname = Astro.url.pathname;
 ---
 
@@ -55,10 +58,30 @@ const pathname = Astro.url.pathname;
   <body>
     <a href="#main" class="skip-link">Skip to main content</a>
 
-    <DashboardNav locale={locale} currentKey={currentNavKey} roles={userRoles} />
+    <DashboardNav locale={locale} currentKey={currentNavKey} roles={userRoles}
+                   showDrawerTrigger={showDrawerTrigger} />
 
-    <main id="main" class="dashboard-main">
-      <slot />
-    </main>
+    <div class="dashboard-shell">
+      <slot name="drawer" />
+      <main id="main" class="dashboard-main">
+        <slot />
+      </main>
+    </div>
+
+    <style>
+      .dashboard-shell {
+        display: block;
+      }
+      @media (min-width: 1024px) {
+        .dashboard-shell {
+          display: grid;
+          grid-template-columns: 320px 1fr;
+          grid-template-areas: "drawer main";
+        }
+        .dashboard-shell > main {
+          grid-area: main;
+        }
+      }
+    </style>
   </body>
 </html>
