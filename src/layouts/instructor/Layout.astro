@@ -1,8 +1,8 @@
 ---
 /*
  * Корневой layout для Instructor zone.
- * Аналог dashboard/Layout, но с InstructorNav (Queue / My Students /
- * Schedule / Account →) + role-strip "INSTRUCTOR" сверху.
+ * Аналог dashboard/Layout, но с InstructorNav (Cohorts / Account)
+ * + role-strip "INSTRUCTOR" сверху.
  * noindex зашит.
  *
  * См. decisions 2026-05-17 §role-zones.
@@ -24,7 +24,7 @@ interface Seo {
 interface Props {
   locale: "en" | "ru";
   seo: Seo;
-  currentNavKey: "queue" | "students" | "schedule" | "account";
+  currentNavKey: "cohorts" | "account";
   userRoles?: Set<Role>;
 }
 

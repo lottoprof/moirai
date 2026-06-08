@@ -101,19 +101,21 @@ const labels = ru
     <div class="metric"><dt>{labels.late}</dt><dd>{lateSubmissions}</dd></div>
   </dl>
 
-  <section class="cohort-card__session">
-    <p class="cohort-card__session-label">{labels.nextSession}</p>
-    {nextSessionFmt ? (
-      <>
-        <p class="cohort-card__session-date">{nextSessionFmt}</p>
-        {nextSessionModuleTitle && (
-          <p class="cohort-card__session-module">{nextSessionModuleTitle}</p>
-        )}
-      </>
-    ) : (
-      <p class="cohort-card__session-empty">{labels.noSession}</p>
-    )}
-  </section>
+  {activeStudents > 0 && (
+    <section class="cohort-card__session">
+      <p class="cohort-card__session-label">{labels.nextSession}</p>
+      {nextSessionFmt ? (
+        <>
+          <p class="cohort-card__session-date">{nextSessionFmt}</p>
+          {nextSessionModuleTitle && (
+            <p class="cohort-card__session-module">{nextSessionModuleTitle}</p>
+          )}
+        </>
+      ) : (
+        <p class="cohort-card__session-empty">{labels.noSession}</p>
+      )}
+    </section>
+  )}
 
   <footer class="cohort-card__actions">
     {zoomActive && meetingJoinUrl ? (

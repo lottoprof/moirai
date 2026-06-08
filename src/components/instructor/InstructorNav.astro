@@ -13,7 +13,7 @@ import ZoneNav from "../shared/ZoneNav.astro";
 
 interface Props {
   locale: "en" | "ru";
-  currentKey: "queue" | "students" | "schedule" | "account";
+  currentKey: "cohorts" | "account";
   roles?: Set<Role>;
 }
 
@@ -22,9 +22,7 @@ const { locale, currentKey, roles } = Astro.props;
 const labels = locale === "ru"
   ? {
       aria: "Навигация инструктора",
-      queue: "Очередь",
-      students: "Мои студенты",
-      schedule: "Расписание",
+      cohorts: "Группы",
       account: "Аккаунт",
       site: "На сайт",
       switchDashboard: "Кабинет",
@@ -32,9 +30,7 @@ const labels = locale === "ru"
     }
   : {
       aria: "Instructor navigation",
-      queue: "Queue",
-      students: "My students",
-      schedule: "Schedule",
+      cohorts: "Cohorts",
       account: "Account",
       site: "View site",
       switchDashboard: "Dashboard",
@@ -42,10 +38,8 @@ const labels = locale === "ru"
     };
 
 const items = [
-  { key: "queue",    label: labels.queue,    href: `/${locale}/instructor` },
-  { key: "students", label: labels.students, href: `/${locale}/instructor` },
-  { key: "schedule", label: labels.schedule, href: `/${locale}/instructor` },
-  { key: "account",  label: labels.account,  href: `/${locale}/account` },
+  { key: "cohorts", label: labels.cohorts, href: `/${locale}/instructor` },
+  { key: "account", label: labels.account,  href: `/${locale}/account` },
 ];
 
 const otherZones: { href: string; label: string }[] = [];

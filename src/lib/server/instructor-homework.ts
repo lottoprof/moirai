@@ -286,18 +286,22 @@ export async function listInstructorCohorts(
       .bind(instructorId, weekAgo, c.cohort_id)
       .first<{ pending: number | null; late: number | null; reviewed_week: number | null }>();
 
-    // Next live session
-    const nextSession = await env.DB.prepare(
-      `SELECT scheduled_at, module_slug
-         FROM sessions
-        WHERE cohort_id = ?
-          AND scheduled_at > ?
-          AND status = 'scheduled'
-        ORDER BY scheduled_at ASC
-        LIMIT 1`,
-    )
-      .bind(c.cohort_id, now)
-      .first<{ scheduled_at: number; module_slug: string }>();
+    // Next live session — only relevant if cohort has students.
+    // Empty cohorts ещё не "ведутся", показывать им next session — data noise.
+    const studentsCount = students?.n ?? 0;
+    const nextSession = studentsCount > 0
+      ? await env.DB.prepare(
+          `SELECT scheduled_at, module_slug
+             FROM sessions
+            WHERE cohort_id = ?
+              AND scheduled_at > ?
+              AND status = 'scheduled'
+            ORDER BY scheduled_at ASC
+            LIMIT 1`,
+        )
+          .bind(c.cohort_id, now)
+          .first<{ scheduled_at: number; module_slug: string }>()
+      : null;
 
     cards.push({
       cohort_id: c.cohort_id,
@@ -306,7 +310,7 @@ export async function listInstructorCohorts(
       start_date: c.start_date,
       end_date: c.end_date,
       status: c.status,
-      active_students: students?.n ?? 0,
+      active_students: studentsCount,
       pending_submissions: subStats?.pending ?? 0,
       reviewed_this_week: subStats?.reviewed_week ?? 0,
       late_submissions: subStats?.late ?? 0,
