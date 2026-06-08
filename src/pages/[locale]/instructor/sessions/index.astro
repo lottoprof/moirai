@@ -1,0 +1,330 @@
+---
+/*
+ * /{locale}/instructor/sessions — расписание занятий preподa.
+ *
+ * Instructor LK v2 Q5 (закрыт 2026-06-08).
+ *
+ * Две секции: Upcoming (ASC, без лимита) + Past (DESC, LIMIT 30).
+ * Каждый row: {date weekday HH:MM ET} · {cohort label} · {module title}
+ * с Join button (если в zoom-window) или Recording link (past).
+ *
+ * Filter chips: by cohort (multi).
+ *
+ * Sessions всегда в ET (FLOW-26).
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../../../layouts/instructor/Layout.astro";
+import InstructorHero from "../../../../components/instructor/InstructorHero.astro";
+import { requireRole } from "../../../../lib/server/guards";
+import { listInstructorSessions } from "../../../../lib/server/instructor-sessions";
+import { formatSessionTime } from "../../../../lib/format-date";
+import { LK_CONFIG } from "../../../../lib/config/lk";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/instructor");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+
+const userOrRes = await requireRole(Astro, "instructor");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+const { upcoming, past } = await listInstructorSessions(env, user.id, typedLocale);
+
+// Programme titles
+const programmeSlugs = Array.from(new Set([...upcoming, ...past].map((s) => s.programme_slug)));
+const programmeTitleMap = new Map<string, string>();
+await Promise.all(programmeSlugs.map(async (slug) => {
+  const entry = await getEntry("programmes", `${slug}.${typedLocale}`);
+  if (entry) programmeTitleMap.set(slug, entry.data.title);
+}));
+
+const intlLocale = ru ? "ru-RU" : "en-US";
+const cohortFmt = new Intl.DateTimeFormat(intlLocale, { month: "short", year: "numeric" });
+
+const cohortLabel = (programmeSlug: string, startDate: number): string => {
+  const prog = programmeTitleMap.get(programmeSlug) ?? programmeSlug;
+  return `${prog} · ${cohortFmt.format(new Date(startDate * 1000))}`;
+};
+
+// Cohort chips
+const cohortIds = Array.from(new Set([...upcoming, ...past].map((s) => s.cohort_id)));
+const cohortChipsList = cohortIds.map((id) => {
+  const example = [...upcoming, ...past].find((s) => s.cohort_id === id);
+  return {
+    id,
+    label: example ? cohortLabel(example.programme_slug, example.cohort_start_date) : id,
+    count: [...upcoming, ...past].filter((s) => s.cohort_id === id).length,
+  };
+}).sort((a, b) => a.label.localeCompare(b.label));
+
+const initialFilters = cohortChipsList.map((c) => `cohort-${c.id}`).join(" ");
+
+const now = Math.floor(Date.now() / 1000);
+const isZoomActive = (s: { scheduled_at: number; meeting_join_url: string | null }) =>
+  s.meeting_join_url != null
+  && now >= s.scheduled_at - LK_CONFIG.zoom_join_window_minutes_before * 60
+  && now <= s.scheduled_at + 4 * 3600;
+
+const t = ru
+  ? {
+      eyebrow: "Преподаватель",
+      title: "Расписание",
+      subtitle: upcoming.length === 0
+        ? "Нет запланированных занятий"
+        : `${upcoming.length.toString()} ближайш${upcoming.length === 1 ? "ее занятие" : "их занятия"}`,
+      upcomingTitle: "Ближайшие",
+      pastTitle: "Прошедшие",
+      labelCohort: "Когорта",
+      noUpcoming: "Нет ближайших занятий.",
+      noPast: "Прошедших занятий ещё нет.",
+      join: "Подключиться",
+      seo: { title: "Расписание — Moirai", description: "Расписание занятий преподавателя." },
+    }
+  : {
+      eyebrow: "Instructor",
+      title: "Schedule",
+      subtitle: upcoming.length === 0
+        ? "No upcoming sessions"
+        : `${upcoming.length.toString()} upcoming session${upcoming.length === 1 ? "" : "s"}`,
+      upcomingTitle: "Upcoming",
+      pastTitle: "Past",
+      labelCohort: "Cohort",
+      noUpcoming: "No upcoming sessions.",
+      noPast: "No past sessions yet.",
+      join: "Join",
+      seo: { title: "Schedule — Moirai", description: "Instructor live sessions schedule." },
+    };
+---
+
+<Layout
+  locale={typedLocale}
+  seo={t.seo}
+  currentNavKey="schedule"
+  userRoles={user.roles}
+>
+  <InstructorHero eyebrow={t.eyebrow} title={t.title} subtitle={t.subtitle} />
+
+  <div class="sessions-content">
+    {cohortChipsList.length > 1 && (
+      <div class="sessions-filters" role="group" aria-label="Session filters">
+        <div class="sessions-filters__group">
+          <span class="sessions-filters__group-label">{t.labelCohort}</span>
+          {cohortChipsList.map((c) => (
+            <button
+              type="button"
+              class="sessions-filter-chip sessions-filter-chip--active"
+              data-filter-key={`cohort-${c.id}`}
+              aria-pressed="true"
+            >
+              <span>{c.label}</span>
+              <span class="sessions-filter-chip__count">{c.count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+
+    <section class="sessions-section">
+      <h2 class="sessions-section__title">{t.upcomingTitle}</h2>
+      {upcoming.length === 0 ? (
+        <p class="sessions-empty">{t.noUpcoming}</p>
+      ) : (
+        <ul class="sessions-list" data-filters={initialFilters}>
+          {upcoming.map((s) => (
+            <li class="session-row" data-cohort={s.cohort_id}>
+              <div class="session-row__main">
+                <div class="session-row__when">
+                  {formatSessionTime(new Date(s.scheduled_at * 1000), typedLocale)}
+                </div>
+                <div class="session-row__what">
+                  <span class={`session-row__cohort session-row__cohort--${s.programme_slug}`}>
+                    {cohortLabel(s.programme_slug, s.cohort_start_date)}
+                  </span>
+                  <span class="session-row__module">{s.module_title ?? s.module_slug}</span>
+                </div>
+              </div>
+              <div class="session-row__actions">
+                {isZoomActive(s) && s.meeting_join_url && (
+                  <a class="session-row__join" href={s.meeting_join_url} target="_blank" rel="noopener">
+                    {t.join}
+                  </a>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+
+    <section class="sessions-section">
+      <h2 class="sessions-section__title">{t.pastTitle}</h2>
+      {past.length === 0 ? (
+        <p class="sessions-empty">{t.noPast}</p>
+      ) : (
+        <ul class="sessions-list sessions-list--past" data-filters={initialFilters}>
+          {past.map((s) => (
+            <li class="session-row session-row--past" data-cohort={s.cohort_id}>
+              <div class="session-row__main">
+                <div class="session-row__when">
+                  {formatSessionTime(new Date(s.scheduled_at * 1000), typedLocale)}
+                </div>
+                <div class="session-row__what">
+                  <span class={`session-row__cohort session-row__cohort--${s.programme_slug}`}>
+                    {cohortLabel(s.programme_slug, s.cohort_start_date)}
+                  </span>
+                  <span class="session-row__module">{s.module_title ?? s.module_slug}</span>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  </div>
+</Layout>
+
+<script>
+  const lists = document.querySelectorAll<HTMLElement>(".sessions-list");
+  const chips = document.querySelectorAll<HTMLButtonElement>(".sessions-filter-chip");
+  if (chips.length > 0) {
+    const apply = () => {
+      const active: string[] = [];
+      chips.forEach((c) => {
+        if (c.getAttribute("aria-pressed") === "true") active.push(c.dataset.filterKey ?? "");
+      });
+      const filterStr = active.join(" ");
+      lists.forEach((l) => { l.dataset.filters = filterStr; });
+    };
+    chips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const pressed = chip.getAttribute("aria-pressed") === "true";
+        chip.setAttribute("aria-pressed", pressed ? "false" : "true");
+        chip.classList.toggle("sessions-filter-chip--active", !pressed);
+        apply();
+      });
+    });
+    apply();
+  }
+</script>
+
+<style>
+  .sessions-content {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .sessions-empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-md) 0;
+  }
+
+  .sessions-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-md) var(--space-lg);
+    margin: 0 0 var(--space-lg);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .sessions-filters__group { display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap; }
+  .sessions-filters__group-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-right: var(--space-xs);
+  }
+  .sessions-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    color: var(--text-faint);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  .sessions-filter-chip--active { color: var(--text); border-color: var(--text); }
+  .sessions-filter-chip__count { color: var(--text-faint); font-size: var(--type-micro-sm); }
+  .sessions-filter-chip--active .sessions-filter-chip__count { color: inherit; opacity: 0.7; }
+
+  .sessions-section { margin-bottom: var(--space-xl); }
+  .sessions-section__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-sm);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0 0 var(--space-md);
+  }
+
+  .sessions-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .session-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .session-row__main { display: flex; align-items: baseline; gap: var(--space-md); flex-wrap: wrap; flex: 1; min-width: 0; }
+  .session-row__when {
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    color: var(--text);
+    min-width: 220px;
+  }
+  .session-row__what { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .session-row__cohort {
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .session-row__cohort--beginner     { color: var(--prog-beginner); }
+  .session-row__cohort--intermediate { color: var(--prog-intermediate); }
+  .session-row__cohort--advanced     { color: var(--prog-advanced); }
+  .session-row__module {
+    color: var(--text);
+    font-size: var(--type-body-sm);
+  }
+  .session-row--past .session-row__when,
+  .session-row--past .session-row__module { color: var(--text-faint); }
+  .session-row__actions { display: flex; gap: var(--space-sm); flex-shrink: 0; }
+  .session-row__join {
+    padding: 8px 14px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    background: var(--amber);
+    color: var(--ink);
+    text-decoration: none;
+    border-radius: 2px;
+  }
+  .session-row__join:hover { background: var(--amber-light); }
+</style>
+
+<style is:global set:html={cohortChipsList.map((c) =>
+  `.sessions-list:not([data-filters~="cohort-${c.id}"]) li[data-cohort="${c.id}"] { display: none; }`
+).join("\n")}></style>
