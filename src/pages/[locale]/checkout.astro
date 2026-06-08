@@ -65,6 +65,12 @@ const cohort = await getCohortWithSlot(env, application.cohort_id);
 if (!cohort) {
   return Astro.redirect(`/${typedLocale}/dashboard`);
 }
+
+// S8: soft warn если cohort без lead_instructor (admin не назначил препода)
+const leadStatusRow = await env.DB.prepare(
+  `SELECT lead_instructor_id FROM cohorts WHERE id = ?`,
+).bind(application.cohort_id).first<{ lead_instructor_id: string | null }>();
+const cohortPendingInstructor = leadStatusRow?.lead_instructor_id == null;
 const programme = await getEntry("programmes", `${application.programme_id}.${typedLocale}`);
 if (!programme) {
   return Astro.redirect(`/${typedLocale}/dashboard`);
@@ -238,6 +244,14 @@ const totalLabel = formatPrice(totalCents, currency);
       <!-- Order summary -->
       <aside class="checkout__summary" aria-labelledby="summary-title">
         <h2 id="summary-title" class="checkout__summary-title">{t.summaryTitle}</h2>
+
+        {cohortPendingInstructor && (
+          <p class="checkout__instructor-pending">
+            {typedLocale === "ru"
+              ? "Преподаватель будет назначен до начала занятий."
+              : "Instructor will be assigned before sessions start."}
+          </p>
+        )}
 
         <div class="checkout__summary-row">
           <span class="checkout__summary-label">{programme.data.title}</span>
@@ -417,6 +431,14 @@ const totalLabel = formatPrice(totalCents, currency);
     font-weight: 400;
     margin: 0 0 var(--space-lg);
     color: var(--text);
+  }
+  .checkout__instructor-pending {
+    padding: var(--space-sm) var(--space-md);
+    background: var(--amber-faint);
+    border-left: 3px solid var(--amber);
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    margin: 0 0 var(--space-md);
   }
   .checkout__summary-row {
     display: flex;

@@ -1,0 +1,290 @@
+---
+/*
+ * /admin/users/[id]/handover — передача всех active cohort'ов preподa
+ * новому lead'у. Для случаев увольнения или длительного отпуска.
+ *
+ * Stage S6 (admin-instructor-management).
+ *
+ * Per-cohort dropdown qualified instructors. Save → batch UPDATE
+ * cohorts.lead_instructor_id.
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../../../layouts/admin/Layout.astro";
+import { requireRole } from "../../../../lib/server/guards";
+import { listActiveLeadCohortsForUser, findQualifiedInstructors } from "../../../../lib/server/admin-instructors";
+import { formatDate } from "../../../../lib/format-date";
+
+export const prerender = false;
+
+const { id } = Astro.params;
+if (!id || typeof id !== "string") return new Response(null, { status: 404 });
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const admin = userOrRes;
+const env = Astro.locals.runtime.env;
+const locale = admin.locale ?? "en";
+const ru = locale === "ru";
+
+const instructor = await env.DB.prepare(
+  `SELECT id, email, name FROM users WHERE id = ?`,
+).bind(id).first<{ id: string; email: string; name: string | null }>();
+if (!instructor) return new Response(null, { status: 404 });
+
+const cohorts = await listActiveLeadCohortsForUser(env, id);
+
+interface CohortHandoverItem {
+  cohort_id: string;
+  programme_slug: string;
+  programme_title: string;
+  start_date: number;
+  status: string;
+  candidates: { user_id: string; name: string | null; email: string; available: boolean }[];
+}
+
+const items: CohortHandoverItem[] = [];
+for (const c of cohorts) {
+  // Подгрузить module_snapshot и programme title
+  const snap = await env.DB.prepare(
+    `SELECT modules_snapshot_json FROM cohorts WHERE id = ?`,
+  ).bind(c.cohort_id).first<{ modules_snapshot_json: string }>();
+  let moduleSlugs: string[];
+  try { moduleSlugs = JSON.parse(snap?.modules_snapshot_json ?? "[]") as string[]; }
+  catch { moduleSlugs = []; }
+
+  const candidates = await findQualifiedInstructors(env, moduleSlugs, {
+    requireAllModules: true,
+    excludeUserId: id,
+  });
+
+  const progEntry = await getEntry("programmes", `${c.programme_slug}.${locale}`);
+  items.push({
+    cohort_id: c.cohort_id,
+    programme_slug: c.programme_slug,
+    programme_title: progEntry?.data.title ?? c.programme_slug,
+    start_date: c.start_date,
+    status: c.status,
+    candidates,
+  });
+}
+
+const t = ru
+  ? {
+      backLink: "← К пользователям",
+      title: "Передача когорт",
+      subtitle: (n: number) => `${n.toString()} активн${n === 1 ? "ая когорта" : "ых когорт"} требу${n === 1 ? "ет" : "ют"} нового lead'а`,
+      empty: "Активных когорт нет — передача не нужна.",
+      headerCohort: "Когорта",
+      headerNewLead: "Новый lead",
+      noCandidates: "Нет квалифицированных",
+      noChange: "— Без изменений —",
+      saveBtn: "Передать",
+      saving: "Передаём...",
+      saved: "Передано. Перезагрузка...",
+      failed: "Ошибка",
+      seo: { title: "Handover — Admin", description: "Cohort handover" },
+    }
+  : {
+      backLink: "← Back to users",
+      title: "Cohort handover",
+      subtitle: (n: number) => `${n.toString()} active cohort${n === 1 ? "" : "s"} need${n === 1 ? "s" : ""} a new lead`,
+      empty: "No active cohorts — no handover needed.",
+      headerCohort: "Cohort",
+      headerNewLead: "New lead",
+      noCandidates: "No qualified candidates",
+      noChange: "— No change —",
+      saveBtn: "Handover",
+      saving: "Handing over...",
+      saved: "Done. Reloading...",
+      failed: "Failed",
+      seo: { title: "Handover — Admin", description: "Cohort handover" },
+    };
+---
+
+<Layout
+  locale={locale}
+  seo={t.seo}
+  currentNavKey="users"
+  userRoles={admin.roles}
+>
+  <div class="admin-page" data-user-id={id}>
+    <a class="admin-page__back" href="/admin/users">{t.backLink}</a>
+
+    <header class="admin-page__head">
+      <h1 class="admin-page__title">{t.title}</h1>
+      <p class="admin-page__subtitle">
+        <strong>{instructor.name ?? instructor.email}</strong> — {t.subtitle(items.length)}
+      </p>
+    </header>
+
+    {items.length === 0 ? (
+      <p class="admin-page__empty">{t.empty}</p>
+    ) : (
+      <form class="handover-form" data-handover-form>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>{t.headerCohort}</th>
+              <th>{t.headerNewLead}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it) => (
+              <tr>
+                <td>
+                  <span class={`admin-table__prog admin-table__prog--${it.programme_slug}`}>
+                    {it.programme_title}
+                  </span>
+                  <span class="admin-table__cohort-date">
+                    {" · "}{formatDate(new Date(it.start_date * 1000), locale)}
+                  </span>
+                </td>
+                <td>
+                  {it.candidates.length === 0 ? (
+                    <em class="admin-table__no-cand">{t.noCandidates}</em>
+                  ) : (
+                    <select class="handover-select" data-cohort-id={it.cohort_id}>
+                      <option value="">{t.noChange}</option>
+                      {it.candidates.map((c) => (
+                        <option value={c.user_id}>{c.name ?? c.email}</option>
+                      ))}
+                    </select>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        <div class="handover-form__actions">
+          <button type="submit" class="handover-form__btn" data-save-btn>{t.saveBtn}</button>
+          <span class="handover-form__status" data-status hidden></span>
+        </div>
+      </form>
+    )}
+  </div>
+</Layout>
+
+<script>
+  const form = document.querySelector("[data-handover-form]");
+  const userIdEl = document.querySelector("[data-user-id]") as HTMLElement | null;
+  const saveBtn = document.querySelector("[data-save-btn]") as HTMLButtonElement | null;
+  const statusEl = document.querySelector("[data-status]") as HTMLElement | null;
+  if (form && userIdEl && saveBtn && statusEl) {
+    const userId = userIdEl.dataset.userId ?? "";
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const selects = document.querySelectorAll(".handover-select");
+      const assignments: { cohort_id: string; instructor_id: string }[] = [];
+      selects.forEach((node) => {
+        const sel = node as unknown as HTMLSelectElement;
+        const cohortId = sel.dataset.cohortId ?? "";
+        const value = sel.value;
+        if (cohortId && value) assignments.push({ cohort_id: cohortId, instructor_id: value });
+      });
+      if (assignments.length === 0) return;
+      saveBtn.disabled = true;
+      statusEl.hidden = false;
+      statusEl.textContent = "...";
+      try {
+        const res = await fetch(`/api/admin/users/${encodeURIComponent(userId)}/handover`, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ assignments }),
+        });
+        if (!res.ok) throw new Error("handover_failed");
+        statusEl.textContent = "OK. Reloading...";
+        setTimeout(() => { window.location.reload(); }, 600);
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "Failed";
+        saveBtn.disabled = false;
+      }
+    });
+  }
+</script>
+
+<style>
+  .admin-page {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .admin-page__back {
+    display: inline-block;
+    color: var(--text-faint);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    margin-bottom: var(--space-md);
+  }
+  .admin-page__back:hover { color: var(--text); }
+  .admin-page__head { margin-bottom: var(--space-xl); }
+  .admin-page__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .admin-page__subtitle { color: var(--text-faint); margin: 4px 0 0; font-size: var(--type-body-sm); }
+  .admin-page__empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-2xl);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    text-align: center;
+  }
+
+  .admin-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: var(--type-body-sm); }
+  .admin-table th {
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+  }
+  .admin-table td {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .admin-table__prog--beginner     { color: var(--prog-beginner); }
+  .admin-table__prog--intermediate { color: var(--prog-intermediate); }
+  .admin-table__prog--advanced     { color: var(--prog-advanced); }
+  .admin-table__cohort-date { color: var(--text-faint); font-size: var(--type-micro-md); }
+  .admin-table__no-cand { color: var(--amber); font-style: italic; font-size: var(--type-micro-md); }
+
+  .handover-select {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 6px 10px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    border-radius: 2px;
+  }
+  .handover-form__actions { display: flex; align-items: center; gap: var(--space-md); margin-top: var(--space-lg); }
+  .handover-form__btn {
+    background: var(--amber);
+    border: 1px solid var(--amber);
+    color: var(--ink);
+    padding: 10px 20px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .handover-form__btn:hover { background: var(--amber-light); border-color: var(--amber-light); }
+  .handover-form__btn:disabled { opacity: 0.5; cursor: wait; }
+  .handover-form__status { color: var(--text-accent); font-size: var(--type-micro-md); text-transform: uppercase; }
+</style>

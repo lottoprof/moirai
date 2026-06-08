@@ -18,6 +18,7 @@ import Btn from "../../components/public/Btn.astro";
 import ConfirmModal from "../../components/shared/ConfirmModal.astro";
 import { requireAuth, primaryRole } from "../../lib/server/guards";
 import { getUserAuthMethods } from "../../lib/server/user-ops";
+import { checkAccountDeleteBlocked } from "../../lib/server/admin-instructors";
 
 export const prerender = false;
 
@@ -43,6 +44,11 @@ const Layout = primary === "admin"
 const methods = await getUserAuthMethods(env, user.id);
 const hasPassword = methods.some((m) => m.kind === "password");
 const canUnlink = methods.length > 1;
+
+// Admin instructor management S7: блок delete-action если user — lead в active.
+const deleteBlockingCohorts = user.roles.has("instructor")
+  ? await checkAccountDeleteBlocked(env, user.id)
+  : [];
 
 const verifiedBadge = Astro.url.searchParams.get("verified") === "1";
 
@@ -253,9 +259,17 @@ function methodLabel(kind: string): string {
             ? "Удалит все ваши данные навсегда. Это действие необратимо."
             : "This will delete all your data permanently. Cannot be undone."}
         </p>
-        <Btn type="button" variant="ghost" size="default" class="js-delete-account">
-          {locale === "ru" ? "Удалить мои данные навсегда" : "Delete my data permanently"}
-        </Btn>
+        {deleteBlockingCohorts.length > 0 ? (
+          <p class="form__hint" style="color: var(--amber); padding: var(--space-sm); border: 1px dashed var(--amber); border-radius: 2px;">
+            {locale === "ru"
+              ? `Удаление заблокировано: вы ведёте ${deleteBlockingCohorts.length.toString()} активны${deleteBlockingCohorts.length === 1 ? "ю когорту" : "х когорт"}. Свяжитесь с админом для передачи.`
+              : `Deletion blocked: you lead ${deleteBlockingCohorts.length.toString()} active cohort${deleteBlockingCohorts.length === 1 ? "" : "s"}. Contact admin to hand them over.`}
+          </p>
+        ) : (
+          <Btn type="button" variant="ghost" size="default" class="js-delete-account">
+            {locale === "ru" ? "Удалить мои данные навсегда" : "Delete my data permanently"}
+          </Btn>
+        )}
       </div>
     </div>
   </section>

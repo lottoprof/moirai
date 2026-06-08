@@ -23,6 +23,7 @@ import type { APIRoute } from 'astro';
 import { z } from 'zod';
 import { requireAuth } from '../../../lib/server/guards';
 import { LK_CONFIG } from '../../../lib/config/lk';
+import { checkAccountDeleteBlocked } from '../../../lib/server/admin-instructors';
 
 export const prerender = false;
 
@@ -49,6 +50,17 @@ export const POST: APIRoute = async (ctx) => {
 
   const env = ctx.locals.runtime.env;
   const now = Math.floor(Date.now() / 1000);
+
+  // Admin instructor management S7: блок если user — lead в open/running cohort.
+  // GDPR Art.17 allows refusal "for compliance with a legal obligation" + "exercise
+  // of public interest" — здесь обязательство перед оплатившими студентами.
+  const blockingCohorts = await checkAccountDeleteBlocked(env, user.id);
+  if (blockingCohorts.length > 0) {
+    return new Response(
+      JSON.stringify({ error: 'blocked_active_cohorts', cohorts: blockingCohorts }),
+      { status: 409, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
 
   // Soft-delete user (personal data — immediate per GDPR)
   await env.DB.batch([

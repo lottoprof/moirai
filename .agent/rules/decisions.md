@@ -123,3 +123,13 @@
   Apex и www подключены через Pages API + ручные CNAME-записи на
   `moirai-c6e.pages.dev`. Полный snapshot в
   `.agent/skills/deploy/SKILL.md` § Production state.
+
+- **2026-06-08** — Instructor management (admin-side): three-level model.
+  (1) instructor_qualifications M2M per module; (2) cohorts.lead_instructor_id
+  явное поле + backfill из slots; (3) sessions.substitute_instructor_id для
+  per-session sickness override. Admin assigns lead с фильтром qualified +
+  time-available. Cohort без lead — soft warn на checkout (без блока),
+  red badge на /admin/cohorts. Account delete блокируется (409) если user —
+  lead в open/running. Handover flow на /admin/users/[id]/handover —
+  forward-only. Migration 0018. Spec: docs/Architecture.md §
+  Instructor management.

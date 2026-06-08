@@ -405,6 +405,40 @@ feedback на homework через `feedback.instructor_id`.
 **Cohort scheduling с 2+ instructors** — Sprint 2 через `runs.lead_instructor_id`
 + `run_instructors` M2M. Не конфликтует с enrollment-level lead.
 
+### Instructor management (migration 0018)
+
+Admin полностью отвечает за назначения. Три уровня:
+
+1. **`instructor_qualifications(user_id, module_slug)`** — quolification
+   per module (M2M). Admin может назначить instructor'а на cohort только
+   если он qualified по всем модулям programme.
+2. **`cohorts.lead_instructor_id`** — явный lead per cohort. Backfilled из
+   `slots.instructor_id` для existing cohorts при migration. Может
+   быть `NULL` (warning в /admin/cohorts).
+3. **`sessions.substitute_instructor_id`** — per-session override
+   (sickness). Если NULL — используется cohort lead. Substitute должен
+   быть qualified для module этой session.
+
+**Business rules:**
+- Cohort с enrollments + `lead_instructor_id = NULL` → красный badge на
+  /admin/cohorts ("needs instructor"). Checkout продолжает работать,
+  но student видит soft banner "Instructor will be assigned before
+  sessions start" (без блокировки).
+- Account delete блокируется (`409 blocked_active_cohorts`) если user —
+  lead в open/running cohort'е. UI в /account показывает hint
+  "Contact admin to hand them over".
+- При увольнении preподa: admin делает batch handover через
+  `/admin/users/[id]/handover` (per-cohort dropdown qualified candidates,
+  forward-only — прошлые sessions остаются на старом lead'е в audit).
+
+**APIs:**
+- `POST /api/admin/instructors/[id]/qualifications` — full-replace
+- `POST /api/admin/cohorts/[id]/assign-instructor`
+- `POST /api/admin/sessions/[id]/substitute`
+- `POST /api/admin/users/[id]/handover` — batch reassign
+- `GET  /api/admin/qualified-instructors?module=X` / `?modules=X,Y,Z`
+- `POST /api/account/delete` — 409 если есть blocking cohorts
+
 ### Auto-resolve `requires_modules`
 
 При добавлении модуля X в enrollment server рекурсивно подтягивает
