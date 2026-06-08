@@ -10,12 +10,13 @@ export interface InstructorListRow {
   email: string;
   name: string | null;
   qualified_count: number;
-  active_lead_count: number;
+  running_count: number;     // status='running' — ведёт сейчас
+  upcoming_count: number;    // status='open' — будущие запуски
 }
 
 /**
- * Все users с role='instructor' + counts qualified modules и active cohort
- * как lead. Для /admin/instructors overview.
+ * Все users с role='instructor' + counts qualified modules + split running/open
+ * cohort counts. Для /admin/instructors overview.
  */
 export async function listInstructorsWithQualifications(
   env: Cloudflare.Env,
@@ -23,7 +24,8 @@ export async function listInstructorsWithQualifications(
   const rows = await env.DB.prepare(
     `SELECT u.id AS user_id, u.email, u.name,
             (SELECT COUNT(*) FROM instructor_qualifications iq WHERE iq.user_id = u.id) AS qualified_count,
-            (SELECT COUNT(*) FROM cohorts c WHERE c.lead_instructor_id = u.id AND c.status IN ('open','running')) AS active_lead_count
+            (SELECT COUNT(*) FROM cohorts c WHERE c.lead_instructor_id = u.id AND c.status = 'running') AS running_count,
+            (SELECT COUNT(*) FROM cohorts c WHERE c.lead_instructor_id = u.id AND c.status = 'open') AS upcoming_count
        FROM users u
        JOIN user_roles ur ON ur.user_id = u.id
       WHERE ur.role = 'instructor'

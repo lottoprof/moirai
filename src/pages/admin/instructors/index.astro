@@ -28,7 +28,8 @@ const t = ru
       headerName: "Имя",
       headerEmail: "Email",
       headerQualified: "Модули",
-      headerLead: "Активные группы",
+      headerRunning: "Идут",
+      headerUpcoming: "Запланированы",
       open: "Открыть",
       seo: { title: "Преподаватели — Admin", description: "Управление преподавателями." },
     }
@@ -39,7 +40,8 @@ const t = ru
       headerName: "Name",
       headerEmail: "Email",
       headerQualified: "Modules",
-      headerLead: "Active cohorts",
+      headerRunning: "Running",
+      headerUpcoming: "Upcoming",
       open: "Open",
       seo: { title: "Instructors — Admin", description: "Manage instructors." },
     };
@@ -66,7 +68,8 @@ const t = ru
             <th>{t.headerName}</th>
             <th>{t.headerEmail}</th>
             <th class="admin-table__num">{t.headerQualified}</th>
-            <th class="admin-table__num">{t.headerLead}</th>
+            <th class="admin-table__num">{t.headerRunning}</th>
+            <th class="admin-table__num">{t.headerUpcoming}</th>
             <th></th>
           </tr>
         </thead>
@@ -76,7 +79,8 @@ const t = ru
               <td>{r.name ?? r.email.split("@")[0]}</td>
               <td class="admin-table__email">{r.email}</td>
               <td class="admin-table__num">{r.qualified_count}</td>
-              <td class="admin-table__num">{r.active_lead_count}</td>
+              <td class="admin-table__num">{r.running_count}</td>
+              <td class="admin-table__num">{r.upcoming_count}</td>
               <td>
                 <a class="admin-table__link" href={`/admin/instructors/${r.user_id}`}>{t.open}</a>
               </td>
