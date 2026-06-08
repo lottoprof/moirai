@@ -26,6 +26,8 @@
   --amber:         #D4820A;
   --amber-light:   #F0A830;
   --amber-faint:   rgba(212, 130, 10, 0.12);
+  --sage:          #7FA8A5;     /* programme: intermediate */
+  --rust:          #B45A3C;     /* programme: advanced */
   --line:          rgba(247, 243, 236, 0.08);
   --line-strong:   rgba(247, 243, 236, 0.16);
 
@@ -47,6 +49,13 @@
   --border:            var(--line);
   --border-strong:     var(--line-strong);
   --focus-ring:        var(--amber);
+
+  /* ============================================
+     Programme accents (instructor/admin cohort cards)
+     ============================================ */
+  --prog-beginner:     var(--amber-light);
+  --prog-intermediate: var(--sage);
+  --prog-advanced:     var(--rust);
 
   /* ============================================
      Typography — scale (responsive via clamp)

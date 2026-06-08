@@ -18,6 +18,7 @@ import { LK_CONFIG } from "../../lib/config/lk";
 interface Props {
   locale: "en" | "ru";
   cohortId: string;
+  programmeSlug: string;
   programmeTitle: string;
   startDate: number;
   status: "open" | "running" | "completed" | "cancelled";
@@ -32,7 +33,7 @@ interface Props {
 }
 
 const {
-  locale, cohortId, programmeTitle, startDate, status,
+  locale, cohortId, programmeSlug, programmeTitle, startDate, status,
   activeStudents, pendingSubmissions, reviewedThisWeek, lateSubmissions,
   nextSessionAt, nextSessionModuleTitle, meetingProvider, meetingJoinUrl,
 } = Astro.props;
@@ -85,7 +86,7 @@ const labels = ru
     };
 ---
 
-<article class:list={["cohort-card", `cohort-card--${status}`]}>
+<article class:list={["cohort-card", `cohort-card--${status}`, `cohort-card--prog-${programmeSlug}`]}>
   <header class="cohort-card__head">
     <div class="cohort-card__title">
       <h2 class="cohort-card__name">{programmeTitle}</h2>
@@ -159,6 +160,10 @@ const labels = ru
     margin: 0;
     line-height: 1.2;
   }
+  /* Programme accents — окраска только заголовка */
+  .cohort-card--prog-beginner     .cohort-card__name { color: var(--prog-beginner); }
+  .cohort-card--prog-intermediate .cohort-card__name { color: var(--prog-intermediate); }
+  .cohort-card--prog-advanced     .cohort-card__name { color: var(--prog-advanced); }
   .cohort-card__date {
     font-family: var(--font-body);
     font-size: var(--type-micro-md);

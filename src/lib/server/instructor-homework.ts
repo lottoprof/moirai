@@ -322,6 +322,30 @@ export async function listInstructorCohorts(
     });
   }
 
+  // Sort B (см. discussion 2026-06-08): running по next_session_at ASC
+  // (ближайший live-урок сверху), open по start_date ASC (ближайший
+  // запуск сверху), completed по end_date DESC (свежие закрытия сверху).
+  const statusRank: Record<string, number> = { running: 0, open: 1, completed: 2 };
+  cards.sort((a, b) => {
+    const ar = statusRank[a.status] ?? 3;
+    const br = statusRank[b.status] ?? 3;
+    if (ar !== br) return ar - br;
+
+    if (a.status === "running") {
+      const an = a.next_session_at ?? Number.MAX_SAFE_INTEGER;
+      const bn = b.next_session_at ?? Number.MAX_SAFE_INTEGER;
+      if (an !== bn) return an - bn;
+      return a.start_date - b.start_date;
+    }
+    if (a.status === "open") {
+      return a.start_date - b.start_date;
+    }
+    if (a.status === "completed") {
+      return b.end_date - a.end_date;
+    }
+    return 0;
+  });
+
   return cards;
 }
 

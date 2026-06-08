@@ -94,6 +94,7 @@ const t = ru
           <CohortCard
             locale={typedLocale}
             cohortId={c.cohort_id}
+            programmeSlug={c.programme_slug}
             programmeTitle={programmeTitleMap.get(c.programme_slug) ?? c.programme_slug}
             startDate={c.start_date}
             status={c.status as "open" | "running" | "completed" | "cancelled"}
