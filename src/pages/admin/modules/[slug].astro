@@ -7,7 +7,6 @@
  * управляются через external methodist repo.
  */
 
-import { marked } from "marked";
 import Layout from "../../../layouts/admin/Layout.astro";
 import { requireRole } from "../../../lib/server/guards";
 
@@ -55,22 +54,21 @@ const ruRow = rows.results.find((r) => r.locale === "ru") ?? null;
 const previewRow = adminLocale === "ru" ? (ruRow ?? enRow) : (enRow ?? ruRow);
 const previewLocale = previewRow?.locale ?? "en";
 
-// Body markdown — рендерим inline (если есть). Download остаётся опциональным.
-let bodyHtml: string | null = null;
+// Body raw markdown — рендерим как plain text (без markdown parser
+// чтобы изолировать 500 от marked). В следующем коммите вернём render
+// если admin без него работает.
+let bodyRaw: string | null = null;
 let bodyError: string | null = null;
 if (previewRow?.body_r2_key) {
   try {
     const obj = await env.MODULE_CONTENT.get(previewRow.body_r2_key);
     if (obj) {
-      const md = await obj.text();
-      const stripped = md.replace(/^---\n[\s\S]*?\n---\n/, "");
-      const parsed = marked.parse(stripped, { async: false }) as string;
-      bodyHtml = parsed;
+      bodyRaw = await obj.text();
     } else {
       bodyError = "missing_in_r2";
     }
   } catch (err) {
-    console.error("[admin module preview] body fetch/parse failed:", err);
+    console.error("[admin module preview] body fetch failed:", err);
     bodyError = "fetch_error";
   }
 } else {
@@ -239,8 +237,8 @@ const t = ru
           </a>
         )}
       </div>
-      {bodyHtml ? (
-        <article class="module-preview__body" set:html={bodyHtml} />
+      {bodyRaw ? (
+        <pre class="module-preview__raw">{bodyRaw}</pre>
       ) : (
         <p class="module-preview__err">
           {bodyError === "no_key" ? t.previewNoKey :
@@ -493,5 +491,18 @@ const t = ru
     padding: var(--space-sm);
     overflow-x: auto;
     border-radius: 2px;
+  }
+  .module-preview__raw {
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    font-family: ui-monospace, monospace;
+    font-size: var(--type-micro-md);
+    padding: var(--space-md);
+    overflow-x: auto;
+    border-radius: 2px;
+    max-height: 600px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    line-height: 1.5;
   }
 </style>
