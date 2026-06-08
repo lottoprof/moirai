@@ -1,0 +1,376 @@
+---
+/*
+ * /admin/modules/[slug] — детальная страница модуля с edit для
+ * метаданных (title per locale, status per locale).
+ *
+ * Body / presentation / workbook R2 keys показаны read-only —
+ * управляются через external methodist repo.
+ */
+
+import Layout from "../../../layouts/admin/Layout.astro";
+import { requireRole } from "../../../lib/server/guards";
+
+export const prerender = false;
+
+const { slug } = Astro.params;
+if (!slug || typeof slug !== "string") return new Response(null, { status: 404 });
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+const adminLocale = user.locale ?? "en";
+const ru = adminLocale === "ru";
+
+interface ModuleRow {
+  slug: string;
+  locale: string;
+  title: string;
+  track: string | null;
+  status: string;
+  has_video: number;
+  has_homework: number;
+  has_text: number;
+  default_duration_days: number;
+  body_r2_key: string | null;
+  presentation_r2_key: string | null;
+  workbook_r2_key: string | null;
+  updated_at: number;
+}
+
+const rows = await env.DB.prepare(
+  `SELECT slug, locale, title, track, status, has_video, has_homework, has_text,
+          default_duration_days, body_r2_key, presentation_r2_key, workbook_r2_key, updated_at
+     FROM modules
+    WHERE slug = ?`,
+).bind(slug).all<ModuleRow>();
+
+if (rows.results.length === 0) return new Response(null, { status: 404 });
+
+const enRow = rows.results.find((r) => r.locale === "en") ?? null;
+const ruRow = rows.results.find((r) => r.locale === "ru") ?? null;
+
+const intlLocale = ru ? "ru-RU" : "en-US";
+const dateFmt = new Intl.DateTimeFormat(intlLocale, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+const t = ru
+  ? {
+      backLink: "← К модулям",
+      enSection: "EN версия",
+      ruSection: "RU версия",
+      missing: "Запись отсутствует",
+      titleLabel: "Название",
+      statusLabel: "Статус",
+      saveBtn: "Сохранить",
+      saving: "Сохраняем...",
+      saved: "Сохранено",
+      failed: "Ошибка",
+      metaTitle: "Метаданные",
+      metaTrack: "Трек",
+      metaFeatures: "Возможности",
+      metaDuration: "Дней по умолчанию",
+      metaUpdated: "Обновлено",
+      featureVideo: "видео",
+      featureHomework: "ДЗ",
+      featureText: "текст",
+      r2Title: "R2-ключи (read-only)",
+      r2Hint: "Тело модуля управляется через methodist repo. R2 keys показаны для отладки.",
+      r2Body: "Body",
+      r2Presentation: "Презентация",
+      r2Workbook: "Workbook",
+      r2None: "не задан",
+      statusOptions: { published: "Опубликован", draft: "Черновик", archived: "Архив" } as Record<string, string>,
+      seo: { title: `${slug} — Admin`, description: "Module edit" },
+    }
+  : {
+      backLink: "← Back to modules",
+      enSection: "EN version",
+      ruSection: "RU version",
+      missing: "Row missing",
+      titleLabel: "Title",
+      statusLabel: "Status",
+      saveBtn: "Save",
+      saving: "Saving...",
+      saved: "Saved",
+      failed: "Failed",
+      metaTitle: "Metadata",
+      metaTrack: "Track",
+      metaFeatures: "Features",
+      metaDuration: "Default duration (days)",
+      metaUpdated: "Updated",
+      featureVideo: "video",
+      featureHomework: "homework",
+      featureText: "text",
+      r2Title: "R2 keys (read-only)",
+      r2Hint: "Module body managed via methodist repo. R2 keys shown for debugging.",
+      r2Body: "Body",
+      r2Presentation: "Presentation",
+      r2Workbook: "Workbook",
+      r2None: "not set",
+      statusOptions: { published: "Published", draft: "Draft", archived: "Archived" } as Record<string, string>,
+      seo: { title: `${slug} — Admin`, description: "Module edit" },
+    };
+---
+
+<Layout
+  locale={adminLocale}
+  seo={t.seo}
+  currentNavKey="modules"
+  userRoles={user.roles}
+>
+  <div class="admin-page" data-module-slug={slug}>
+    <a class="admin-page__back" href="/admin/modules">{t.backLink}</a>
+
+    <header class="admin-page__head">
+      <h1 class="admin-page__title">{slug}</h1>
+    </header>
+
+    <form data-module-form class="module-form">
+      <section class="module-form__section">
+        <h2 class="module-form__section-title">{t.enSection}</h2>
+        {enRow ? (
+          <>
+            <label class="module-form__field">
+              <span class="module-form__label">{t.titleLabel}</span>
+              <input type="text" class="module-form__input" data-locale="en" data-field="title" value={enRow.title} />
+            </label>
+            <label class="module-form__field">
+              <span class="module-form__label">{t.statusLabel}</span>
+              <select class="module-form__input" data-locale="en" data-field="status">
+                {Object.keys(t.statusOptions).map((opt) => (
+                  <option value={opt} selected={enRow.status === opt}>{t.statusOptions[opt]}</option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : (
+          <p class="module-form__missing">{t.missing}</p>
+        )}
+      </section>
+
+      <section class="module-form__section">
+        <h2 class="module-form__section-title">{t.ruSection}</h2>
+        {ruRow ? (
+          <>
+            <label class="module-form__field">
+              <span class="module-form__label">{t.titleLabel}</span>
+              <input type="text" class="module-form__input" data-locale="ru" data-field="title" value={ruRow.title} />
+            </label>
+            <label class="module-form__field">
+              <span class="module-form__label">{t.statusLabel}</span>
+              <select class="module-form__input" data-locale="ru" data-field="status">
+                {Object.keys(t.statusOptions).map((opt) => (
+                  <option value={opt} selected={ruRow.status === opt}>{t.statusOptions[opt]}</option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : (
+          <p class="module-form__missing">{t.missing}</p>
+        )}
+      </section>
+
+      <div class="module-form__actions">
+        <button type="submit" class="module-form__save" data-save-btn>{t.saveBtn}</button>
+        <span class="module-form__status" data-status hidden></span>
+      </div>
+    </form>
+
+    <section class="module-meta">
+      <h2 class="module-meta__title">{t.metaTitle}</h2>
+      <dl class="module-meta__list">
+        <div><dt>{t.metaTrack}</dt><dd>{enRow?.track ?? ruRow?.track ?? "—"}</dd></div>
+        <div>
+          <dt>{t.metaFeatures}</dt>
+          <dd class="module-meta__features">
+            {(enRow?.has_video ?? ruRow?.has_video ?? 0) === 1 && <span>{t.featureVideo}</span>}
+            {(enRow?.has_homework ?? ruRow?.has_homework ?? 0) === 1 && <span>{t.featureHomework}</span>}
+            {(enRow?.has_text ?? ruRow?.has_text ?? 1) === 1 && <span>{t.featureText}</span>}
+          </dd>
+        </div>
+        <div><dt>{t.metaDuration}</dt><dd>{enRow?.default_duration_days ?? ruRow?.default_duration_days ?? "—"}</dd></div>
+        <div><dt>{t.metaUpdated}</dt><dd>{enRow ? dateFmt.format(new Date(enRow.updated_at * 1000)) : "—"}</dd></div>
+      </dl>
+    </section>
+
+    <section class="module-r2">
+      <h2 class="module-meta__title">{t.r2Title}</h2>
+      <p class="module-r2__hint">{t.r2Hint}</p>
+      <dl class="module-meta__list">
+        <div><dt>{t.r2Body} (EN)</dt><dd class="module-r2__key">{enRow?.body_r2_key ?? t.r2None}</dd></div>
+        <div><dt>{t.r2Body} (RU)</dt><dd class="module-r2__key">{ruRow?.body_r2_key ?? t.r2None}</dd></div>
+        <div><dt>{t.r2Presentation} (EN)</dt><dd class="module-r2__key">{enRow?.presentation_r2_key ?? t.r2None}</dd></div>
+        <div><dt>{t.r2Presentation} (RU)</dt><dd class="module-r2__key">{ruRow?.presentation_r2_key ?? t.r2None}</dd></div>
+        <div><dt>{t.r2Workbook} (EN)</dt><dd class="module-r2__key">{enRow?.workbook_r2_key ?? t.r2None}</dd></div>
+        <div><dt>{t.r2Workbook} (RU)</dt><dd class="module-r2__key">{ruRow?.workbook_r2_key ?? t.r2None}</dd></div>
+      </dl>
+    </section>
+  </div>
+</Layout>
+
+<script>
+  const page = document.querySelector<HTMLElement>("[data-module-slug]");
+  const form = document.querySelector("[data-module-form]");
+  const saveBtn = document.querySelector("[data-save-btn]") as HTMLButtonElement | null;
+  const statusEl = document.querySelector("[data-status]") as HTMLElement | null;
+  if (page && form && saveBtn && statusEl) {
+    const slug = page.dataset.moduleSlug ?? "";
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const inputs = document.querySelectorAll(".module-form__input");
+      const payload: { en?: { title: string; status: string }; ru?: { title: string; status: string } } = {};
+      inputs.forEach((node) => {
+        const el = node as HTMLInputElement | HTMLSelectElement;
+        const lang = el.getAttribute("data-locale");
+        const field = el.getAttribute("data-field");
+        if (!lang || !field) return;
+        const bucket = (payload[lang as "en" | "ru"] ??= { title: "", status: "" });
+        if (field === "title") bucket.title = el.value;
+        else if (field === "status") bucket.status = el.value;
+      });
+      saveBtn.disabled = true;
+      statusEl.hidden = false;
+      statusEl.textContent = "...";
+      try {
+        const res = await fetch(`/api/admin/modules/${encodeURIComponent(slug)}`, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("save_failed");
+        statusEl.textContent = "OK";
+        setTimeout(() => { statusEl.hidden = true; }, 2000);
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "Failed";
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+  }
+</script>
+
+<style>
+  .admin-page {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .admin-page__back {
+    display: inline-block;
+    color: var(--text-faint);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    margin-bottom: var(--space-md);
+  }
+  .admin-page__back:hover { color: var(--text); }
+  .admin-page__head { margin-bottom: var(--space-xl); }
+  .admin-page__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .module-form { display: flex; flex-direction: column; gap: var(--space-lg); }
+  .module-form__section {
+    padding: var(--space-md);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+  .module-form__section-title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-sm);
+    font-weight: 400;
+    margin: 0 0 var(--space-md);
+    color: var(--text);
+  }
+  .module-form__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: var(--space-md);
+  }
+  .module-form__label {
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .module-form__input {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 8px 10px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    border-radius: 2px;
+    width: 100%;
+  }
+  .module-form__missing { color: var(--amber); font-style: italic; margin: 0; }
+  .module-form__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+  .module-form__save {
+    background: var(--amber);
+    border: 1px solid var(--amber);
+    color: var(--ink);
+    padding: 10px 20px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .module-form__save:hover { background: var(--amber-light); border-color: var(--amber-light); }
+  .module-form__save:disabled { opacity: 0.5; cursor: wait; }
+  .module-form__status { color: var(--text-accent); font-size: var(--type-micro-md); text-transform: uppercase; }
+
+  .module-meta, .module-r2 {
+    margin-top: var(--space-xl);
+    padding: var(--space-md);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+  .module-meta__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-sm);
+    font-weight: 400;
+    margin: 0 0 var(--space-md);
+    color: var(--text);
+  }
+  .module-meta__list {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px var(--space-md);
+    margin: 0;
+  }
+  .module-meta__list > div { display: contents; }
+  .module-meta__list dt {
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    align-self: center;
+  }
+  .module-meta__list dd { margin: 0; color: var(--text); }
+  .module-meta__features { display: flex; gap: 6px; flex-wrap: wrap; }
+  .module-meta__features span {
+    font-size: var(--type-micro-sm);
+    color: var(--text-muted);
+    padding: 2px 6px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+  .module-r2__hint { color: var(--text-faint); font-size: var(--type-micro-md); margin: 0 0 var(--space-md); }
+  .module-r2__key { color: var(--text-faint); font-family: var(--font-body); font-size: var(--type-micro-md); }
+</style>

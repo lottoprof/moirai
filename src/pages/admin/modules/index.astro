@@ -1,0 +1,278 @@
+---
+/*
+ * /admin/modules — список всех модулей сгруппированных по programme.
+ *
+ * Источник правды для structure — Content Collection programmes
+ * (поле modules — список slugs). Title / status / R2 keys — из D1
+ * таблицы modules (composite PK slug+locale, по 2 row per slug).
+ *
+ * Без редактирования body — только метаданные (status). Body content
+ * управляется через external methodist repo.
+ */
+
+import { getCollection } from "astro:content";
+import type { CollectionEntry } from "astro:content";
+import Layout from "../../../layouts/admin/Layout.astro";
+import { requireRole } from "../../../lib/server/guards";
+
+export const prerender = false;
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+const locale = user.locale ?? "en";
+const ru = locale === "ru";
+
+interface ProgrammeView {
+  slug: string;
+  title: string;
+  module_slugs: string[];
+}
+
+const PACKAGE_SLUGS = new Set(["bundle", "individual"]);
+const programmesAll = await getCollection("programmes", (e: CollectionEntry<"programmes">) =>
+  e.id.endsWith(`.${locale}`),
+);
+const programmes: ProgrammeView[] = programmesAll
+  .map((p: CollectionEntry<"programmes">): ProgrammeView => {
+    const data = p.data as { title?: string; modules?: string[] | null };
+    return {
+      slug: p.id.replace(`.${locale}`, ""),
+      title: data.title ?? p.id,
+      module_slugs: data.modules ?? [],
+    };
+  })
+  .filter((p: ProgrammeView) => p.module_slugs.length > 0 && !PACKAGE_SLUGS.has(p.slug));
+
+const allModuleSlugs = Array.from(new Set(programmes.flatMap((p) => p.module_slugs)));
+
+interface ModuleRow {
+  slug: string;
+  locale: string;
+  title: string;
+  status: string;
+  has_video: number;
+  has_homework: number;
+}
+
+const moduleMap = new Map<string, { en?: ModuleRow; ru?: ModuleRow }>();
+if (allModuleSlugs.length > 0) {
+  const placeholders = allModuleSlugs.map(() => "?").join(",");
+  const rows = await env.DB.prepare(
+    `SELECT slug, locale, title, status, has_video, has_homework
+       FROM modules
+      WHERE slug IN (${placeholders})`,
+  ).bind(...allModuleSlugs).all<ModuleRow>();
+  for (const r of rows.results) {
+    const entry = moduleMap.get(r.slug) ?? {};
+    if (r.locale === "en") entry.en = r;
+    else if (r.locale === "ru") entry.ru = r;
+    moduleMap.set(r.slug, entry);
+  }
+}
+
+const t = ru
+  ? {
+      title: "Модули",
+      subtitle: `${allModuleSlugs.length.toString()} уникальных слагов`,
+      empty: "Модулей нет.",
+      headerNum: "№",
+      headerSlug: "Slug",
+      headerTitleEn: "Title (EN)",
+      headerTitleRu: "Title (RU)",
+      headerStatus: "Статус",
+      headerFeatures: "Есть",
+      noTitle: "—",
+      featureVideo: "видео",
+      featureHomework: "ДЗ",
+      statusLabels: { published: "Опубликован", draft: "Черновик", archived: "Архив" } as Record<string, string>,
+      open: "Открыть",
+      seo: { title: "Модули — Admin", description: "Управление модулями." },
+    }
+  : {
+      title: "Modules",
+      subtitle: `${allModuleSlugs.length.toString()} unique slugs`,
+      empty: "No modules.",
+      headerNum: "#",
+      headerSlug: "Slug",
+      headerTitleEn: "Title (EN)",
+      headerTitleRu: "Title (RU)",
+      headerStatus: "Status",
+      headerFeatures: "Has",
+      noTitle: "—",
+      featureVideo: "video",
+      featureHomework: "HW",
+      statusLabels: { published: "Published", draft: "Draft", archived: "Archived" } as Record<string, string>,
+      open: "Open",
+      seo: { title: "Modules — Admin", description: "Module management." },
+    };
+
+function deriveStatus(slug: string): string {
+  const entry = moduleMap.get(slug);
+  if (!entry) return "missing";
+  const en = entry.en?.status;
+  const ru = entry.ru?.status;
+  if (en && ru && en === ru) return en;
+  if (en === "published" || ru === "published") return "published";
+  return en ?? ru ?? "draft";
+}
+---
+
+<Layout
+  locale={locale}
+  seo={t.seo}
+  currentNavKey="modules"
+  userRoles={user.roles}
+>
+  <div class="admin-page">
+    <header class="admin-page__head">
+      <h1 class="admin-page__title">{t.title}</h1>
+      <p class="admin-page__subtitle">{t.subtitle}</p>
+    </header>
+
+    {programmes.length === 0 ? (
+      <p class="admin-page__empty">{t.empty}</p>
+    ) : (
+      <div class="modules-stack">
+        {programmes.map((prog) => (
+          <section class="modules-programme">
+            <h2 class={`modules-programme__title modules-programme__title--${prog.slug}`}>{prog.title}</h2>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th class="admin-table__num">{t.headerNum}</th>
+                  <th>{t.headerSlug}</th>
+                  <th>{t.headerTitleEn}</th>
+                  <th>{t.headerTitleRu}</th>
+                  <th>{t.headerStatus}</th>
+                  <th>{t.headerFeatures}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {prog.module_slugs.map((slug, idx) => {
+                  const entry = moduleMap.get(slug);
+                  const status = deriveStatus(slug);
+                  return (
+                    <tr>
+                      <td class="admin-table__num">{(idx + 1).toString().padStart(2, "0")}</td>
+                      <td class="admin-table__slug">{slug}</td>
+                      <td>{entry?.en?.title ?? t.noTitle}</td>
+                      <td>{entry?.ru?.title ?? t.noTitle}</td>
+                      <td>
+                        <span class={`status-badge status-badge--${status}`}>
+                          {t.statusLabels[status] ?? status}
+                        </span>
+                      </td>
+                      <td class="admin-table__features">
+                        {(entry?.en?.has_video ?? 0) === 1 && <span class="feature">{t.featureVideo}</span>}
+                        {(entry?.en?.has_homework ?? 0) === 1 && <span class="feature">{t.featureHomework}</span>}
+                      </td>
+                      <td>
+                        <a class="admin-table__link" href={`/admin/modules/${encodeURIComponent(slug)}`}>{t.open}</a>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </section>
+        ))}
+      </div>
+    )}
+  </div>
+</Layout>
+
+<style>
+  .admin-page {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .admin-page__head { margin-bottom: var(--space-xl); }
+  .admin-page__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .admin-page__subtitle { color: var(--text-faint); margin: 4px 0 0; font-size: var(--type-body-sm); }
+  .admin-page__empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-2xl);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    text-align: center;
+  }
+
+  .modules-stack { display: flex; flex-direction: column; gap: var(--space-xl); }
+  .modules-programme__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-sm);
+    font-weight: 400;
+    margin: 0 0 var(--space-md);
+    color: var(--text);
+  }
+  .modules-programme__title--beginner     { color: var(--prog-beginner); }
+  .modules-programme__title--intermediate { color: var(--prog-intermediate); }
+  .modules-programme__title--advanced     { color: var(--prog-advanced); }
+
+  .admin-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: var(--type-body-sm); }
+  .admin-table th {
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+  }
+  .admin-table td {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .admin-table th.admin-table__num,
+  .admin-table td.admin-table__num { text-align: right; }
+  .admin-table__slug { color: var(--text-faint); font-family: var(--font-body); font-size: var(--type-micro-md); }
+  .admin-table__link {
+    color: var(--text-accent);
+    text-decoration: none;
+    text-transform: uppercase;
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+  }
+  .admin-table__link:hover { color: var(--text); }
+  .admin-table__features { display: flex; gap: 6px; flex-wrap: wrap; }
+  .feature {
+    font-size: var(--type-micro-sm);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    padding: 2px 6px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+
+  .status-badge {
+    font-size: var(--type-micro-sm);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+  }
+  .status-badge--published {
+    color: var(--text-accent);
+    border-color: var(--amber);
+    background: var(--amber-faint);
+  }
+  .status-badge--draft { color: var(--text-faint); border-style: dashed; }
+  .status-badge--archived { color: var(--text-faint); font-style: italic; }
+  .status-badge--missing { color: var(--amber); border-color: var(--amber); }
+</style>

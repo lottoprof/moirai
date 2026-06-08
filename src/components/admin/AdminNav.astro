@@ -13,7 +13,7 @@ import ZoneNav from "../shared/ZoneNav.astro";
 
 interface Props {
   locale: "en" | "ru";
-  currentKey: "overview" | "users" | "applications" | "enrollments" | "instructors" | "account";
+  currentKey: "overview" | "users" | "applications" | "enrollments" | "modules" | "instructors" | "account";
   roles?: Set<Role>;
 }
 
@@ -26,6 +26,7 @@ const labels = locale === "ru"
       users: "Пользователи",
       applications: "Заявки",
       enrollments: "Записи",
+      modules: "Модули",
       instructors: "Преподаватели",
       account: "Аккаунт",
       switchInstructor: "Преподавателю",
@@ -37,6 +38,7 @@ const labels = locale === "ru"
       users: "Users",
       applications: "Applications",
       enrollments: "Enrollments",
+      modules: "Modules",
       instructors: "Instructors",
       account: "Account",
       switchInstructor: "Instructor",
@@ -48,6 +50,7 @@ const items = [
   { key: "users",        label: labels.users,        href: `/admin/users` },
   { key: "applications", label: labels.applications, href: `/admin/applications` },
   { key: "enrollments",  label: labels.enrollments,  href: `/admin/cohorts` },
+  { key: "modules",      label: labels.modules,      href: `/admin/modules` },
   { key: "instructors",  label: labels.instructors,  href: `/admin/instructors` },
   { key: "account",      label: labels.account,      href: `/${locale}/account` },
 ];
