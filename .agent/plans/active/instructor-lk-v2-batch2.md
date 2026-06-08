@@ -223,6 +223,98 @@ preподу с правильным контентом.
 - **Q8** — Multi-cohort handling: filter chips уже решают для 2-3
   programmes. Защёлкнем когда добавится Advanced или станет 5+.
 
+## TODO: S7 — Cron trigger Worker (для Q9 digest)
+
+**Status:** не блокер для текущего deploy (S6 digest код inert до
+появления trigger'а), но обязателен прежде чем digest начнёт реально
+отправляться preподам.
+
+**Why separate Worker:** CF Pages не поддерживает `[triggers]` нативно
+(https://developers.cloudflare.com/pages/functions/wrangler-configuration/).
+Нужен **отдельный CF Worker** который раз в N мин hit'ает Pages endpoint
+`/api/internal/cron/run?job=<X>` с CRON_SECRET.
+
+**CF Free tier:** **5 cron triggers per account**
+(https://developers.cloudflare.com/workers/platform/limits/). Используем
+**1 trigger** через time-aware dispatcher → 4 запас.
+
+**Структура:**
+
+```
+cron-worker/
+  wrangler.toml
+  src/index.ts
+```
+
+**wrangler.toml:**
+
+```toml
+name = "moirai-cron"
+main = "src/index.ts"
+compatibility_date = "2026-05-01"
+workers_dev = false
+
+[vars]
+PAGES_BASE_URL = "https://moiraionline.pro"
+
+[triggers]
+crons = ["*/15 * * * *"]
+```
+
+**src/index.ts:**
+
+```typescript
+export interface Env {
+  PAGES_BASE_URL: string;
+  CRON_SECRET: string;
+}
+
+export default {
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const now = new Date(event.scheduledTime);
+    const hr = now.getUTCHours();
+    const min = now.getUTCMinutes();
+
+    // Каждые 15 мин: auto-approve
+    ctx.waitUntil(callJob(env, "auto-approve"));
+
+    // Daily jobs на минуте 0 каждого нужного часа (UTC)
+    if (min === 0) {
+      if (hr === 3)  ctx.waitUntil(callJob(env, "retention"));
+      if (hr === 4)  ctx.waitUntil(callJob(env, "pre-archive-email"));
+      if (hr === 5)  ctx.waitUntil(callJob(env, "orphan-cleanup"));
+      if (hr === 13) ctx.waitUntil(callJob(env, "instructor-digest"));
+    }
+  },
+};
+
+async function callJob(env: Env, job: string): Promise<void> {
+  const url = `${env.PAGES_BASE_URL}/api/internal/cron/run?job=${encodeURIComponent(job)}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.CRON_SECRET}` },
+  });
+  if (!res.ok) {
+    console.error(`[cron-worker] job=${job} status=${res.status} body=${await res.text()}`);
+  }
+}
+```
+
+**Deploy:**
+
+```bash
+source ~/.nvm/nvm.sh && nvm use 22
+pnpm exec wrangler secret put CRON_SECRET --config cron-worker/wrangler.toml
+# (вставить то же значение что в Pages secret)
+
+pnpm exec wrangler deploy --config cron-worker/wrangler.toml
+```
+
+**Trade-off:** Все daily jobs привязаны к UTC. instructor-digest 13:00
+UTC ≈ 09:00 EDT (8:00 EST зимой). Это глобальный момент для всех
+preподов — не зависит от их personal timezone. Подходит per Q10
+reuse `/account` (timezone preпода НЕ применяется к delivery time).
+
 ## Lifecycle
 
 После всех 6 этапов:
