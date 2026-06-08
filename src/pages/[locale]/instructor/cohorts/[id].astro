@@ -85,6 +85,12 @@ const t = ru
       drawerOverride: "Открыть досрочно",
       drawerRemoveOverride: "Отменить override",
       drawerNoSubmission: "Студент пока не сдавал ДЗ по этому модулю.",
+      confirmOverrideTitle: "Открыть модуль студенту?",
+      confirmOverrideBody: "Модуль будет доступен студенту прямо сейчас, до плановой даты разблокировки.",
+      confirmRemoveOverrideTitle: "Снять досрочное открытие?",
+      confirmRemoveOverrideBody: "Модуль вернётся к плановой логике разблокировки. Если плановая дата ещё не наступила — модуль станет недоступен.",
+      confirmCancel: "Отмена",
+      confirmConfirm: "Подтвердить",
       seo: { title: `${programmeTitle} — Moirai`, description: "Cohort detail" },
     }
   : {
@@ -107,6 +113,12 @@ const t = ru
       drawerOverride: "Unlock now",
       drawerRemoveOverride: "Remove override",
       drawerNoSubmission: "Student hasn't submitted homework for this module yet.",
+      confirmOverrideTitle: "Unlock this module for the student?",
+      confirmOverrideBody: "The module will be opened now, before its scheduled unlock date.",
+      confirmRemoveOverrideTitle: "Remove the manual override?",
+      confirmRemoveOverrideBody: "The module will return to its scheduled unlock logic. If the scheduled date hasn't arrived yet, the module will become unavailable.",
+      confirmCancel: "Cancel",
+      confirmConfirm: "Confirm",
       seo: { title: `${programmeTitle} — Moirai`, description: "Cohort detail" },
     };
 
@@ -215,10 +227,14 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
              data-review-base={`/${typedLocale}/instructor/homework/`}>
             {t.drawerOpenReview}
           </a>
-          <button type="button" class="cell-drawer__btn" data-drawer-override hidden>
+          <button type="button" class="cell-drawer__btn" data-drawer-override hidden
+                  data-confirm-title={t.confirmOverrideTitle}
+                  data-confirm-body={t.confirmOverrideBody}>
             {t.drawerOverride}
           </button>
-          <button type="button" class="cell-drawer__btn cell-drawer__btn--danger" data-drawer-remove-override hidden>
+          <button type="button" class="cell-drawer__btn cell-drawer__btn--danger" data-drawer-remove-override hidden
+                  data-confirm-title={t.confirmRemoveOverrideTitle}
+                  data-confirm-body={t.confirmRemoveOverrideBody}>
             {t.drawerRemoveOverride}
           </button>
         </div>
@@ -226,6 +242,19 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       </div>
     </aside>
     <div class="cell-drawer-backdrop" data-cell-drawer-backdrop hidden></div>
+
+    <!-- ConfirmModal (Q6) — заменяет native confirm() для override actions -->
+    <div class="confirm-modal" data-confirm-modal hidden role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+      <div class="confirm-modal__backdrop" data-confirm-modal-backdrop></div>
+      <div class="confirm-modal__box">
+        <h2 class="confirm-modal__title" id="confirm-modal-title" data-confirm-modal-title></h2>
+        <p class="confirm-modal__body" data-confirm-modal-body></p>
+        <div class="confirm-modal__actions">
+          <button type="button" class="confirm-modal__btn" data-confirm-modal-cancel>{t.confirmCancel}</button>
+          <button type="button" class="confirm-modal__btn confirm-modal__btn--primary" data-confirm-modal-confirm>{t.confirmConfirm}</button>
+        </div>
+      </div>
+    </div>
   </div>
 </Layout>
 
@@ -516,6 +545,82 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
     background: rgba(0, 0, 0, 0.4);
     z-index: 199;
   }
+
+  /* ConfirmModal (Q6) */
+  .confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-lg);
+  }
+  .confirm-modal[hidden] { display: none; }
+  .confirm-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+  }
+  .confirm-modal__box {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    padding: var(--space-lg);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  }
+  .confirm-modal__title {
+    font-family: var(--font-display);
+    font-size: var(--type-body-lg);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0 0 var(--space-sm);
+    line-height: 1.25;
+  }
+  .confirm-modal__body {
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    color: var(--text-muted);
+    margin: 0 0 var(--space-lg);
+    line-height: 1.5;
+  }
+  .confirm-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+  }
+  .confirm-modal__btn {
+    padding: 8px 16px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+  }
+  .confirm-modal__btn:hover {
+    color: var(--text);
+    border-color: var(--text);
+  }
+  .confirm-modal__btn--primary {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: var(--ink);
+  }
+  .confirm-modal__btn--primary:hover {
+    background: var(--amber-light);
+    border-color: var(--amber-light);
+    color: var(--ink);
+  }
 </style>
 
 <script>
@@ -636,12 +741,63 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
     }
   }
 
+  // ConfirmModal — заменяет native confirm() (Q6)
+  const confirmModal = document.querySelector<HTMLElement>("[data-confirm-modal]");
+  const confirmModalTitle = document.querySelector<HTMLElement>("[data-confirm-modal-title]");
+  const confirmModalBody = document.querySelector<HTMLElement>("[data-confirm-modal-body]");
+  const confirmModalCancel = document.querySelector<HTMLButtonElement>("[data-confirm-modal-cancel]");
+  const confirmModalConfirm = document.querySelector<HTMLButtonElement>("[data-confirm-modal-confirm]");
+  const confirmModalBackdrop = document.querySelector<HTMLElement>("[data-confirm-modal-backdrop]");
+
+  function showConfirm(title: string, body: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      if (!confirmModal || !confirmModalTitle || !confirmModalBody
+        || !confirmModalCancel || !confirmModalConfirm || !confirmModalBackdrop) {
+        resolve(false);
+        return;
+      }
+      confirmModalTitle.textContent = title;
+      confirmModalBody.textContent = body;
+      confirmModal.hidden = false;
+      confirmModalConfirm.focus();
+
+      const close = (result: boolean) => {
+        confirmModal.hidden = true;
+        confirmModalCancel.removeEventListener("click", onCancel);
+        confirmModalConfirm.removeEventListener("click", onConfirm);
+        confirmModalBackdrop.removeEventListener("click", onCancel);
+        document.removeEventListener("keydown", onKey);
+        resolve(result);
+      };
+      const onCancel = () => { close(false); };
+      const onConfirm = () => { close(true); };
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") close(false);
+        if (e.key === "Enter") close(true);
+      };
+      confirmModalCancel.addEventListener("click", onCancel);
+      confirmModalConfirm.addEventListener("click", onConfirm);
+      confirmModalBackdrop.addEventListener("click", onCancel);
+      document.addEventListener("keydown", onKey);
+    });
+  }
+
   overrideBtn?.addEventListener("click", () => {
-    if (!confirm("Open this module to the student before its scheduled date?")) return;
-    void callOverride("POST");
+    void (async () => {
+      const ok = await showConfirm(
+        overrideBtn.dataset.confirmTitle ?? "Confirm?",
+        overrideBtn.dataset.confirmBody ?? "",
+      );
+      if (ok) await callOverride("POST");
+    })();
   });
   removeOverrideBtn?.addEventListener("click", () => {
-    if (!confirm("Remove the manual override?")) return;
-    void callOverride("DELETE");
+    void (async () => {
+      const ok = await showConfirm(
+        removeOverrideBtn.dataset.confirmTitle ?? "Confirm?",
+        removeOverrideBtn.dataset.confirmBody ?? "",
+      );
+      if (ok) await callOverride("DELETE");
+    })();
   });
 </script>
