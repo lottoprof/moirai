@@ -910,6 +910,10 @@ export interface InstructorStudentRow {
 /**
  * Список всех студентов preподa с прогресс-метриками.
  * ACL: students в cohorts где slot.instructor_id или lead_instructor.
+ *
+ * enrollment_modules.status НЕ существует — статус модуля derive'им
+ * из homework_submissions + cohort.modules_snapshot_json (см. Q11
+ * matrix derivation pattern).
  */
 export async function listInstructorStudents(
   env: Cloudflare.Env,
@@ -920,7 +924,8 @@ export async function listInstructorStudents(
   const enrollments = await env.DB.prepare(
     `SELECT e.id AS enrollment_id, e.user_id,
             u.name AS student_name, u.email AS student_email,
-            c.id AS cohort_id, c.programme_id AS programme_slug, c.start_date AS cohort_start_date
+            c.id AS cohort_id, c.programme_id AS programme_slug, c.start_date AS cohort_start_date,
+            c.modules_snapshot_json
        FROM enrollments e
        JOIN users u ON u.id = e.user_id
        JOIN applications a ON a.enrollment_id = e.id
@@ -937,33 +942,49 @@ export async function listInstructorStudents(
     cohort_id: string;
     programme_slug: string;
     cohort_start_date: number;
+    modules_snapshot_json: string;
   }>();
 
   const rows: InstructorStudentRow[] = [];
   for (const e of enrollments.results) {
-    // Module stats
-    const mods = await env.DB.prepare(
-      `SELECT status FROM enrollment_modules WHERE enrollment_id = ?`,
-    ).bind(e.enrollment_id).all<{ status: string }>();
-    const total = mods.results.length;
-    const done = mods.results.filter((m) => m.status === 'done').length;
+    // Module list для cohort'ы
+    let moduleSlugs: string[];
+    try { moduleSlugs = JSON.parse(e.modules_snapshot_json) as string[]; }
+    catch { moduleSlugs = []; }
+    const total = moduleSlugs.length;
+
+    // Latest submission per module — для подсчёта done/pending
+    const submissions = await env.DB.prepare(
+      `SELECT module_slug, status, uploaded_at
+         FROM homework_submissions
+        WHERE enrollment_id = ?
+        ORDER BY uploaded_at DESC`,
+    ).bind(e.enrollment_id).all<{ module_slug: string; status: string; uploaded_at: number }>();
+
+    const latestPerModule = new Map<string, string>();
+    for (const sub of submissions.results) {
+      if (!latestPerModule.has(sub.module_slug)) latestPerModule.set(sub.module_slug, sub.status);
+    }
+
+    let done = 0;
+    let pendingCount = 0;
+    let currentModuleSlug: string | null = null;
+    for (const slug of moduleSlugs) {
+      const subStatus = latestPerModule.get(slug);
+      if (subStatus === 'approved' || subStatus === 'auto_approved') done++;
+      else if (currentModuleSlug == null) currentModuleSlug = slug;  // first non-done
+      if (subStatus === 'pending') pendingCount++;
+    }
     const progressPct = total === 0 ? 0 : Math.round((done / total) * 100);
 
-    // Current module — first active (lowest order_idx with status='active' or 'pending')
-    const current = await env.DB.prepare(
-      `SELECT em.module_slug, m.title
-         FROM enrollment_modules em
-         LEFT JOIN modules m ON m.slug = em.module_slug AND m.locale = ?
-        WHERE em.enrollment_id = ? AND em.status IN ('active','pending')
-        ORDER BY em.order_idx ASC
-        LIMIT 1`,
-    ).bind(locale, e.enrollment_id).first<{ module_slug: string; title: string | null }>();
-
-    // Pending count
-    const pending = await env.DB.prepare(
-      `SELECT COUNT(*) AS n FROM homework_submissions
-        WHERE enrollment_id = ? AND status = 'pending'`,
-    ).bind(e.enrollment_id).first<{ n: number }>();
+    // Current module title — отдельный lookup в modules
+    let currentModuleTitle: string | null = null;
+    if (currentModuleSlug != null) {
+      const row = await env.DB.prepare(
+        `SELECT title FROM modules WHERE slug = ? AND locale = ?`,
+      ).bind(currentModuleSlug, locale).first<{ title: string }>();
+      currentModuleTitle = row?.title ?? null;
+    }
 
     rows.push({
       user_id: e.user_id,
@@ -973,10 +994,10 @@ export async function listInstructorStudents(
       programme_slug: e.programme_slug,
       cohort_id: e.cohort_id,
       cohort_start_date: e.cohort_start_date,
-      current_module_slug: current?.module_slug ?? null,
-      current_module_title: current?.title ?? null,
+      current_module_slug: currentModuleSlug,
+      current_module_title: currentModuleTitle,
       progress_pct: progressPct,
-      pending_count: pending?.n ?? 0,
+      pending_count: pendingCount,
     });
   }
 
@@ -1025,7 +1046,8 @@ export async function getInstructorStudentDetail(
   const enr = await env.DB.prepare(
     `SELECT e.id AS enrollment_id, e.user_id, e.created_at AS joined_at,
             u.name AS student_name, u.email AS student_email,
-            c.id AS cohort_id, c.programme_id AS programme_slug, c.start_date AS cohort_start_date
+            c.id AS cohort_id, c.programme_id AS programme_slug, c.start_date AS cohort_start_date,
+            c.modules_snapshot_json
        FROM enrollments e
        JOIN users u ON u.id = e.user_id
        JOIN applications a ON a.enrollment_id = e.id
@@ -1043,25 +1065,68 @@ export async function getInstructorStudentDetail(
     cohort_id: string;
     programme_slug: string;
     cohort_start_date: number;
+    modules_snapshot_json: string;
   }>();
   if (!enr) return null;
 
-  // Modules timeline
-  const modules = await env.DB.prepare(
-    `SELECT em.module_slug, em.order_idx, em.status, m.title
-       FROM enrollment_modules em
-       LEFT JOIN modules m ON m.slug = em.module_slug AND m.locale = ?
-      WHERE em.enrollment_id = ?
-      ORDER BY em.order_idx ASC`,
-  ).bind(locale, enr.enrollment_id).all<{
-    module_slug: string;
-    order_idx: number;
-    status: string;
-    title: string | null;
-  }>();
+  let moduleSlugs: string[];
+  try { moduleSlugs = JSON.parse(enr.modules_snapshot_json) as string[]; }
+  catch { moduleSlugs = []; }
+
+  // Module titles + sessions + overrides + submissions для derivation
+  const placeholders = moduleSlugs.map(() => '?').join(',');
+  const moduleTitleRows = moduleSlugs.length === 0
+    ? { results: [] as { slug: string; title: string }[] }
+    : await env.DB.prepare(
+        `SELECT slug, title FROM modules WHERE slug IN (${placeholders}) AND locale = ?`,
+      ).bind(...moduleSlugs, locale).all<{ slug: string; title: string }>();
+  const titleMap = new Map(moduleTitleRows.results.map((r) => [r.slug, r.title]));
+
+  const sessionRows = await env.DB.prepare(
+    `SELECT module_slug, scheduled_at FROM sessions WHERE cohort_id = ?`,
+  ).bind(enr.cohort_id).all<{ module_slug: string; scheduled_at: number }>();
+  const sessionMap = new Map(sessionRows.results.map((r) => [r.module_slug, r.scheduled_at]));
+
+  const overrideRows = await env.DB.prepare(
+    `SELECT module_slug FROM enrollment_modules
+      WHERE enrollment_id = ? AND unlock_override_at IS NOT NULL`,
+  ).bind(enr.enrollment_id).all<{ module_slug: string }>();
+  const overrideSet = new Set(overrideRows.results.map((r) => r.module_slug));
+
+  const submissions = await env.DB.prepare(
+    `SELECT module_slug, status, uploaded_at FROM homework_submissions
+      WHERE enrollment_id = ?
+      ORDER BY uploaded_at DESC`,
+  ).bind(enr.enrollment_id).all<{ module_slug: string; status: string; uploaded_at: number }>();
+  const latestSubMap = new Map<string, string>();
+  for (const sub of submissions.results) {
+    if (!latestSubMap.has(sub.module_slug)) latestSubMap.set(sub.module_slug, sub.status);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const UNLOCK_LEAD_SEC = 6 * 3600;
+  const modules: InstructorStudentModule[] = moduleSlugs.map((slug, idx) => {
+    const subStatus = latestSubMap.get(slug);
+    let status: string;
+    if (subStatus === 'approved' || subStatus === 'auto_approved') status = 'done';
+    else if (subStatus === 'needs_revision') status = 'needs_revision';
+    else if (subStatus === 'pending') status = 'pending';
+    else {
+      const scheduledAt = sessionMap.get(slug);
+      const unlocked = overrideSet.has(slug)
+        || (scheduledAt != null && now >= scheduledAt - UNLOCK_LEAD_SEC);
+      status = unlocked ? 'active' : 'locked';
+    }
+    return {
+      module_slug: slug,
+      module_title: titleMap.get(slug) ?? null,
+      order_idx: idx,
+      status,
+    };
+  });
 
   // Recent 10 submissions
-  const subs = await env.DB.prepare(
+  const subsRecent = await env.DB.prepare(
     `SELECT hs.id, hs.module_slug, m.title AS module_title,
             hs.status, hs.uploaded_at, hs.is_late
        FROM homework_submissions hs
@@ -1087,13 +1152,8 @@ export async function getInstructorStudentDetail(
     programme_slug: enr.programme_slug,
     cohort_id: enr.cohort_id,
     cohort_start_date: enr.cohort_start_date,
-    modules: modules.results.map((m) => ({
-      module_slug: m.module_slug,
-      module_title: m.title,
-      order_idx: m.order_idx,
-      status: m.status,
-    })),
-    recent_submissions: subs.results.map((s) => ({
+    modules,
+    recent_submissions: subsRecent.results.map((s) => ({
       id: s.id,
       module_slug: s.module_slug,
       module_title: s.module_title,
