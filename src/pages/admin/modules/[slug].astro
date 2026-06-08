@@ -40,15 +40,14 @@ interface ModuleRow {
   has_video: number;
   has_homework: number;
   has_text: number;
-  default_duration_days: number;
   presentation_r2_key: string | null;
   workbook_r2_key: string | null;
-  updated_at: number;
+  synced_at: number;
 }
 
 const rows = await env.DB.prepare(
   `SELECT slug, locale, title, track, status, has_video, has_homework, has_text,
-          default_duration_days, presentation_r2_key, workbook_r2_key, updated_at
+          presentation_r2_key, workbook_r2_key, synced_at
      FROM modules WHERE slug = ?`,
 ).bind(slug).all<ModuleRow>();
 
@@ -91,8 +90,8 @@ const t = ru
       workbookTitle: "Workbook", presentationTitle: "Презентация",
       workbookMissing: "Workbook не загружен.", presentationMissing: "Презентация не загружена.",
       metaTitle: "Метаданные", metaTrack: "Трек",
-      metaFeatures: "Возможности", metaDuration: "Дней по умолчанию",
-      metaUpdated: "Обновлено",
+      metaFeatures: "Возможности",
+      metaSynced: "Синхронизирован",
       featureVideo: "видео", featureHomework: "ДЗ", featureText: "текст",
       statusOptions: { published: "Опубликован", draft: "Черновик", archived: "Архив" } as Record<string, string>,
       seo: { title: `${slug} — Admin`, description: "Module edit" },
@@ -106,8 +105,8 @@ const t = ru
       workbookTitle: "Workbook", presentationTitle: "Presentation",
       workbookMissing: "Workbook not uploaded.", presentationMissing: "Presentation not uploaded.",
       metaTitle: "Metadata", metaTrack: "Track",
-      metaFeatures: "Features", metaDuration: "Default duration (days)",
-      metaUpdated: "Updated",
+      metaFeatures: "Features",
+      metaSynced: "Synced",
       featureVideo: "video", featureHomework: "homework", featureText: "text",
       statusOptions: { published: "Published", draft: "Draft", archived: "Archived" } as Record<string, string>,
       seo: { title: `${slug} — Admin`, description: "Module edit" },
@@ -200,8 +199,7 @@ const t = ru
             {(enRow?.has_text ?? ruRow?.has_text ?? 1) === 1 && <span>{t.featureText}</span>}
           </dd>
         </div>
-        <div><dt>{t.metaDuration}</dt><dd>{enRow?.default_duration_days ?? ruRow?.default_duration_days ?? "—"}</dd></div>
-        <div><dt>{t.metaUpdated}</dt><dd>{enRow ? dateFmt.format(new Date(enRow.updated_at * 1000)) : "—"}</dd></div>
+        <div><dt>{t.metaSynced}</dt><dd>{enRow ? dateFmt.format(new Date(enRow.synced_at * 1000)) : "—"}</dd></div>
       </dl>
     </section>
   </div>

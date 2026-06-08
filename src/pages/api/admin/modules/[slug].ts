@@ -47,13 +47,13 @@ export const POST: APIRoute = async (ctx) => {
   const ops = [];
   if (parsed.data.en) {
     ops.push(env.DB.prepare(
-      `UPDATE modules SET title = ?, status = ?, updated_at = ?
+      `UPDATE modules SET title = ?, status = ?, synced_at = ?
         WHERE slug = ? AND locale = 'en'`,
     ).bind(parsed.data.en.title, parsed.data.en.status, now, slug));
   }
   if (parsed.data.ru) {
     ops.push(env.DB.prepare(
-      `UPDATE modules SET title = ?, status = ?, updated_at = ?
+      `UPDATE modules SET title = ?, status = ?, synced_at = ?
         WHERE slug = ? AND locale = 'ru'`,
     ).bind(parsed.data.ru.title, parsed.data.ru.status, now, slug));
   }
