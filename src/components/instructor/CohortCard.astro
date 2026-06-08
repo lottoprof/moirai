@@ -86,7 +86,12 @@ const labels = ru
     };
 ---
 
-<article class:list={["cohort-card", `cohort-card--${status}`, `cohort-card--prog-${programmeSlug}`]}>
+<article
+  class:list={["cohort-card", `cohort-card--${status}`, `cohort-card--prog-${programmeSlug}`]}
+  data-programme={programmeSlug}
+  data-status={status}
+  data-empty={activeStudents === 0 ? "1" : "0"}
+>
   <header class="cohort-card__head">
     <div class="cohort-card__title">
       <h2 class="cohort-card__name">{programmeTitle}</h2>

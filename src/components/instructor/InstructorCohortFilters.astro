@@ -1,0 +1,219 @@
+---
+/*
+ * Filter chip bar для /instructor cohort grid.
+ *
+ * Multi-select chips по 3 измерениям:
+ *   Programme: Beginner / Intermediate / Advanced (ON по дефолту,
+ *     показывается только если в данных есть такие cohorts).
+ *   Status:    Running / Open (ON по дефолту) / Completed (OFF).
+ *   Hide empty toggle (ON) — скрывает cohorts с active_students=0.
+ *
+ * Поведение чисто client-side через data-filters на .cohort-grid:
+ *   .cohort-grid[data-filters="prog-beginner status-running ..."]
+ * CSS селекторы скрывают карточки чьи data-* не в списке.
+ * Состояние не персистится — свежий вход = дефолты.
+ */
+
+interface ProgrammeChip {
+  slug: string;
+  label: string;
+  count: number;
+}
+
+interface StatusChip {
+  key: "running" | "open" | "completed";
+  label: string;
+  count: number;
+  defaultOn: boolean;
+}
+
+interface Props {
+  locale: "en" | "ru";
+  programmes: ProgrammeChip[];
+  statuses: StatusChip[];
+  emptyCount: number;
+}
+
+const { locale, programmes, statuses, emptyCount } = Astro.props;
+const ru = locale === "ru";
+
+const t = ru
+  ? {
+      programme: "Программы",
+      status: "Статус",
+      hideEmpty: "Скрыть пустые",
+      empty: "пуст.",
+    }
+  : {
+      programme: "Programme",
+      status: "Status",
+      hideEmpty: "Hide empty",
+      empty: "empty",
+    };
+---
+
+<div class="cohort-filters" role="group" aria-label={ru ? "Фильтры когорт" : "Cohort filters"}>
+  <div class="cohort-filters__group">
+    <span class="cohort-filters__group-label">{t.programme}</span>
+    {programmes.map((p) => (
+      <button
+        type="button"
+        class:list={["cohort-filters__chip", "cohort-filters__chip--active", `cohort-filters__chip--prog-${p.slug}`]}
+        data-filter-key={`prog-${p.slug}`}
+        aria-pressed="true"
+      >
+        <span class="cohort-filters__chip-label">{p.label}</span>
+        <span class="cohort-filters__chip-count">{p.count}</span>
+      </button>
+    ))}
+  </div>
+
+  <div class="cohort-filters__group">
+    <span class="cohort-filters__group-label">{t.status}</span>
+    {statuses.map((s) => (
+      <button
+        type="button"
+        class:list={[
+          "cohort-filters__chip",
+          s.defaultOn ? "cohort-filters__chip--active" : null,
+          `cohort-filters__chip--status-${s.key}`,
+        ]}
+        data-filter-key={`status-${s.key}`}
+        aria-pressed={s.defaultOn ? "true" : "false"}
+      >
+        <span class="cohort-filters__chip-label">{s.label}</span>
+        <span class="cohort-filters__chip-count">{s.count}</span>
+      </button>
+    ))}
+  </div>
+
+  <div class="cohort-filters__group">
+    <button
+      type="button"
+      class="cohort-filters__chip cohort-filters__chip--active cohort-filters__chip--toggle"
+      data-filter-key="hide-empty"
+      aria-pressed="true"
+    >
+      <span class="cohort-filters__chip-label">{t.hideEmpty}</span>
+      <span class="cohort-filters__chip-count">{emptyCount}</span>
+    </button>
+  </div>
+</div>
+
+<script>
+  const grid = document.querySelector<HTMLElement>(".cohort-grid");
+  const chips = document.querySelectorAll<HTMLButtonElement>(".cohort-filters__chip");
+  if (grid) {
+    const apply = () => {
+      const active: string[] = [];
+      chips.forEach((c) => {
+        if (c.getAttribute("aria-pressed") === "true") {
+          active.push(c.dataset.filterKey ?? "");
+        }
+      });
+      grid.dataset.filters = active.join(" ");
+    };
+    chips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const pressed = chip.getAttribute("aria-pressed") === "true";
+        chip.setAttribute("aria-pressed", pressed ? "false" : "true");
+        chip.classList.toggle("cohort-filters__chip--active", !pressed);
+        apply();
+      });
+    });
+    apply();
+  }
+</script>
+
+<style>
+  .cohort-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-md) var(--space-lg);
+    margin: 0 0 var(--space-lg);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .cohort-filters__group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+  .cohort-filters__group-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-right: var(--space-xs);
+  }
+  .cohort-filters__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    color: var(--text-faint);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-out),
+                border-color var(--duration-fast) var(--ease-out);
+  }
+  .cohort-filters__chip:hover {
+    color: var(--text-muted);
+    border-color: var(--text-muted);
+  }
+  .cohort-filters__chip--active {
+    color: var(--text);
+    border-color: var(--text);
+  }
+  .cohort-filters__chip--prog-beginner.cohort-filters__chip--active {
+    color: var(--prog-beginner);
+    border-color: var(--prog-beginner);
+  }
+  .cohort-filters__chip--prog-intermediate.cohort-filters__chip--active {
+    color: var(--prog-intermediate);
+    border-color: var(--prog-intermediate);
+  }
+  .cohort-filters__chip--prog-advanced.cohort-filters__chip--active {
+    color: var(--prog-advanced);
+    border-color: var(--prog-advanced);
+  }
+  .cohort-filters__chip--status-running.cohort-filters__chip--active {
+    color: var(--amber);
+    border-color: var(--amber);
+  }
+  .cohort-filters__chip-count {
+    color: var(--text-faint);
+    font-size: var(--type-micro-sm);
+  }
+  .cohort-filters__chip--active .cohort-filters__chip-count {
+    color: inherit;
+    opacity: 0.7;
+  }
+
+  @media (max-width: 640px) {
+    .cohort-filters { gap: var(--space-sm); }
+    .cohort-filters__group { flex-wrap: wrap; }
+  }
+</style>
+
+<style is:global>
+  /* Hide-logic для cohort-grid, основанная на data-filters chip-баре.
+     Карта скрывается если её programme/status НЕ в активном списке,
+     либо empty + активен hide-empty. */
+  .cohort-grid:not([data-filters~="prog-beginner"])     .cohort-card[data-programme="beginner"]     { display: none; }
+  .cohort-grid:not([data-filters~="prog-intermediate"]) .cohort-card[data-programme="intermediate"] { display: none; }
+  .cohort-grid:not([data-filters~="prog-advanced"])     .cohort-card[data-programme="advanced"]     { display: none; }
+  .cohort-grid:not([data-filters~="status-running"])    .cohort-card[data-status="running"]         { display: none; }
+  .cohort-grid:not([data-filters~="status-open"])       .cohort-card[data-status="open"]            { display: none; }
+  .cohort-grid:not([data-filters~="status-completed"])  .cohort-card[data-status="completed"]       { display: none; }
+  .cohort-grid[data-filters~="hide-empty"]              .cohort-card[data-empty="1"]                { display: none; }
+</style>

@@ -13,6 +13,7 @@
 import Layout from "../../../layouts/instructor/Layout.astro";
 import InstructorHero from "../../../components/instructor/InstructorHero.astro";
 import CohortCard from "../../../components/instructor/CohortCard.astro";
+import InstructorCohortFilters from "../../../components/instructor/InstructorCohortFilters.astro";
 import { requireRole } from "../../../lib/server/guards";
 import { listInstructorCohorts } from "../../../lib/server/instructor-homework";
 import { getEntry } from "astro:content";
@@ -56,6 +57,38 @@ if (moduleSlugs.length > 0) {
 // Total pending across all cohorts — для subtitle
 const totalPending = cards.reduce((sum, c) => sum + c.pending_submissions, 0);
 
+// Filter counts (только programmes/statuses которые встретились в данных)
+const programmeChips = programmeSlugs
+  .map((slug) => ({
+    slug,
+    label: programmeTitleMap.get(slug) ?? slug,
+    count: cards.filter((c) => c.programme_slug === slug).length,
+  }))
+  .sort((a, b) => a.label.localeCompare(b.label));
+
+const statusOrder: Array<"running" | "open" | "completed"> = ["running", "open", "completed"];
+const statusLabels = ru
+  ? { running: "Идёт", open: "Открыта", completed: "Завершена" }
+  : { running: "Running", open: "Open", completed: "Completed" };
+const statusChips = statusOrder
+  .map((key) => ({
+    key,
+    label: statusLabels[key],
+    count: cards.filter((c) => c.status === key).length,
+    defaultOn: key !== "completed",
+  }))
+  .filter((s) => s.count > 0);
+
+const emptyCount = cards.filter((c) => c.active_students === 0).length;
+
+// Initial data-filters для grid: все программы + дефолтные статусы +
+// hide-empty (для совпадения с дефолтным состоянием чипов)
+const initialFilters = [
+  ...programmeChips.map((p) => `prog-${p.slug}`),
+  ...statusChips.filter((s) => s.defaultOn).map((s) => `status-${s.key}`),
+  "hide-empty",
+].join(" ");
+
 const t = ru
   ? {
       eyebrow: "Преподаватель",
@@ -89,7 +122,14 @@ const t = ru
     {cards.length === 0 ? (
       <p class="instructor-content__empty">{t.empty}</p>
     ) : (
-      <div class="cohort-grid">
+      <>
+        <InstructorCohortFilters
+          locale={typedLocale}
+          programmes={programmeChips}
+          statuses={statusChips}
+          emptyCount={emptyCount}
+        />
+        <div class="cohort-grid" data-filters={initialFilters}>
         {cards.map((c) => (
           <CohortCard
             locale={typedLocale}
@@ -108,7 +148,8 @@ const t = ru
             meetingJoinUrl={c.meeting_host_url ?? c.meeting_url}
           />
         ))}
-      </div>
+        </div>
+      </>
     )}
   </div>
 </Layout>
