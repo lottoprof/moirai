@@ -498,6 +498,12 @@ export interface CohortRow {
    *  programme.default_modules. Programme changes НЕ каскадят в active cohorts.
    *  Stage A: optional (см. meeting_provider note). */
   modules_snapshot_json?: string;
+  /** Admin instructor management (migration 0018): явный lead instructor
+   *  cohort'ы. Раньше косвенно через slot.instructor_id; теперь явное поле,
+   *  admin может переопределить независимо от slot. NULL = unassigned →
+   *  /admin/cohorts покажет warning badge.
+   *  При создании cohort'ы из slot — backfill (см. migration 0018). */
+  lead_instructor_id?: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -577,8 +583,23 @@ export interface SessionRow {
   meeting_host_url: string | null;
   status: SessionStatus;
   notes: string | null;
+  /** Admin instructor management (migration 0018): per-session substitute
+   *  preподa (sickness и т.п.). NULL → используется cohort.lead_instructor_id.
+   *  Substitute должен быть qualified для module_slug этой session. */
+  substitute_instructor_id?: string | null;
   created_at: number;
   updated_at: number;
+}
+
+/**
+ * instructor_qualifications — M2M user × module (migration 0018).
+ * Admin assigns lead_instructor / substitute только из qualified.
+ */
+export interface InstructorQualificationRow {
+  user_id: string;
+  module_slug: string;
+  granted_by: string;
+  granted_at: number;
 }
 
 /**
