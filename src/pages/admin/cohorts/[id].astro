@@ -1,0 +1,416 @@
+---
+/*
+ * /admin/cohorts/[id] — детальная страница cohort'ы с assignment + sessions UI.
+ *
+ * Stage S4 + S5 (admin-instructor-management).
+ *
+ * Содержит:
+ *   - Header: programme + start_date + status + lead instructor
+ *   - Assignment block: dropdown qualified instructors → POST assign
+ *   - Sessions list: каждая session с substitute dropdown
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../../layouts/admin/Layout.astro";
+import { requireRole } from "../../../lib/server/guards";
+import { findQualifiedInstructors } from "../../../lib/server/admin-instructors";
+import { formatSessionTime, formatDate } from "../../../lib/format-date";
+
+export const prerender = false;
+
+const { id } = Astro.params;
+if (!id || typeof id !== "string") return new Response(null, { status: 404 });
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+const locale = user.locale ?? "en";
+const ru = locale === "ru";
+
+interface CohortRec {
+  id: string;
+  programme_slug: string;
+  start_date: number;
+  end_date: number;
+  status: string;
+  lead_instructor_id: string | null;
+  lead_name: string | null;
+  lead_email: string | null;
+  modules_snapshot_json: string;
+}
+
+const cohort = await env.DB.prepare(
+  `SELECT c.id, c.programme_id AS programme_slug, c.start_date, c.end_date, c.status,
+          c.lead_instructor_id, c.modules_snapshot_json,
+          u.name AS lead_name, u.email AS lead_email
+     FROM cohorts c
+     LEFT JOIN users u ON u.id = c.lead_instructor_id
+    WHERE c.id = ?`,
+).bind(id).first<CohortRec>();
+
+if (!cohort) return new Response(null, { status: 404 });
+
+const programmeEntry = await getEntry("programmes", `${cohort.programme_slug}.${locale}`);
+const programmeTitle = programmeEntry?.data.title ?? cohort.programme_slug;
+
+let moduleSlugs: string[];
+try { moduleSlugs = JSON.parse(cohort.modules_snapshot_json) as string[]; }
+catch { moduleSlugs = []; }
+
+// Qualified instructors для assignment dropdown (require all modules)
+const candidates = await findQualifiedInstructors(env, moduleSlugs, {
+  requireAllModules: true,
+});
+
+// Sessions cohort'ы + substitute info
+interface SessionRec {
+  id: string;
+  module_slug: string;
+  scheduled_at: number;
+  status: string;
+  substitute_instructor_id: string | null;
+  substitute_name: string | null;
+}
+const sessionRows = await env.DB.prepare(
+  `SELECT s.id, s.module_slug, s.scheduled_at, s.status,
+          s.substitute_instructor_id,
+          u.name AS substitute_name
+     FROM sessions s
+     LEFT JOIN users u ON u.id = s.substitute_instructor_id
+    WHERE s.cohort_id = ?
+    ORDER BY s.scheduled_at ASC`,
+).bind(id).all<SessionRec>();
+const sessions = sessionRows.results;
+
+// Module titles
+const moduleTitleMap = new Map<string, string>();
+if (moduleSlugs.length > 0) {
+  const placeholders = moduleSlugs.map(() => "?").join(",");
+  const rows = await env.DB.prepare(
+    `SELECT slug, title FROM modules WHERE slug IN (${placeholders}) AND locale = ?`,
+  ).bind(...moduleSlugs, locale).all<{ slug: string; title: string }>();
+  for (const r of rows.results) moduleTitleMap.set(r.slug, r.title);
+}
+
+const enrollmentCount = await env.DB.prepare(
+  `SELECT COUNT(*) AS n FROM applications a
+     JOIN enrollments e ON e.id = a.enrollment_id
+    WHERE a.cohort_id = ? AND e.archived_at IS NULL AND e.status IN ('active','completed')`,
+).bind(id).first<{ n: number }>();
+const totalStudents = enrollmentCount?.n ?? 0;
+
+const t = ru
+  ? {
+      backLink: "← К когортам",
+      assignmentTitle: "Назначение преподавателя",
+      currentLead: "Текущий преподаватель",
+      noLead: "Не назначен",
+      assignSelect: "Выбрать",
+      assignSave: "Назначить",
+      unassign: "Снять",
+      noCandidates: "Нет квалифицированных преподавателей. Назначь квалификацию в /admin/instructors.",
+      sessionsTitle: "Сессии",
+      sessionSubstitute: "Замена",
+      sessionDefault: "По умолчанию (lead)",
+      saved: "Сохранено",
+      failed: "Ошибка",
+      enrolled: (n: number) => `${n.toString()} студент${n === 1 ? "" : n < 5 ? "а" : "ов"}`,
+      seo: { title: `${programmeTitle} — Admin`, description: "Cohort assignment" },
+    }
+  : {
+      backLink: "← Back to cohorts",
+      assignmentTitle: "Instructor assignment",
+      currentLead: "Current lead",
+      noLead: "Not assigned",
+      assignSelect: "Select",
+      assignSave: "Assign",
+      unassign: "Unassign",
+      noCandidates: "No qualified instructors. Set qualifications in /admin/instructors.",
+      sessionsTitle: "Sessions",
+      sessionSubstitute: "Substitute",
+      sessionDefault: "Default (lead)",
+      saved: "Saved",
+      failed: "Failed",
+      enrolled: (n: number) => `${n.toString()} student${n === 1 ? "" : "s"}`,
+      seo: { title: `${programmeTitle} — Admin`, description: "Cohort assignment" },
+    };
+---
+
+<Layout
+  locale={locale}
+  seo={t.seo}
+  currentNavKey="enrollments"
+  userRoles={user.roles}
+>
+  <div class="admin-page" data-cohort-id={cohort.id}>
+    <a class="admin-page__back" href="/admin/cohorts">{t.backLink}</a>
+
+    <header class="admin-page__head">
+      <h1 class={`admin-page__title admin-page__prog--${cohort.programme_slug}`}>{programmeTitle}</h1>
+      <p class="admin-page__subtitle">
+        {formatDate(new Date(cohort.start_date * 1000), locale)} · {t.enrolled(totalStudents)}
+      </p>
+    </header>
+
+    <section class="assignment">
+      <h2 class="section__title">{t.assignmentTitle}</h2>
+      <p class="assignment__current">
+        <span>{t.currentLead}:</span>{" "}
+        {cohort.lead_instructor_id ? (
+          <strong>{cohort.lead_name ?? cohort.lead_email}</strong>
+        ) : (
+          <em class="assignment__no-lead">{t.noLead}</em>
+        )}
+      </p>
+
+      {candidates.length === 0 ? (
+        <p class="assignment__hint">{t.noCandidates}</p>
+      ) : (
+        <div class="assignment__actions">
+          <select class="assignment__select" data-assign-select>
+            <option value="">{t.assignSelect}</option>
+            {candidates.map((c) => (
+              <option value={c.user_id} selected={c.user_id === cohort.lead_instructor_id}>
+                {c.name ?? c.email}{c.available ? "" : " *"}
+              </option>
+            ))}
+          </select>
+          <button type="button" class="assignment__btn" data-assign-save>{t.assignSave}</button>
+          {cohort.lead_instructor_id && (
+            <button type="button" class="assignment__btn assignment__btn--ghost" data-assign-clear>{t.unassign}</button>
+          )}
+          <span class="assignment__status" data-assign-status hidden></span>
+        </div>
+      )}
+    </section>
+
+    <section class="sessions">
+      <h2 class="section__title">{t.sessionsTitle}</h2>
+      <ul class="sessions-list">
+        {sessions.map((s) => (
+          <li class="session-row" data-session-id={s.id} data-module-slug={s.module_slug}>
+            <div class="session-row__main">
+              <div class="session-row__time">{formatSessionTime(new Date(s.scheduled_at * 1000), locale)}</div>
+              <div class="session-row__module">{moduleTitleMap.get(s.module_slug) ?? s.module_slug}</div>
+            </div>
+            <div class="session-row__sub">
+              <label class="session-row__sub-label">{t.sessionSubstitute}</label>
+              <select class="session-row__sub-select" data-sub-select>
+                <option value="">{t.sessionDefault}</option>
+              </select>
+              <span class="session-row__current" data-sub-current>{s.substitute_name ?? ""}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  </div>
+</Layout>
+
+<script>
+  interface QualifiedRow { user_id: string; email: string; name: string | null; available: boolean }
+
+  const page = document.querySelector<HTMLElement>("[data-cohort-id]");
+  if (page) {
+    const cohortId = page.dataset.cohortId ?? "";
+
+    // === Assignment ===
+    const select = document.querySelector("[data-assign-select]") as HTMLSelectElement | null;
+    const saveBtn = document.querySelector<HTMLButtonElement>("[data-assign-save]");
+    const clearBtn = document.querySelector<HTMLButtonElement>("[data-assign-clear]");
+    const statusEl = document.querySelector<HTMLElement>("[data-assign-status]");
+
+    async function callAssign(instructorId: string | null) {
+      if (!statusEl) return;
+      statusEl.hidden = false;
+      statusEl.textContent = "...";
+      try {
+        const res = await fetch(`/api/admin/cohorts/${encodeURIComponent(cohortId)}/assign-instructor`, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ instructor_id: instructorId }),
+        });
+        if (!res.ok) throw new Error("assign_failed");
+        statusEl.textContent = "Saved. Reloading...";
+        setTimeout(() => { window.location.reload(); }, 600);
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "Failed";
+      }
+    }
+    saveBtn?.addEventListener("click", () => {
+      const value = select?.value ?? "";
+      if (!value) return;
+      void callAssign(value);
+    });
+    clearBtn?.addEventListener("click", () => { void callAssign(null); });
+
+    // === Sessions substitute ===
+    // Lazy-load candidates per module (one fetch first time user opens select).
+    const subCandidatesCache = new Map<string, QualifiedRow[]>();
+
+    document.querySelectorAll<HTMLElement>(".session-row").forEach((row) => {
+      const sessionId = row.dataset.sessionId ?? "";
+      const moduleSlug = row.dataset.moduleSlug ?? "";
+      const sel = row.querySelector("[data-sub-select]") as HTMLSelectElement | null;
+      const currentEl = row.querySelector<HTMLElement>("[data-sub-current]");
+      if (!sel) return;
+      const selectEl: HTMLSelectElement = sel;
+
+      let populated = false;
+      async function populate() {
+        if (populated) return;
+        populated = true;
+        if (!subCandidatesCache.has(moduleSlug)) {
+          const res = await fetch(`/api/admin/qualified-instructors?module=${encodeURIComponent(moduleSlug)}`, {
+            credentials: "same-origin",
+          });
+          if (res.ok) {
+            const data = await res.json() as { candidates: QualifiedRow[] };
+            subCandidatesCache.set(moduleSlug, data.candidates);
+          } else {
+            subCandidatesCache.set(moduleSlug, []);
+          }
+        }
+        const cands = subCandidatesCache.get(moduleSlug) ?? [];
+        for (const c of cands) {
+          const opt = document.createElement("option");
+          opt.value = c.user_id;
+          opt.textContent = c.name ?? c.email;
+          selectEl.appendChild(opt);
+        }
+      }
+
+      selectEl.addEventListener("focus", () => { void populate(); });
+      selectEl.addEventListener("change", async () => {
+        await populate();
+        const userId = selectEl.value || null;
+        try {
+          const res = await fetch(`/api/admin/sessions/${encodeURIComponent(sessionId)}/substitute`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ instructor_id: userId }),
+          });
+          if (!res.ok) throw new Error("substitute_failed");
+          if (currentEl) {
+            const selectedText = selectEl.options[selectEl.selectedIndex]?.textContent ?? "";
+            currentEl.textContent = userId ? selectedText : "";
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      });
+    });
+  }
+</script>
+
+<style>
+  .admin-page {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .admin-page__back {
+    display: inline-block;
+    color: var(--text-faint);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    margin-bottom: var(--space-md);
+  }
+  .admin-page__back:hover { color: var(--text); }
+  .admin-page__head { margin-bottom: var(--space-xl); }
+  .admin-page__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .admin-page__prog--beginner     { color: var(--prog-beginner); }
+  .admin-page__prog--intermediate { color: var(--prog-intermediate); }
+  .admin-page__prog--advanced     { color: var(--prog-advanced); }
+  .admin-page__subtitle { color: var(--text-faint); margin: 4px 0 0; font-size: var(--type-body-sm); }
+
+  .section__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-sm);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0 0 var(--space-md);
+  }
+
+  .assignment { margin-bottom: var(--space-xl); padding-bottom: var(--space-xl); border-bottom: 1px solid var(--border); }
+  .assignment__current { color: var(--text-muted); margin: 0 0 var(--space-md); }
+  .assignment__no-lead { color: var(--amber); font-style: italic; }
+  .assignment__hint {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-md);
+    border: 1px dashed var(--border-strong);
+    border-radius: 2px;
+  }
+  .assignment__actions { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
+  .assignment__select {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 8px 12px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    border-radius: 2px;
+  }
+  .assignment__btn {
+    background: var(--amber);
+    border: 1px solid var(--amber);
+    color: var(--ink);
+    padding: 8px 16px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .assignment__btn:hover { background: var(--amber-light); border-color: var(--amber-light); }
+  .assignment__btn--ghost {
+    background: transparent;
+    color: var(--text-muted);
+  }
+  .assignment__btn--ghost:hover { background: transparent; color: var(--text); }
+  .assignment__status { color: var(--text-accent); font-size: var(--type-micro-md); text-transform: uppercase; }
+
+  .sessions-list { list-style: none; padding: 0; margin: 0; }
+  .session-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .session-row__main { display: flex; flex-direction: column; gap: 2px; }
+  .session-row__time { color: var(--text); font-size: var(--type-body-md); }
+  .session-row__module { color: var(--text-muted); font-size: var(--type-body-sm); }
+  .session-row__sub { display: flex; align-items: center; gap: var(--space-sm); }
+  .session-row__sub-label {
+    font-size: var(--type-micro-sm);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+  }
+  .session-row__sub-select {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 4px 8px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    border-radius: 2px;
+  }
+  .session-row__current { color: var(--text-faint); font-size: var(--type-micro-md); }
+</style>

@@ -1,0 +1,261 @@
+---
+/*
+ * /admin/cohorts — overview cohorts с emphasis на assignment status.
+ *
+ * Stage S4 (admin-instructor-management plan).
+ *
+ * Сортировка: cohorts без lead_instructor с активными enrollments
+ * наверх (need urgent attention), затем running, затем open ASC.
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../../layouts/admin/Layout.astro";
+import { requireRole } from "../../../lib/server/guards";
+
+export const prerender = false;
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+const locale = user.locale ?? "en";
+const ru = locale === "ru";
+
+interface CohortRow {
+  cohort_id: string;
+  programme_slug: string;
+  start_date: number;
+  status: string;
+  lead_instructor_id: string | null;
+  lead_name: string | null;
+  lead_email: string | null;
+  enrollment_count: number;
+}
+
+const cohortRows = await env.DB.prepare(
+  `SELECT c.id AS cohort_id, c.programme_id AS programme_slug,
+          c.start_date, c.status,
+          c.lead_instructor_id,
+          u.name AS lead_name, u.email AS lead_email,
+          (SELECT COUNT(*) FROM applications a
+            JOIN enrollments e ON e.id = a.enrollment_id
+           WHERE a.cohort_id = c.id
+             AND e.archived_at IS NULL
+             AND e.status IN ('active','completed')) AS enrollment_count
+     FROM cohorts c
+     LEFT JOIN users u ON u.id = c.lead_instructor_id
+    WHERE c.status IN ('open','running','completed')
+    ORDER BY c.start_date DESC
+    LIMIT 200`,
+).all<CohortRow>();
+
+const cohorts = cohortRows.results;
+
+// Programme titles из Content Collection
+const programmeSlugs = Array.from(new Set(cohorts.map((c) => c.programme_slug)));
+const progTitleMap = new Map<string, string>();
+await Promise.all(programmeSlugs.map(async (slug) => {
+  const entry = await getEntry("programmes", `${slug}.${locale}`);
+  if (entry) progTitleMap.set(slug, entry.data.title);
+}));
+
+const intlLocale = ru ? "ru-RU" : "en-US";
+const dateFmt = new Intl.DateTimeFormat(intlLocale, { month: "short", day: "numeric", year: "numeric" });
+
+// Sort: needs-instructor (lead==null AND enrollments>0) first
+cohorts.sort((a, b) => {
+  const aNeeds = a.lead_instructor_id == null && a.enrollment_count > 0;
+  const bNeeds = b.lead_instructor_id == null && b.enrollment_count > 0;
+  if (aNeeds !== bNeeds) return aNeeds ? -1 : 1;
+  // Then by status: running, open, completed
+  const statusRank: Record<string, number> = { running: 0, open: 1, completed: 2 };
+  const ar = statusRank[a.status] ?? 3;
+  const br = statusRank[b.status] ?? 3;
+  if (ar !== br) return ar - br;
+  return a.start_date - b.start_date;
+});
+
+const needsAttention = cohorts.filter((c) => c.lead_instructor_id == null && c.enrollment_count > 0).length;
+
+const t = ru
+  ? {
+      title: "Когорты",
+      subtitle: needsAttention > 0
+        ? `${needsAttention.toString()} требу${needsAttention === 1 ? "ет" : "ют"} назначения преподавателя`
+        : "Все когорты с назначенными преподавателями",
+      empty: "Когорт нет.",
+      headerProgramme: "Программа",
+      headerStartDate: "Старт",
+      headerStatus: "Статус",
+      headerLead: "Преподаватель",
+      headerEnrollments: "Студенты",
+      noLead: "Не назначен",
+      open: "Открыть",
+      statusLabels: { open: "Открыта", running: "Идёт", completed: "Завершена" } as Record<string, string>,
+      seo: { title: "Когорты — Admin", description: "Управление когортами и преподавателями." },
+    }
+  : {
+      title: "Cohorts",
+      subtitle: needsAttention > 0
+        ? `${needsAttention.toString()} cohort${needsAttention === 1 ? "" : "s"} need${needsAttention === 1 ? "s" : ""} an instructor`
+        : "All cohorts have instructors assigned",
+      empty: "No cohorts.",
+      headerProgramme: "Programme",
+      headerStartDate: "Start",
+      headerStatus: "Status",
+      headerLead: "Instructor",
+      headerEnrollments: "Students",
+      noLead: "Not assigned",
+      open: "Open",
+      statusLabels: { open: "Open", running: "Running", completed: "Completed" } as Record<string, string>,
+      seo: { title: "Cohorts — Admin", description: "Manage cohorts and instructors." },
+    };
+---
+
+<Layout
+  locale={locale}
+  seo={t.seo}
+  currentNavKey="enrollments"
+  userRoles={user.roles}
+>
+  <div class="admin-page">
+    <header class="admin-page__head">
+      <h1 class="admin-page__title">{t.title}</h1>
+      <p class:list={["admin-page__subtitle", needsAttention > 0 ? "admin-page__subtitle--accent" : null]}>
+        {t.subtitle}
+      </p>
+    </header>
+
+    {cohorts.length === 0 ? (
+      <p class="admin-page__empty">{t.empty}</p>
+    ) : (
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>{t.headerProgramme}</th>
+            <th>{t.headerStartDate}</th>
+            <th>{t.headerStatus}</th>
+            <th>{t.headerLead}</th>
+            <th class="admin-table__num">{t.headerEnrollments}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {cohorts.map((c) => {
+            const needs = c.lead_instructor_id == null && c.enrollment_count > 0;
+            return (
+              <tr class:list={[needs ? "admin-table__row--alert" : null]}>
+                <td class={`admin-table__prog admin-table__prog--${c.programme_slug}`}>
+                  {progTitleMap.get(c.programme_slug) ?? c.programme_slug}
+                </td>
+                <td>{dateFmt.format(new Date(c.start_date * 1000))}</td>
+                <td>
+                  <span class={`status-badge status-badge--${c.status}`}>
+                    {t.statusLabels[c.status] ?? c.status}
+                  </span>
+                </td>
+                <td>
+                  {c.lead_instructor_id ? (c.lead_name ?? c.lead_email ?? c.lead_instructor_id)
+                  : <span class="admin-table__no-lead">{t.noLead}</span>}
+                </td>
+                <td class="admin-table__num">{c.enrollment_count}</td>
+                <td>
+                  <a class="admin-table__link" href={`/admin/cohorts/${c.cohort_id}`}>{t.open}</a>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    )}
+  </div>
+</Layout>
+
+<style>
+  .admin-page {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .admin-page__head { margin-bottom: var(--space-xl); }
+  .admin-page__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .admin-page__subtitle {
+    color: var(--text-faint);
+    margin: 4px 0 0;
+    font-size: var(--type-body-sm);
+  }
+  .admin-page__subtitle--accent { color: var(--text-accent); }
+  .admin-page__empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-2xl);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    text-align: center;
+  }
+
+  .admin-table { width: 100%; border-collapse: collapse; font-family: var(--font-body); font-size: var(--type-body-sm); }
+  .admin-table th {
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+  }
+  .admin-table td {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .admin-table__num { text-align: right; }
+  .admin-table__row--alert {
+    background: var(--amber-faint);
+  }
+  .admin-table__row--alert .admin-table__no-lead {
+    color: var(--amber);
+    font-weight: 500;
+  }
+  .admin-table__no-lead {
+    color: var(--text-faint);
+    font-style: italic;
+  }
+  .admin-table__prog--beginner     { color: var(--prog-beginner); }
+  .admin-table__prog--intermediate { color: var(--prog-intermediate); }
+  .admin-table__prog--advanced     { color: var(--prog-advanced); }
+  .admin-table__link {
+    color: var(--text-accent);
+    text-decoration: none;
+    text-transform: uppercase;
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+  }
+  .admin-table__link:hover { color: var(--text); }
+
+  .status-badge {
+    font-size: var(--type-micro-sm);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+  }
+  .status-badge--running {
+    color: var(--text-accent);
+    border-color: var(--amber);
+    background: var(--amber-faint);
+  }
+  .status-badge--completed {
+    color: var(--text-faint);
+    border-style: dashed;
+  }
+</style>
