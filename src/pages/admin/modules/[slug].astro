@@ -1,13 +1,22 @@
 ---
 /*
- * /admin/modules/[slug] — детальная страница модуля с edit для
- * метаданных (title per locale, status per locale).
+ * /admin/modules/[slug] — детальная страница модуля для admin.
  *
- * Body / presentation / workbook R2 keys показаны read-only —
- * управляются через external methodist repo.
+ * Содержит:
+ *   - Edit формa: title + status per locale (EN/RU)
+ *   - Preview: body (markdown через MarkdownContent) + workbook (тоже).
+ *   - Презентация: ссылка на /api/modules/preview/{slug}/{locale}/presentation.
+ *   - Read-only metadata (track, features, duration, updated_at, R2 keys).
+ *
+ * Render markdown — через MarkdownContent (тот же путь что student
+ * `/dashboard/modules/[slug]` + `/dashboard/modules/[slug]/present`,
+ * чтобы поведение совпадало).
+ *
+ * Methodist загружает materials, admin видит без unlock check.
  */
 
 import Layout from "../../../layouts/admin/Layout.astro";
+import MarkdownContent from "../../../components/shared/MarkdownContent.astro";
 import { requireRole } from "../../../lib/server/guards";
 
 export const prerender = false;
@@ -41,8 +50,7 @@ interface ModuleRow {
 const rows = await env.DB.prepare(
   `SELECT slug, locale, title, track, status, has_video, has_homework, has_text,
           default_duration_days, body_r2_key, presentation_r2_key, workbook_r2_key, updated_at
-     FROM modules
-    WHERE slug = ?`,
+     FROM modules WHERE slug = ?`,
 ).bind(slug).all<ModuleRow>();
 
 if (rows.results.length === 0) return new Response(null, { status: 404 });
@@ -50,104 +58,60 @@ if (rows.results.length === 0) return new Response(null, { status: 404 });
 const enRow = rows.results.find((r) => r.locale === "en") ?? null;
 const ruRow = rows.results.find((r) => r.locale === "ru") ?? null;
 
-// Preview locale — выбираем что показать (admin locale fallback)
 const previewRow = adminLocale === "ru" ? (ruRow ?? enRow) : (enRow ?? ruRow);
 const previewLocale = previewRow?.locale ?? "en";
 
-// Body raw markdown — рендерим как plain text (без markdown parser
-// чтобы изолировать 500 от marked). В следующем коммите вернём render
-// если admin без него работает.
-let bodyRaw: string | null = null;
-let bodyError: string | null = null;
-if (previewRow?.body_r2_key) {
+// Fetch markdown через R2. Используем те же ключи (body / workbook).
+async function fetchR2Text(key: string | null | undefined): Promise<string | null> {
+  if (!key) return null;
   try {
-    const obj = await env.MODULE_CONTENT.get(previewRow.body_r2_key);
-    if (obj) {
-      bodyRaw = await obj.text();
-    } else {
-      bodyError = "missing_in_r2";
-    }
+    const obj = await env.MODULE_CONTENT.get(key);
+    if (!obj) return null;
+    return await obj.text();
   } catch (err) {
-    console.error("[admin module preview] body fetch failed:", err);
-    bodyError = "fetch_error";
+    console.error("[admin module] R2 fetch failed", key, err);
+    return null;
   }
-} else {
-  bodyError = "no_key";
 }
 
+const bodyMd = await fetchR2Text(previewRow?.body_r2_key);
+const workbookMd = await fetchR2Text(previewRow?.workbook_r2_key);
+
 const intlLocale = ru ? "ru-RU" : "en-US";
-const dateFmt = new Intl.DateTimeFormat(intlLocale, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+const dateFmt = new Intl.DateTimeFormat(intlLocale, {
+  year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+});
 
 const t = ru
   ? {
       backLink: "← К модулям",
-      enSection: "EN версия",
-      ruSection: "RU версия",
+      enSection: "EN версия", ruSection: "RU версия",
       missing: "Запись отсутствует",
-      titleLabel: "Название",
-      statusLabel: "Статус",
+      titleLabel: "Название", statusLabel: "Статус",
       saveBtn: "Сохранить",
-      saving: "Сохраняем...",
-      saved: "Сохранено",
-      failed: "Ошибка",
-      metaTitle: "Метаданные",
-      metaTrack: "Трек",
-      metaFeatures: "Возможности",
-      metaDuration: "Дней по умолчанию",
+      bodyTitle: "Body", workbookTitle: "Workbook",
+      bodyMissing: "Body не загружен.", workbookMissing: "Workbook не загружен.",
+      presentationBtn: "Открыть презентацию",
+      metaTitle: "Метаданные", metaTrack: "Трек",
+      metaFeatures: "Возможности", metaDuration: "Дней по умолчанию",
       metaUpdated: "Обновлено",
-      featureVideo: "видео",
-      featureHomework: "ДЗ",
-      featureText: "текст",
-      previewTitle: "Просмотр",
-      previewHint: (loc: string) => `Материалы модуля (${loc.toUpperCase()}). Загружено методистом.`,
-      viewBody: "Открыть body (raw)",
-      downloadPresentation: "Скачать презентацию",
-      downloadWorkbook: "Скачать workbook",
-      previewMissing: "Body не загружен в R2.",
-      previewError: "Ошибка загрузки body.",
-      previewNoKey: "body_r2_key не задан.",
-      r2Title: "R2-ключи (read-only)",
-      r2Hint: "Тело модуля управляется через methodist repo. R2 keys показаны для отладки.",
-      r2Body: "Body",
-      r2Presentation: "Презентация",
-      r2Workbook: "Workbook",
-      r2None: "не задан",
+      featureVideo: "видео", featureHomework: "ДЗ", featureText: "текст",
       statusOptions: { published: "Опубликован", draft: "Черновик", archived: "Архив" } as Record<string, string>,
       seo: { title: `${slug} — Admin`, description: "Module edit" },
     }
   : {
       backLink: "← Back to modules",
-      enSection: "EN version",
-      ruSection: "RU version",
+      enSection: "EN version", ruSection: "RU version",
       missing: "Row missing",
-      titleLabel: "Title",
-      statusLabel: "Status",
+      titleLabel: "Title", statusLabel: "Status",
       saveBtn: "Save",
-      saving: "Saving...",
-      saved: "Saved",
-      failed: "Failed",
-      metaTitle: "Metadata",
-      metaTrack: "Track",
-      metaFeatures: "Features",
-      metaDuration: "Default duration (days)",
+      bodyTitle: "Body", workbookTitle: "Workbook",
+      bodyMissing: "Body not uploaded.", workbookMissing: "Workbook not uploaded.",
+      presentationBtn: "Open presentation",
+      metaTitle: "Metadata", metaTrack: "Track",
+      metaFeatures: "Features", metaDuration: "Default duration (days)",
       metaUpdated: "Updated",
-      featureVideo: "video",
-      featureHomework: "homework",
-      featureText: "text",
-      previewTitle: "Preview",
-      previewHint: (loc: string) => `Module materials (${loc.toUpperCase()}). Uploaded by methodist.`,
-      viewBody: "Open body (raw)",
-      downloadPresentation: "Download presentation",
-      downloadWorkbook: "Download workbook",
-      previewMissing: "Body not uploaded to R2.",
-      previewError: "Failed to fetch / parse body.",
-      previewNoKey: "body_r2_key not set.",
-      r2Title: "R2 keys (read-only)",
-      r2Hint: "Module body managed via methodist repo. R2 keys shown for debugging.",
-      r2Body: "Body",
-      r2Presentation: "Presentation",
-      r2Workbook: "Workbook",
-      r2None: "not set",
+      featureVideo: "video", featureHomework: "homework", featureText: "text",
       statusOptions: { published: "Published", draft: "Draft", archived: "Archived" } as Record<string, string>,
       seo: { title: `${slug} — Admin`, description: "Module edit" },
     };
@@ -217,40 +181,27 @@ const t = ru
       </div>
     </form>
 
-    <section class="module-preview">
-      <h2 class="module-meta__title">{t.previewTitle}</h2>
-      <p class="module-preview__hint">{t.previewHint(previewLocale)}</p>
-      <div class="module-preview__downloads">
-        {previewRow?.body_r2_key && (
-          <a class="module-preview__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${previewLocale}/body`} target="_blank" rel="noopener">
-            {t.viewBody}
-          </a>
-        )}
-        {previewRow?.presentation_r2_key && (
-          <a class="module-preview__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${previewLocale}/presentation`} target="_blank" rel="noopener">
-            {t.downloadPresentation}
-          </a>
-        )}
-        {previewRow?.workbook_r2_key && (
-          <a class="module-preview__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${previewLocale}/workbook`} target="_blank" rel="noopener">
-            {t.downloadWorkbook}
-          </a>
-        )}
-      </div>
-      {bodyRaw ? (
-        <pre class="module-preview__raw">{bodyRaw}</pre>
-      ) : (
-        <p class="module-preview__err">
-          {bodyError === "no_key" ? t.previewNoKey :
-           bodyError === "missing_in_r2" ? t.previewMissing :
-           t.previewError}
-        </p>
-      )}
+    {previewRow?.presentation_r2_key && (
+      <p class="module-section__cta">
+        <a class="module-form__save" href={`/api/modules/preview/${encodeURIComponent(slug)}/${previewLocale}/presentation`} target="_blank" rel="noopener">
+          {t.presentationBtn}
+        </a>
+      </p>
+    )}
+
+    <section class="module-section">
+      <h2 class="module-section__title">{t.bodyTitle} ({previewLocale.toUpperCase()})</h2>
+      {bodyMd ? <MarkdownContent md={bodyMd} /> : <p class="module-section__missing">{t.bodyMissing}</p>}
     </section>
 
-    <section class="module-meta">
-      <h2 class="module-meta__title">{t.metaTitle}</h2>
-      <dl class="module-meta__list">
+    <section class="module-section">
+      <h2 class="module-section__title">{t.workbookTitle} ({previewLocale.toUpperCase()})</h2>
+      {workbookMd ? <MarkdownContent md={workbookMd} /> : <p class="module-section__missing">{t.workbookMissing}</p>}
+    </section>
+
+    <section class="module-section">
+      <h2 class="module-section__title">{t.metaTitle}</h2>
+      <dl class="module-meta">
         <div><dt>{t.metaTrack}</dt><dd>{enRow?.track ?? ruRow?.track ?? "—"}</dd></div>
         <div>
           <dt>{t.metaFeatures}</dt>
@@ -264,47 +215,34 @@ const t = ru
         <div><dt>{t.metaUpdated}</dt><dd>{enRow ? dateFmt.format(new Date(enRow.updated_at * 1000)) : "—"}</dd></div>
       </dl>
     </section>
-
-    <section class="module-r2">
-      <h2 class="module-meta__title">{t.r2Title}</h2>
-      <p class="module-r2__hint">{t.r2Hint}</p>
-      <dl class="module-meta__list">
-        <div><dt>{t.r2Body} (EN)</dt><dd class="module-r2__key">{enRow?.body_r2_key ?? t.r2None}</dd></div>
-        <div><dt>{t.r2Body} (RU)</dt><dd class="module-r2__key">{ruRow?.body_r2_key ?? t.r2None}</dd></div>
-        <div><dt>{t.r2Presentation} (EN)</dt><dd class="module-r2__key">{enRow?.presentation_r2_key ?? t.r2None}</dd></div>
-        <div><dt>{t.r2Presentation} (RU)</dt><dd class="module-r2__key">{ruRow?.presentation_r2_key ?? t.r2None}</dd></div>
-        <div><dt>{t.r2Workbook} (EN)</dt><dd class="module-r2__key">{enRow?.workbook_r2_key ?? t.r2None}</dd></div>
-        <div><dt>{t.r2Workbook} (RU)</dt><dd class="module-r2__key">{ruRow?.workbook_r2_key ?? t.r2None}</dd></div>
-      </dl>
-    </section>
   </div>
 </Layout>
 
-<script>
-  const page = document.querySelector<HTMLElement>("[data-module-slug]");
-  const form = document.querySelector("[data-module-form]");
-  const saveBtn = document.querySelector("[data-save-btn]") as HTMLButtonElement | null;
-  const statusEl = document.querySelector("[data-status]") as HTMLElement | null;
-  if (page && form && saveBtn && statusEl) {
-    const slug = page.dataset.moduleSlug ?? "";
-    form.addEventListener("submit", async (e) => {
+<script is:inline>
+  (function () {
+    const page = document.querySelector("[data-module-slug]");
+    const form = document.querySelector("[data-module-form]");
+    const saveBtn = document.querySelector("[data-save-btn]");
+    const statusEl = document.querySelector("[data-status]");
+    if (!page || !form || !saveBtn || !statusEl) return;
+    const slug = page.dataset.moduleSlug || "";
+    form.addEventListener("submit", async function (e) {
       e.preventDefault();
       const inputs = document.querySelectorAll(".module-form__input");
-      const payload: { en?: { title: string; status: string }; ru?: { title: string; status: string } } = {};
-      inputs.forEach((node) => {
-        const el = node as HTMLInputElement | HTMLSelectElement;
+      const payload = {};
+      inputs.forEach(function (el) {
         const lang = el.getAttribute("data-locale");
         const field = el.getAttribute("data-field");
         if (!lang || !field) return;
-        const bucket = (payload[lang as "en" | "ru"] ??= { title: "", status: "" });
-        if (field === "title") bucket.title = el.value;
-        else if (field === "status") bucket.status = el.value;
+        if (!payload[lang]) payload[lang] = { title: "", status: "" };
+        if (field === "title") payload[lang].title = el.value;
+        else if (field === "status") payload[lang].status = el.value;
       });
       saveBtn.disabled = true;
       statusEl.hidden = false;
       statusEl.textContent = "...";
       try {
-        const res = await fetch(`/api/admin/modules/${encodeURIComponent(slug)}`, {
+        const res = await fetch("/api/admin/modules/" + encodeURIComponent(slug), {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
@@ -312,7 +250,7 @@ const t = ru
         });
         if (!res.ok) throw new Error("save_failed");
         statusEl.textContent = "OK";
-        setTimeout(() => { statusEl.hidden = true; }, 2000);
+        setTimeout(function () { statusEl.hidden = true; }, 2000);
       } catch (err) {
         console.error(err);
         statusEl.textContent = "Failed";
@@ -320,7 +258,7 @@ const t = ru
         saveBtn.disabled = false;
       }
     });
-  }
+  })();
 </script>
 
 <style>
@@ -348,12 +286,8 @@ const t = ru
     margin: 0;
   }
 
-  .module-form { display: flex; flex-direction: column; gap: var(--space-lg); }
-  .module-form__section {
-    padding: var(--space-md);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-  }
+  .module-form { display: flex; flex-direction: column; gap: var(--space-lg); margin-bottom: var(--space-xl); }
+  .module-form__section { padding: var(--space-md); border: 1px solid var(--border); border-radius: 2px; }
   .module-form__section-title {
     font-family: var(--font-display);
     font-size: var(--type-display-sm);
@@ -361,12 +295,7 @@ const t = ru
     margin: 0 0 var(--space-md);
     color: var(--text);
   }
-  .module-form__field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: var(--space-md);
-  }
+  .module-form__field { display: flex; flex-direction: column; gap: 4px; margin-bottom: var(--space-md); }
   .module-form__label {
     font-size: var(--type-micro-sm);
     letter-spacing: var(--tracking-wider);
@@ -384,11 +313,7 @@ const t = ru
     width: 100%;
   }
   .module-form__missing { color: var(--amber); font-style: italic; margin: 0; }
-  .module-form__actions {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-  }
+  .module-form__actions { display: flex; align-items: center; gap: var(--space-md); }
   .module-form__save {
     background: var(--amber);
     border: 1px solid var(--amber);
@@ -400,39 +325,34 @@ const t = ru
     letter-spacing: var(--tracking-wide);
     border-radius: 2px;
     cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
   }
-  .module-form__save:hover { background: var(--amber-light); border-color: var(--amber-light); }
+  .module-form__save:hover { background: var(--amber-light); border-color: var(--amber-light); color: var(--ink); }
   .module-form__save:disabled { opacity: 0.5; cursor: wait; }
   .module-form__status { color: var(--text-accent); font-size: var(--type-micro-md); text-transform: uppercase; }
 
-  .module-meta, .module-r2 {
-    margin-top: var(--space-xl);
-    padding: var(--space-md);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-  }
-  .module-meta__title {
+  .module-section { margin-bottom: var(--space-xl); padding-bottom: var(--space-xl); border-bottom: 1px solid var(--border); }
+  .module-section__title {
     font-family: var(--font-display);
     font-size: var(--type-display-sm);
     font-weight: 400;
     margin: 0 0 var(--space-md);
     color: var(--text);
   }
-  .module-meta__list {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 4px var(--space-md);
-    margin: 0;
-  }
-  .module-meta__list > div { display: contents; }
-  .module-meta__list dt {
+  .module-section__cta { margin: 0 0 var(--space-xl); }
+  .module-section__missing { color: var(--text-faint); font-style: italic; }
+
+  .module-meta { display: grid; grid-template-columns: auto 1fr; gap: 4px var(--space-md); margin: 0; }
+  .module-meta > div { display: contents; }
+  .module-meta dt {
     font-size: var(--type-micro-sm);
     letter-spacing: var(--tracking-wider);
     text-transform: uppercase;
     color: var(--text-faint);
     align-self: center;
   }
-  .module-meta__list dd { margin: 0; color: var(--text); }
+  .module-meta dd { margin: 0; color: var(--text); }
   .module-meta__features { display: flex; gap: 6px; flex-wrap: wrap; }
   .module-meta__features span {
     font-size: var(--type-micro-sm);
@@ -442,67 +362,5 @@ const t = ru
     border-radius: 2px;
     text-transform: uppercase;
     letter-spacing: var(--tracking-wide);
-  }
-  .module-r2__hint { color: var(--text-faint); font-size: var(--type-micro-md); margin: 0 0 var(--space-md); }
-  .module-r2__key { color: var(--text-faint); font-family: var(--font-body); font-size: var(--type-micro-md); }
-
-  .module-preview {
-    margin-top: var(--space-xl);
-    padding: var(--space-md);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-  }
-  .module-preview__hint { color: var(--text-faint); margin: 0 0 var(--space-md); font-size: var(--type-micro-md); }
-  .module-preview__downloads { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-lg); }
-  .module-preview__btn {
-    padding: 8px 14px;
-    background: transparent;
-    border: 1px solid var(--border-strong);
-    color: var(--text-muted);
-    text-decoration: none;
-    font-family: var(--font-body);
-    font-size: var(--type-micro-md);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-wide);
-    border-radius: 2px;
-  }
-  .module-preview__btn:hover { color: var(--text); border-color: var(--text); }
-  .module-preview__err { color: var(--text-faint); font-style: italic; }
-  .module-preview__body {
-    color: var(--text);
-    font-family: var(--font-body);
-    font-size: var(--type-body-sm);
-    line-height: var(--leading-relaxed);
-  }
-  .module-preview__body :global(h1),
-  .module-preview__body :global(h2),
-  .module-preview__body :global(h3) {
-    font-family: var(--font-display);
-    font-weight: 400;
-    margin-top: var(--space-md);
-  }
-  .module-preview__body :global(code) {
-    background: var(--bg-elevated);
-    padding: 1px 4px;
-    border-radius: 2px;
-  }
-  .module-preview__body :global(pre) {
-    background: var(--bg-elevated);
-    padding: var(--space-sm);
-    overflow-x: auto;
-    border-radius: 2px;
-  }
-  .module-preview__raw {
-    background: var(--bg-elevated);
-    color: var(--text-muted);
-    font-family: ui-monospace, monospace;
-    font-size: var(--type-micro-md);
-    padding: var(--space-md);
-    overflow-x: auto;
-    border-radius: 2px;
-    max-height: 600px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    line-height: 1.5;
   }
 </style>
