@@ -183,26 +183,3 @@ export async function requireRoleApi(
   return user;
 }
 
-/**
- * Require any one of the roles (admin OR instructor etc). API context.
- */
-export async function requireAnyRoleApi(
-  ctx: APIContext,
-  roles: Role[],
-): Promise<UserWithRoles | Response> {
-  const env = ctx.locals.runtime.env;
-  const session = await verifyRefreshSession(env, ctx.request);
-
-  const jsonErr = (code: string, status: number) =>
-    new Response(JSON.stringify({ error: code }), {
-      status,
-      headers: { "Content-Type": "application/json" },
-    });
-
-  if (!session) return jsonErr("unauthenticated", 401);
-  const user = await getUserWithRoles(env, session.userId);
-  if (!user) return jsonErr("unauthenticated", 401);
-  if (user.deactivated_at !== null) return jsonErr("account_deactivated", 403);
-  if (!roles.some((r) => user.roles.has(r))) return jsonErr("forbidden", 403);
-  return user;
-}

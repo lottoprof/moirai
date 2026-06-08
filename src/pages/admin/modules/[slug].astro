@@ -4,13 +4,11 @@
  *
  * Содержит:
  *   - Edit формa: title + status per locale (EN/RU)
- *   - Preview: body (markdown через MarkdownContent) + workbook (тоже).
- *   - Презентация: ссылка на /api/modules/preview/{slug}/{locale}/presentation.
- *   - Read-only metadata (track, features, duration, updated_at, R2 keys).
+ *   - Workbook + Presentation: markdown render через MarkdownContent.
+ *   - Read-only metadata (track, features, synced_at).
  *
  * Render markdown — через MarkdownContent (тот же путь что student
- * `/dashboard/modules/[slug]` + `/dashboard/modules/[slug]/present`,
- * чтобы поведение совпадало).
+ * /dashboard/modules/[slug], одинаковый вывод для всех ролей).
  *
  * Methodist загружает materials, admin видит без unlock check.
  */
@@ -59,7 +57,7 @@ const ruRow = rows.results.find((r) => r.locale === "ru") ?? null;
 const previewRow = adminLocale === "ru" ? (ruRow ?? enRow) : (enRow ?? ruRow);
 const previewLocale = previewRow?.locale ?? "en";
 
-// Fetch markdown через R2. Используем те же ключи (body / workbook).
+// Fetch markdown через R2.
 async function fetchR2Text(key: string | null | undefined): Promise<string | null> {
   if (!key) return null;
   try {
