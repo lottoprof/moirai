@@ -2,28 +2,19 @@
 /*
  * /{locale}/instructor — overview-страница инструктора.
  *
+ * Instructor LK v2 Q2-expansion (rewritten 2026-06-08):
+ *   Grid из cohort cards — main entity для preпода. Top stats row убран
+ *   (метрики per-cohort вместо). Pending queue + students — теперь в
+ *   cohort cards (counts) и /instructor/cohorts/[id] (детали).
+ *
  * Layout: InstructorLayout. Guard: requireRole(ctx, 'instructor').
- *
- * Содержимое (mockup parity):
- *   - Hero "Review queue. N submissions awaiting feedback"
- *   - 3 stat cards (awaiting / reviewed this week / my students)
- *   - Pending feedback queue (homework cards)
- *   - My students mini-table
- *   - Next session card
- *
- * Stage 21: данные о homework / sessions / reviewed-this-week — STUB
- * (таблицы появятся Sprint 2). Реальные данные о enrollments
- * (where lead_instructor_id = current user) — из D1.
  */
 
 import Layout from "../../../layouts/instructor/Layout.astro";
 import InstructorHero from "../../../components/instructor/InstructorHero.astro";
-import StatCard from "../../../components/dashboard/StatCard.astro";
-import HwQueueCard from "../../../components/instructor/HwQueueCard.astro";
-import StudentRow from "../../../components/instructor/StudentRow.astro";
+import CohortCard from "../../../components/instructor/CohortCard.astro";
 import { requireRole } from "../../../lib/server/guards";
-import { listCohortsByInstructor, parseDaysJson, normalizeDayPair, deriveTimeOfDay, type CohortWithSlot } from "../../../lib/server/cohorts";
-import { getReviewQueue, getReviewMetrics } from "../../../lib/server/instructor-homework";
+import { listInstructorCohorts } from "../../../lib/server/instructor-homework";
 import { getEntry } from "astro:content";
 
 export const prerender = false;
@@ -32,134 +23,62 @@ const { locale } = Astro.params;
 if (locale !== "en" && locale !== "ru") {
   return Astro.redirect("/en/instructor");
 }
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
 
 const userOrRes = await requireRole(Astro, "instructor");
 if (userOrRes instanceof Response) return userOrRes;
 const user = userOrRes;
 const env = Astro.locals.runtime.env;
 
-// Реальные данные: enrollments где user — lead_instructor
-interface MyEnrollment {
-  id: string;
-  user_id: string;
-  programme_slug: string;
-  student_name: string | null;
-  student_email: string;
-}
-const myEnrollments = await env.DB.prepare(
-  `SELECT e.id, e.user_id, e.programme_slug, u.name as student_name, u.email as student_email
-   FROM enrollments e
-   JOIN users u ON u.id = e.user_id
-   WHERE e.lead_instructor_id = ? AND e.status = 'active'
-   ORDER BY e.enrolled_at DESC`,
-).bind(user.id).all<MyEnrollment>();
+const cards = await listInstructorCohorts(env, user.id);
 
-// FLOW-21: My cohorts (upcoming + active) — Stage 14r
-const myCohorts: CohortWithSlot[] = await listCohortsByInstructor(env, user.id, ["open", "running"]);
-const upcomingCohorts = myCohorts.filter((c) => c.status === "open");
-const activeCohorts = myCohorts.filter((c) => c.status === "running");
-
-// Programme titles map (для всех уникальных programme_id из cohorts)
-const uniqueProgrammeIds = Array.from(new Set(myCohorts.map((c) => c.programme_id)));
+// Resolve programme titles + next session module titles
+const programmeSlugs = Array.from(new Set(cards.map((c) => c.programme_slug)));
 const programmeTitleMap = new Map<string, string>();
-await Promise.all(uniqueProgrammeIds.map(async (slug) => {
-  const entry = await getEntry("programmes", `${slug}.${locale}`);
+await Promise.all(programmeSlugs.map(async (slug) => {
+  const entry = await getEntry("programmes", `${slug}.${typedLocale}`);
   if (entry) programmeTitleMap.set(slug, entry.data.title);
 }));
 
-// Stage D real data — Student LK v2
-const metrics = await getReviewMetrics(env, user.id);
-const queue = await getReviewQueue(env, user.id, locale, { status: "pending" });
+const moduleSlugs = Array.from(new Set(
+  cards.map((c) => c.next_session_module_slug).filter((s): s is string => Boolean(s)),
+));
+const moduleTitleMap = new Map<string, string>();
+if (moduleSlugs.length > 0) {
+  const placeholders = moduleSlugs.map(() => "?").join(",");
+  const rows = await env.DB.prepare(
+    `SELECT slug, title FROM modules WHERE slug IN (${placeholders}) AND locale = ?`,
+  ).bind(...moduleSlugs, typedLocale).all<{ slug: string; title: string }>();
+  for (const r of rows.results) moduleTitleMap.set(r.slug, r.title);
+}
 
-const now = Math.floor(Date.now() / 1000);
-const pendingCards = queue.slice(0, 4).map((q) => {
-  const daysWaiting = Math.floor((now - q.uploaded_at) / 86400);
-  const studentName = q.student_name?.trim() || q.student_email.split("@")[0];
-  return {
-    studentName,
-    module: `${q.module_title ?? q.module_slug}`.toUpperCase(),
-    title: q.module_title ?? q.module_slug,
-    daysWaiting,
-    href: `/${locale}/instructor/homework/${q.id}`,
-  };
-});
+// Total pending across all cohorts — для subtitle
+const totalPending = cards.reduce((sum, c) => sum + c.pending_submissions, 0);
 
-// Next session widget — Stage D scope не включает sessions list,
-// показываем stub (Stage F или follow-up Instructor LK v2 заменит).
-const nextSessionStub = {
-  when: locale === "ru" ? "—" : "—",
-  title: locale === "ru" ? "Расписание появится после backfill sessions" : "Schedule pending sessions backfill",
-  detail: "",
-};
-
-// Если у инструктора 0 enrollment'ов — пустой list (без stub).
-// Stage D — real data only.
-const students = myEnrollments.results.map((e, i) => {
-  const name = e.student_name?.trim() || e.student_email.split("@")[0];
-  const firstName = name.split(/\s+/)[0];
-  const initials = firstName.slice(0, 2).toUpperCase();
-  return {
-    name,
-    initials,
-    // Stage D: progress + currentModule пока ставим placeholder (требует
-    // join на homework_submissions + sessions). Instructor LK v2 — реалии.
-    currentModuleNum: String((i % 9) + 1).padStart(2, "0"),
-    progress: 0,
-    href: `/${locale}/instructor`,  // Instructor LK v2 добавит student detail
-  };
-});
-
-const t = locale === "ru"
+const t = ru
   ? {
       eyebrow: "Преподаватель",
-      title: "Очередь проверки.",
-      subtitle: `${String(metrics.awaiting_review)} работ ждут фидбэка`,
-      statAwaiting: "На проверке",
-      statAwaitingSub: (n: number | null) => n === null ? "—" : `самой старой: ${String(n)} д.`,
-      statReviewed: "Проверено за неделю",
-      statReviewedSub: (n: number) => `авто-принято: ${String(n)}`,
-      statStudents: "Мои студенты",
-      statStudentsSub: "beginner · intermediate",
-      pendingLabel: "Pending feedback",
-      studentsLabel: "Мои студенты",
-      sessionLabel: "Следующая сессия",
-      review: "Проверить",
-      waiting: locale === "ru" ? "д. в ожидании" : "d waiting",
-      myUpcomingCohorts: "Мои когорты — предстоящие",
-      myActiveCohorts: "Мои когорты — идут",
-      noCohorts: "Когорты ещё не назначены. Админ привяжет slot позже.",
-      cohortApplied: (n: number) => `${n.toString()} ${n === 1 ? "заявка" : n < 5 ? "заявки" : "заявок"}`,
-      cohortPaid: (n: number) => `${n.toString()} оплачено`,
-      cohortDaysUntil: (d: number) => d > 0 ? `через ${d.toString()} ${d === 1 ? "день" : d < 5 ? "дня" : "дней"}` : d === 0 ? "сегодня" : `идёт ${Math.abs(d).toString()}-й день`,
-      seo: { title: "Преподаватель — Moirai", description: "Очередь проверки и студенты." },
+      title: "Мои когорты",
+      subtitle: totalPending === 0
+        ? "Очередь чиста"
+        : `${totalPending.toString()} работ${totalPending === 1 ? "а" : totalPending < 5 ? "ы" : ""} на проверке`,
+      empty: "Когорты ещё не назначены.",
+      seo: { title: "Преподаватель — Moirai", description: "Мои когорты и проверка ДЗ." },
     }
   : {
       eyebrow: "Instructor",
-      title: "Review queue.",
-      subtitle: `${String(metrics.awaiting_review)} submissions awaiting feedback`,
-      statAwaiting: "Awaiting review",
-      statAwaitingSub: (n: number | null) => n === null ? "—" : `oldest: ${String(n)} days ago`,
-      statReviewed: "Reviewed this week",
-      statReviewedSub: (n: number) => `auto-approved: ${String(n)}`,
-      statStudents: "My students",
-      statStudentsSub: "beginner · intermediate",
-      pendingLabel: "Pending feedback",
-      studentsLabel: "My students",
-      sessionLabel: "Next session",
-      review: "Review",
-      waiting: "d waiting",
-      myUpcomingCohorts: "My cohorts — upcoming",
-      myActiveCohorts: "My cohorts — running",
-      noCohorts: "No cohorts assigned yet. Admin will link a slot later.",
-      cohortApplied: (n: number) => `${n.toString()} ${n === 1 ? "application" : "applications"}`,
-      cohortPaid: (n: number) => `${n.toString()} paid`,
-      cohortDaysUntil: (d: number) => d > 0 ? `in ${d.toString()} ${d === 1 ? "day" : "days"}` : d === 0 ? "today" : `day ${Math.abs(d).toString()}`,
-      seo: { title: "Instructor — Moirai", description: "Review queue and my students." },
+      title: "My cohorts",
+      subtitle: totalPending === 0
+        ? "Queue clear"
+        : `${totalPending.toString()} submission${totalPending === 1 ? "" : "s"} awaiting review`,
+      empty: "No cohorts assigned yet.",
+      seo: { title: "Instructor — Moirai", description: "My cohorts and homework review." },
     };
 ---
 
 <Layout
-  locale={locale}
+  locale={typedLocale}
   seo={{ title: t.seo.title, description: t.seo.description }}
   currentNavKey="queue"
   userRoles={user.roles}
@@ -167,133 +86,28 @@ const t = locale === "ru"
   <InstructorHero eyebrow={t.eyebrow} title={t.title} subtitle={t.subtitle} />
 
   <div class="instructor-content">
-    <section class="instructor-content__stats" aria-label={t.eyebrow}>
-      <StatCard
-        label={t.statAwaiting}
-        value={[metrics.awaiting_review, ""]}
-        sub={t.statAwaitingSub(metrics.oldest_pending_days)}
-      />
-      <StatCard
-        label={t.statReviewed}
-        value={String(metrics.reviewed_this_week)}
-        sub={t.statReviewedSub(metrics.auto_approved_this_week)}
-      />
-      <StatCard
-        label={t.statStudents}
-        value={String(students.length)}
-        sub={t.statStudentsSub}
-      />
-    </section>
-
-    <section class="instructor-content__two-col">
-      <div>
-        <p class="instructor-content__section-label">{t.pendingLabel}</p>
-        {pendingCards.length === 0 ? (
-          <p class="instructor-content__empty">
-            {locale === "ru" ? "Очередь пуста." : "Queue empty."}
-          </p>
-        ) : pendingCards.map((h) => (
-          <HwQueueCard
-            studentName={h.studentName}
-            moduleLabel={h.module}
-            title={h.title}
-            daysWaiting={h.daysWaiting}
-            href={h.href}
-            reviewLabel={t.review}
-            waitingLabel={t.waiting}
+    {cards.length === 0 ? (
+      <p class="instructor-content__empty">{t.empty}</p>
+    ) : (
+      <div class="cohort-grid">
+        {cards.map((c) => (
+          <CohortCard
+            locale={typedLocale}
+            cohortId={c.cohort_id}
+            programmeTitle={programmeTitleMap.get(c.programme_slug) ?? c.programme_slug}
+            startDate={c.start_date}
+            status={c.status as "open" | "running" | "completed" | "cancelled"}
+            activeStudents={c.active_students}
+            pendingSubmissions={c.pending_submissions}
+            reviewedThisWeek={c.reviewed_this_week}
+            lateSubmissions={c.late_submissions}
+            nextSessionAt={c.next_session_at}
+            nextSessionModuleTitle={c.next_session_module_slug ? (moduleTitleMap.get(c.next_session_module_slug) ?? c.next_session_module_slug) : null}
+            meetingProvider={c.meeting_provider}
+            meetingJoinUrl={c.meeting_host_url ?? c.meeting_url}
           />
         ))}
       </div>
-
-      <div>
-        <p class="instructor-content__section-label">{t.studentsLabel}</p>
-        <div class="instructor-content__students">
-          {students.map((s) => (
-            <StudentRow
-              name={s.name}
-              initials={s.initials}
-              currentModuleNum={s.currentModuleNum}
-              progress={s.progress}
-              href={s.href}
-            />
-          ))}
-        </div>
-
-        <p class="instructor-content__section-label instructor-content__section-label--top">{t.sessionLabel}</p>
-        <div class="next-session">
-          <p class="next-session__when">{nextSessionStub.when}</p>
-          <p class="next-session__title">{nextSessionStub.title}</p>
-          <p class="next-session__detail">{nextSessionStub.detail}</p>
-        </div>
-      </div>
-    </section>
-
-    {/* FLOW-21 My cohorts — Stage 14r */}
-    {(upcomingCohorts.length > 0 || activeCohorts.length > 0) ? (
-      <>
-        {activeCohorts.length > 0 && (
-          <section aria-label={t.myActiveCohorts}>
-            <p class="instructor-content__section-label">{t.myActiveCohorts}</p>
-            <div class="my-cohorts">
-              {activeCohorts.map((c) => {
-                const days = normalizeDayPair(parseDaysJson(c.slot.days_json));
-                const daysLabel = days.join("+");
-                const tod = deriveTimeOfDay(c.slot.time_et);
-                const daysUntil = Math.ceil((c.start_date - Math.floor(Date.now() / 1000)) / 86400);
-                return (
-                  <div class="my-cohort-card">
-                    <div class="my-cohort-card__head">
-                      <strong>{programmeTitleMap.get(c.programme_id) ?? c.programme_id}</strong>
-                      <span class="my-cohort-card__when">{t.cohortDaysUntil(daysUntil)}</span>
-                    </div>
-                    <p class="my-cohort-card__meta">
-                      {daysLabel} · {tod} · {c.slot.time_et} ET
-                    </p>
-                    <p class="my-cohort-card__stats">
-                      <span>{t.cohortApplied(c.apply_count)}</span>
-                      <span class="my-cohort-card__paid">{t.cohortPaid(c.paid_count)}</span>
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {upcomingCohorts.length > 0 && (
-          <section aria-label={t.myUpcomingCohorts}>
-            <p class="instructor-content__section-label">{t.myUpcomingCohorts}</p>
-            <div class="my-cohorts">
-              {upcomingCohorts.map((c) => {
-                const days = normalizeDayPair(parseDaysJson(c.slot.days_json));
-                const daysLabel = days.join("+");
-                const tod = deriveTimeOfDay(c.slot.time_et);
-                const daysUntil = Math.ceil((c.start_date - Math.floor(Date.now() / 1000)) / 86400);
-                return (
-                  <div class="my-cohort-card">
-                    <div class="my-cohort-card__head">
-                      <strong>{programmeTitleMap.get(c.programme_id) ?? c.programme_id}</strong>
-                      <span class="my-cohort-card__when">{t.cohortDaysUntil(daysUntil)}</span>
-                    </div>
-                    <p class="my-cohort-card__meta">
-                      {daysLabel} · {tod} · {c.slot.time_et} ET
-                    </p>
-                    <p class="my-cohort-card__stats">
-                      <span>{t.cohortApplied(c.apply_count)}</span>
-                      <span class="my-cohort-card__paid">{t.cohortPaid(c.paid_count)}</span>
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-      </>
-    ) : (
-      <section aria-label={t.myUpcomingCohorts}>
-        <p class="instructor-content__section-label">{t.myUpcomingCohorts}</p>
-        <p class="my-cohorts-empty">{t.noCohorts}</p>
-      </section>
     )}
   </div>
 </Layout>
@@ -301,139 +115,20 @@ const t = locale === "ru"
 <style>
   .instructor-content {
     padding: var(--space-xl) var(--container-pad) var(--space-3xl);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2xl);
     max-width: var(--container-max);
     margin: 0 auto;
-  }
-
-  .instructor-content__stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--space-sm);
-  }
-
-  .instructor-content__section-label {
-    font-family: var(--font-body);
-    font-size: var(--type-micro-sm);
-    font-weight: 500;
-    letter-spacing: var(--tracking-wider);
-    text-transform: uppercase;
-    color: var(--text-faint);
-    margin-bottom: var(--space-md);
-  }
-  .instructor-content__section-label--top {
-    margin-top: var(--space-xl);
-  }
-
-  .instructor-content__two-col {
-    display: grid;
-    grid-template-columns: 1.6fr 1fr;
-    gap: var(--space-lg);
-  }
-
-  .instructor-content__students {
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    overflow: hidden;
   }
   .instructor-content__empty {
     color: var(--text-faint);
     font-style: italic;
-    padding: var(--space-md);
+    padding: var(--space-2xl);
     border: 1px dashed var(--border);
     border-radius: 2px;
     text-align: center;
   }
-
-  .next-session {
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: var(--space-md) var(--space-lg);
-  }
-  .next-session__when {
-    font-family: var(--font-body);
-    font-size: var(--type-micro-sm);
-    color: var(--text-faint);
-    margin-bottom: var(--space-2xs);
-    letter-spacing: 0.05em;
-  }
-  .next-session__title {
-    font-family: var(--font-display);
-    color: var(--text);
-    font-size: 15px;
-    margin: 0;
-  }
-  .next-session__detail {
-    font-family: var(--font-body);
-    font-size: var(--type-micro-md);
-    color: var(--text-accent);
-    margin-top: var(--space-2xs);
-  }
-
-  /* My cohorts (Stage 14r) */
-  .my-cohorts {
+  .cohort-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: var(--space-sm);
-  }
-  .my-cohorts-empty {
-    color: var(--text-faint);
-    font-style: italic;
-    padding: var(--space-md) var(--space-lg);
-    border: 1px dashed var(--border);
-    border-radius: 2px;
-  }
-  .my-cohort-card {
-    border: 1px solid var(--border);
-    background: var(--bg-elevated);
-    border-radius: 2px;
-    padding: var(--space-md);
-  }
-  .my-cohort-card__head {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: var(--space-sm);
-    margin-bottom: var(--space-2xs);
-  }
-  .my-cohort-card__head strong {
-    color: var(--text);
-    font-weight: 500;
-  }
-  .my-cohort-card__when {
-    color: var(--text-accent);
-    font-size: var(--type-micro-md);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-wide);
-  }
-  .my-cohort-card__meta {
-    color: var(--text-muted);
-    font-size: var(--type-body-sm);
-    margin: 0 0 var(--space-sm);
-  }
-  .my-cohort-card__stats {
-    display: flex;
-    justify-content: space-between;
-    color: var(--text-faint);
-    font-size: var(--type-micro-md);
-    text-transform: uppercase;
-    letter-spacing: var(--tracking-wide);
-    margin: 0;
-    border-top: 1px solid var(--border);
-    padding-top: var(--space-xs);
-  }
-  .my-cohort-card__paid {
-    color: var(--text-accent);
-  }
-
-  @media (max-width: 768px) {
-    .instructor-content__stats {
-      grid-template-columns: 1fr;
-    }
-    .instructor-content__two-col {
-      grid-template-columns: 1fr;
-    }
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-md);
   }
 </style>

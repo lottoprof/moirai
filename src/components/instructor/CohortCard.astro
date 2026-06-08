@@ -1,0 +1,281 @@
+---
+/*
+ * CohortCard — карточка cohort'ы на /instructor overview.
+ *
+ * Instructor LK v2 Q2-expansion (закрыт 2026-06-08).
+ *
+ * Содержание:
+ *   - Programme name + label (started/starts <date>)
+ *   - Status badge (open/running/completed)
+ *   - 4 числа: students / pending / reviewed_this_week / late
+ *   - Next live session (date + module)
+ *   - Zoom join CTA (active за 15 мин до session — link на meeting_host_url или meeting_url)
+ *   - Click на card → /instructor/cohorts/[id] (Q11 matrix view, TBD)
+ */
+
+import { LK_CONFIG } from "../../lib/config/lk";
+
+interface Props {
+  locale: "en" | "ru";
+  cohortId: string;
+  programmeTitle: string;
+  startDate: number;
+  status: "open" | "running" | "completed" | "cancelled";
+  activeStudents: number;
+  pendingSubmissions: number;
+  reviewedThisWeek: number;
+  lateSubmissions: number;
+  nextSessionAt: number | null;
+  nextSessionModuleTitle: string | null;
+  meetingProvider: string | null;
+  meetingJoinUrl: string | null;  // host_url ?? meeting_url
+}
+
+const {
+  locale, cohortId, programmeTitle, startDate, status,
+  activeStudents, pendingSubmissions, reviewedThisWeek, lateSubmissions,
+  nextSessionAt, nextSessionModuleTitle, meetingProvider, meetingJoinUrl,
+} = Astro.props;
+
+const ru = locale === "ru";
+const intlLocale = ru ? "ru-RU" : "en-US";
+
+const startDateFmt = new Intl.DateTimeFormat(intlLocale, {
+  month: "short", day: "numeric", year: "numeric",
+}).format(new Date(startDate * 1000));
+
+const startLabel = status === "open"
+  ? (ru ? `Старт ${startDateFmt}` : `Starts ${startDateFmt}`)
+  : (ru ? `С ${startDateFmt}` : `Since ${startDateFmt}`);
+
+const statusLabel = ru
+  ? { open: "Открыта", running: "Идёт", completed: "Завершена", cancelled: "Отменена" }[status]
+  : { open: "Open", running: "Running", completed: "Completed", cancelled: "Cancelled" }[status];
+
+const nextSessionFmt = nextSessionAt
+  ? new Intl.DateTimeFormat(intlLocale, {
+      weekday: "short", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    }).format(new Date(nextSessionAt * 1000))
+  : null;
+
+// Zoom CTA active если до session ≤ 15 min (или прямо в момент)
+const now = Math.floor(Date.now() / 1000);
+const zoomActive = nextSessionAt != null
+  && meetingJoinUrl != null
+  && now >= nextSessionAt - LK_CONFIG.zoom_join_window_minutes_before * 60
+  && now <= nextSessionAt + 4 * 3600; // 4h grace для длинных sessions
+
+const labels = ru
+  ? {
+      students: "Студенты", pending: "На проверке", reviewed: "Проверено за неделю", late: "С опозданием",
+      nextSession: "Ближайшее занятие", noSession: "Нет запланированных",
+      joinZoom: meetingProvider === "teams" ? "Подключиться (Teams)" :
+                meetingProvider === "gmeet" ? "Подключиться (Meet)" :
+                "Подключиться (Zoom)",
+      openCohort: "Открыть группу",
+    }
+  : {
+      students: "Students", pending: "Pending", reviewed: "Reviewed (7d)", late: "Late",
+      nextSession: "Next session", noSession: "No sessions scheduled",
+      joinZoom: meetingProvider === "teams" ? "Join Teams" :
+                meetingProvider === "gmeet" ? "Join Meet" :
+                "Join Zoom",
+      openCohort: "Open cohort",
+    };
+---
+
+<article class:list={["cohort-card", `cohort-card--${status}`]}>
+  <header class="cohort-card__head">
+    <div class="cohort-card__title">
+      <h2 class="cohort-card__name">{programmeTitle}</h2>
+      <p class="cohort-card__date">{startLabel}</p>
+    </div>
+    <span class={`cohort-card__status cohort-card__status--${status}`}>{statusLabel}</span>
+  </header>
+
+  <dl class="cohort-card__metrics">
+    <div class="metric"><dt>{labels.students}</dt><dd>{activeStudents}</dd></div>
+    <div class="metric metric--accent"><dt>{labels.pending}</dt><dd>{pendingSubmissions}</dd></div>
+    <div class="metric"><dt>{labels.reviewed}</dt><dd>{reviewedThisWeek}</dd></div>
+    <div class="metric"><dt>{labels.late}</dt><dd>{lateSubmissions}</dd></div>
+  </dl>
+
+  <section class="cohort-card__session">
+    <p class="cohort-card__session-label">{labels.nextSession}</p>
+    {nextSessionFmt ? (
+      <>
+        <p class="cohort-card__session-date">{nextSessionFmt}</p>
+        {nextSessionModuleTitle && (
+          <p class="cohort-card__session-module">{nextSessionModuleTitle}</p>
+        )}
+      </>
+    ) : (
+      <p class="cohort-card__session-empty">{labels.noSession}</p>
+    )}
+  </section>
+
+  <footer class="cohort-card__actions">
+    {zoomActive && meetingJoinUrl ? (
+      <a class="cohort-card__cta cohort-card__cta--zoom" href={meetingJoinUrl} target="_blank" rel="noopener">
+        {labels.joinZoom}
+      </a>
+    ) : (
+      <a class="cohort-card__cta cohort-card__cta--open" href={`/${locale}/instructor/cohorts/${cohortId}`}>
+        {labels.openCohort}
+      </a>
+    )}
+  </footer>
+</article>
+
+<style>
+  .cohort-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+  .cohort-card--running {
+    border-color: color-mix(in srgb, var(--amber) 30%, transparent);
+  }
+
+  .cohort-card__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+  .cohort-card__title { min-width: 0; flex: 1; }
+  .cohort-card__name {
+    font-family: var(--font-display);
+    font-size: var(--type-body-lg);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+    line-height: 1.2;
+  }
+  .cohort-card__date {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    margin: 4px 0 0;
+    letter-spacing: 0.04em;
+  }
+
+  .cohort-card__status {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .cohort-card__status--running {
+    color: var(--text-accent);
+    border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+    background: var(--amber-faint);
+  }
+  .cohort-card__status--completed {
+    color: var(--text-faint);
+    border-style: dashed;
+  }
+  .cohort-card__status--cancelled {
+    color: var(--text-faint);
+    border-style: dashed;
+  }
+
+  .cohort-card__metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-sm);
+    margin: 0;
+    padding: var(--space-sm) 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .metric { margin: 0; }
+  .metric dt {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 2px;
+  }
+  .metric dd {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+    line-height: 1;
+  }
+  .metric--accent dd { color: var(--text-accent); }
+
+  .cohort-card__session {
+    color: var(--text-muted);
+  }
+  .cohort-card__session-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 4px;
+  }
+  .cohort-card__session-date {
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    color: var(--text);
+    margin: 0;
+  }
+  .cohort-card__session-module {
+    font-size: var(--type-body-sm);
+    color: var(--text-muted);
+    margin: 2px 0 0;
+  }
+  .cohort-card__session-empty {
+    color: var(--text-faint);
+    font-style: italic;
+    font-size: var(--type-body-sm);
+    margin: 0;
+  }
+
+  .cohort-card__actions { display: flex; }
+  .cohort-card__cta {
+    flex: 1;
+    text-align: center;
+    padding: 10px 16px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    text-decoration: none;
+    border-radius: 2px;
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .cohort-card__cta--zoom {
+    background: var(--amber);
+    color: var(--ink);
+  }
+  .cohort-card__cta--zoom:hover { background: var(--amber-light); }
+  .cohort-card__cta--open {
+    color: var(--text-muted);
+    border: 1px solid var(--border-strong);
+  }
+  .cohort-card__cta--open:hover { color: var(--text); border-color: var(--text); }
+
+  @media (max-width: 640px) {
+    .cohort-card__metrics { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>

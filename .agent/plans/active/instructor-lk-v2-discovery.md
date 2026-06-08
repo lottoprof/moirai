@@ -122,24 +122,33 @@ queue нужна на отдельной странице.
 
 ### Q2-expansion. Overview = cohorts с динамикой ДЗ + Zoom join
 
-**Контекст (lottoprof, 2026-06-07):** инструктор должен видеть
-**группы (cohorts)** с количеством студентов и **динамикой ДЗ** —
-overview это про **monitoring** прогресса cohort'ы, не плоский список
-submissions. Plus Zoom join button прямо из ЛК.
+**Закрыт 2026-06-08.**
 
-**Подвопросы:**
+Overview reworked: вместо плоского queue + stats row — **grid из cohort
+cards**. Top stats row убран (cohort cards несут эти числа per-cohort).
 
-- **Q2e. Cohort cards содержание:**
-  - Programme + cohort number / label
-  - Количество студентов (active enrollments)
-  - "Динамика ДЗ" — что именно: график (last 14 days submissions
-    timeline)? Или просто counters (pending / needs_revision / approved
-    this week)?
-  - Current module + дата next session
-  - Quick action: "Join Zoom" (active за 15 мин до session)
-- **Q2f. Zoom join button** — где брать URL: `session.zoom_url` или
-  `cohort.zoom_url`. Plus **host URL** — отдельное поле? Студент имеет
-  join link, инструктор должен иметь host link.
+**Q2e — содержание cohort card:**
+- Programme name + label из start_date
+  ("Starts Jun 15, 2026" для open, "Started Jun 1, 2026" для running)
+- Status badge (open / running / completed / cancelled)
+- N active students (`COUNT enrollments WHERE cohort_id AND status='active'`)
+- **Три метрики ДЗ (все):**
+  - Pending review (status='pending' AND priority='normal')
+  - Reviewed this week (reviewed_by=me AND reviewed_at >= week_start)
+  - Late submissions (is_late=1 AND status='pending')
+- Next live session (MIN sessions.scheduled_at WHERE > now AND
+  status='scheduled')
+- Zoom join CTA (active за `LK_CONFIG.zoom_join_window_minutes_before`
+  = 15 минут до session)
+
+Click на card → `/instructor/cohorts/[id]` (Q11 matrix view).
+
+**Q2f — Zoom URL:**
+- Для preподa: `cohort.meeting_host_url ?? cohort.meeting_url` (host
+  если есть, иначе join). Per-session override через
+  `sessions.meeting_host_url`/`sessions.meeting_url` (с тем же fallback).
+
+**Layout: Variant A — Grid cards** (не Hero + list).
 
 ### Q2. Overview `/instructor` — реальные данные
 

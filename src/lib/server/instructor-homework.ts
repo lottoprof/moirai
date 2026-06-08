@@ -187,6 +187,141 @@ export async function getReviewMetrics(
 }
 
 // ============================================================
+// Cohort overview cards (Instructor LK v2 Q2-expansion)
+// ============================================================
+
+export interface InstructorCohortCard {
+  cohort_id: string;
+  programme_slug: string;
+  programme_title: string | null;
+  start_date: number;
+  end_date: number;
+  status: string;
+  active_students: number;
+  pending_submissions: number;
+  reviewed_this_week: number;
+  late_submissions: number;
+  next_session_at: number | null;
+  next_session_module_slug: string | null;
+  meeting_provider: string | null;
+  meeting_url: string | null;
+  meeting_host_url: string | null;
+}
+
+interface RawCohortRow {
+  cohort_id: string;
+  programme_slug: string;
+  start_date: number;
+  end_date: number;
+  status: string;
+  meeting_provider: string | null;
+  meeting_url: string | null;
+  meeting_host_url: string | null;
+}
+
+/**
+ * Cohorts grid для /instructor overview (Q2-expansion).
+ *
+ * Возвращает cohorts где instructor — lead, с метриками ДЗ + next session +
+ * Zoom URLs. Sort: status (running > open > completed/cancelled), потом
+ * start_date DESC.
+ */
+export async function listInstructorCohorts(
+  env: Cloudflare.Env,
+  instructorId: string,
+): Promise<InstructorCohortCard[]> {
+  const now = Math.floor(Date.now() / 1000);
+  const weekAgo = now - 7 * 86400;
+
+  // Step 1: cohorts where this instructor leads enrollments
+  // (через JOIN enrollments) — могут быть cohorts без enrollments если
+  // instructor назначен через slot.
+  const cohortRows = await env.DB.prepare(
+    `SELECT DISTINCT c.id AS cohort_id, c.programme_id AS programme_slug,
+            c.start_date, c.end_date, c.status,
+            c.meeting_provider, c.meeting_url, c.meeting_host_url
+       FROM cohorts c
+      WHERE (
+        c.slot_id IN (SELECT id FROM slots WHERE instructor_id = ?)
+        OR c.id IN (
+          SELECT DISTINCT cohort_id FROM applications a
+            JOIN enrollments e ON e.id = a.enrollment_id
+           WHERE e.lead_instructor_id = ? AND e.archived_at IS NULL
+        )
+      )
+        AND c.status IN ('open','running','completed')
+      ORDER BY
+        CASE c.status WHEN 'running' THEN 0 WHEN 'open' THEN 1 ELSE 2 END,
+        c.start_date DESC
+      LIMIT 50`,
+  )
+    .bind(instructorId, instructorId)
+    .all<RawCohortRow>();
+
+  const cards: InstructorCohortCard[] = [];
+  for (const c of cohortRows.results) {
+    // Active students
+    const students = await env.DB.prepare(
+      `SELECT COUNT(*) AS n
+         FROM applications a
+         JOIN enrollments e ON e.id = a.enrollment_id
+        WHERE a.cohort_id = ?
+          AND e.status = 'active'
+          AND e.archived_at IS NULL`,
+    )
+      .bind(c.cohort_id)
+      .first<{ n: number }>();
+
+    // Pending + late submissions for this cohort
+    const subStats = await env.DB.prepare(
+      `SELECT
+         SUM(CASE WHEN hs.status='pending' AND hs.priority='normal' THEN 1 ELSE 0 END) AS pending,
+         SUM(CASE WHEN hs.status='pending' AND hs.is_late=1 THEN 1 ELSE 0 END) AS late,
+         SUM(CASE WHEN hs.reviewed_by = ? AND hs.reviewed_at >= ? THEN 1 ELSE 0 END) AS reviewed_week
+        FROM homework_submissions hs
+        JOIN enrollments e ON e.id = hs.enrollment_id
+        JOIN applications a ON a.enrollment_id = e.id
+       WHERE a.cohort_id = ? AND e.archived_at IS NULL`,
+    )
+      .bind(instructorId, weekAgo, c.cohort_id)
+      .first<{ pending: number | null; late: number | null; reviewed_week: number | null }>();
+
+    // Next live session
+    const nextSession = await env.DB.prepare(
+      `SELECT scheduled_at, module_slug
+         FROM sessions
+        WHERE cohort_id = ?
+          AND scheduled_at > ?
+          AND status = 'scheduled'
+        ORDER BY scheduled_at ASC
+        LIMIT 1`,
+    )
+      .bind(c.cohort_id, now)
+      .first<{ scheduled_at: number; module_slug: string }>();
+
+    cards.push({
+      cohort_id: c.cohort_id,
+      programme_slug: c.programme_slug,
+      programme_title: null, // resolved page-side через Content Collection
+      start_date: c.start_date,
+      end_date: c.end_date,
+      status: c.status,
+      active_students: students?.n ?? 0,
+      pending_submissions: subStats?.pending ?? 0,
+      reviewed_this_week: subStats?.reviewed_week ?? 0,
+      late_submissions: subStats?.late ?? 0,
+      next_session_at: nextSession?.scheduled_at ?? null,
+      next_session_module_slug: nextSession?.module_slug ?? null,
+      meeting_provider: c.meeting_provider,
+      meeting_url: c.meeting_url,
+      meeting_host_url: c.meeting_host_url,
+    });
+  }
+
+  return cards;
+}
+
+// ============================================================
 // Submission detail для review page
 // ============================================================
 
