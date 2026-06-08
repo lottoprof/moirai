@@ -29,13 +29,12 @@ const env = Astro.locals.runtime.env;
 
 interface ModuleRow {
   title: string;
-  body_r2_key: string | null;
   presentation_r2_key: string | null;
   workbook_r2_key: string | null;
 }
 
 const row = await env.DB.prepare(
-  `SELECT title, body_r2_key, presentation_r2_key, workbook_r2_key
+  `SELECT title, presentation_r2_key, workbook_r2_key
      FROM modules WHERE slug = ? AND locale = ?`,
 ).bind(slug, typedLocale).first<ModuleRow>();
 
@@ -53,22 +52,20 @@ async function fetchR2Text(key: string | null): Promise<string | null> {
   }
 }
 
-const bodyMd = await fetchR2Text(row.body_r2_key);
 const workbookMd = await fetchR2Text(row.workbook_r2_key);
+const presentationMd = await fetchR2Text(row.presentation_r2_key);
 
 const t = ru
   ? {
       backLink: "← К модулям",
-      bodyTitle: "Body", workbookTitle: "Workbook",
-      bodyMissing: "Body не загружен.", workbookMissing: "Workbook не загружен.",
-      presentationBtn: "Открыть презентацию",
+      workbookTitle: "Workbook", presentationTitle: "Презентация",
+      workbookMissing: "Workbook не загружен.", presentationMissing: "Презентация не загружена.",
       seo: { title: `${row.title} — Преподаватель`, description: "Module preview" },
     }
   : {
       backLink: "← Back to modules",
-      bodyTitle: "Body", workbookTitle: "Workbook",
-      bodyMissing: "Body not uploaded.", workbookMissing: "Workbook not uploaded.",
-      presentationBtn: "Open presentation",
+      workbookTitle: "Workbook", presentationTitle: "Presentation",
+      workbookMissing: "Workbook not uploaded.", presentationMissing: "Presentation not uploaded.",
       seo: { title: `${row.title} — Instructor`, description: "Module preview" },
     };
 ---
@@ -87,22 +84,14 @@ const t = ru
       <p class="instr-mod__slug">{slug}</p>
     </header>
 
-    {row.presentation_r2_key && (
-      <p class="instr-mod__cta">
-        <a class="instr-mod__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${typedLocale}/presentation`} target="_blank" rel="noopener">
-          {t.presentationBtn}
-        </a>
-      </p>
-    )}
-
-    <section class="instr-mod__section">
-      <h2 class="instr-mod__section-title">{t.bodyTitle}</h2>
-      {bodyMd ? <MarkdownContent md={bodyMd} /> : <p class="instr-mod__missing">{t.bodyMissing}</p>}
-    </section>
-
     <section class="instr-mod__section">
       <h2 class="instr-mod__section-title">{t.workbookTitle}</h2>
       {workbookMd ? <MarkdownContent md={workbookMd} /> : <p class="instr-mod__missing">{t.workbookMissing}</p>}
+    </section>
+
+    <section class="instr-mod__section">
+      <h2 class="instr-mod__section-title">{t.presentationTitle}</h2>
+      {presentationMd ? <MarkdownContent md={presentationMd} /> : <p class="instr-mod__missing">{t.presentationMissing}</p>}
     </section>
   </div>
 </Layout>

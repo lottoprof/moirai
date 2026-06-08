@@ -21,7 +21,6 @@ import { requireAnyRoleApi } from '../../../../../../lib/server/guards';
 export const prerender = false;
 
 const KIND_TO_COLUMN: Record<string, string> = {
-  body: 'body_r2_key',
   presentation: 'presentation_r2_key',
   workbook: 'workbook_r2_key',
 };

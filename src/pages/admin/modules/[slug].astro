@@ -41,7 +41,6 @@ interface ModuleRow {
   has_homework: number;
   has_text: number;
   default_duration_days: number;
-  body_r2_key: string | null;
   presentation_r2_key: string | null;
   workbook_r2_key: string | null;
   updated_at: number;
@@ -49,7 +48,7 @@ interface ModuleRow {
 
 const rows = await env.DB.prepare(
   `SELECT slug, locale, title, track, status, has_video, has_homework, has_text,
-          default_duration_days, body_r2_key, presentation_r2_key, workbook_r2_key, updated_at
+          default_duration_days, presentation_r2_key, workbook_r2_key, updated_at
      FROM modules WHERE slug = ?`,
 ).bind(slug).all<ModuleRow>();
 
@@ -74,8 +73,8 @@ async function fetchR2Text(key: string | null | undefined): Promise<string | nul
   }
 }
 
-const bodyMd = await fetchR2Text(previewRow?.body_r2_key);
 const workbookMd = await fetchR2Text(previewRow?.workbook_r2_key);
+const presentationMd = await fetchR2Text(previewRow?.presentation_r2_key);
 
 const intlLocale = ru ? "ru-RU" : "en-US";
 const dateFmt = new Intl.DateTimeFormat(intlLocale, {
@@ -89,9 +88,8 @@ const t = ru
       missing: "Запись отсутствует",
       titleLabel: "Название", statusLabel: "Статус",
       saveBtn: "Сохранить",
-      bodyTitle: "Body", workbookTitle: "Workbook",
-      bodyMissing: "Body не загружен.", workbookMissing: "Workbook не загружен.",
-      presentationBtn: "Открыть презентацию",
+      workbookTitle: "Workbook", presentationTitle: "Презентация",
+      workbookMissing: "Workbook не загружен.", presentationMissing: "Презентация не загружена.",
       metaTitle: "Метаданные", metaTrack: "Трек",
       metaFeatures: "Возможности", metaDuration: "Дней по умолчанию",
       metaUpdated: "Обновлено",
@@ -105,9 +103,8 @@ const t = ru
       missing: "Row missing",
       titleLabel: "Title", statusLabel: "Status",
       saveBtn: "Save",
-      bodyTitle: "Body", workbookTitle: "Workbook",
-      bodyMissing: "Body not uploaded.", workbookMissing: "Workbook not uploaded.",
-      presentationBtn: "Open presentation",
+      workbookTitle: "Workbook", presentationTitle: "Presentation",
+      workbookMissing: "Workbook not uploaded.", presentationMissing: "Presentation not uploaded.",
       metaTitle: "Metadata", metaTrack: "Track",
       metaFeatures: "Features", metaDuration: "Default duration (days)",
       metaUpdated: "Updated",
@@ -181,22 +178,14 @@ const t = ru
       </div>
     </form>
 
-    {previewRow?.presentation_r2_key && (
-      <p class="module-section__cta">
-        <a class="module-form__save" href={`/api/modules/preview/${encodeURIComponent(slug)}/${previewLocale}/presentation`} target="_blank" rel="noopener">
-          {t.presentationBtn}
-        </a>
-      </p>
-    )}
-
-    <section class="module-section">
-      <h2 class="module-section__title">{t.bodyTitle} ({previewLocale.toUpperCase()})</h2>
-      {bodyMd ? <MarkdownContent md={bodyMd} /> : <p class="module-section__missing">{t.bodyMissing}</p>}
-    </section>
-
     <section class="module-section">
       <h2 class="module-section__title">{t.workbookTitle} ({previewLocale.toUpperCase()})</h2>
       {workbookMd ? <MarkdownContent md={workbookMd} /> : <p class="module-section__missing">{t.workbookMissing}</p>}
+    </section>
+
+    <section class="module-section">
+      <h2 class="module-section__title">{t.presentationTitle} ({previewLocale.toUpperCase()})</h2>
+      {presentationMd ? <MarkdownContent md={presentationMd} /> : <p class="module-section__missing">{t.presentationMissing}</p>}
     </section>
 
     <section class="module-section">
