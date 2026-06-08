@@ -39,7 +39,8 @@ if (!instructor) return new Response(null, { status: 404 });
 
 const qualified = await getInstructorQualifications(env, id);
 
-// Programmes из Content Collection — default_modules как source of truth
+// Programmes из Content Collection — поле modules как source of truth.
+// (Раньше я ошибочно искал default_modules — поля нет, было `modules`).
 interface ProgrammeView {
   slug: string;
   title: string;
@@ -50,11 +51,11 @@ const programmesAll = await getCollection("programmes", (e: CollectionEntry<"pro
 );
 const programmes: ProgrammeView[] = programmesAll
   .map((p: CollectionEntry<"programmes">): ProgrammeView => {
-    const data = p.data as { title?: string; default_modules?: string[] | null };
+    const data = p.data as { title?: string; modules?: string[] | null };
     return {
       slug: p.id.replace(`.${locale}`, ""),
       title: data.title ?? p.id,
-      default_modules: data.default_modules ?? [],
+      default_modules: data.modules ?? [],
     };
   })
   .filter((p: ProgrammeView) => p.default_modules.length > 0);

@@ -1,6 +1,6 @@
 # Admin: Instructor management
 
-> Status: active. Утверждено 2026-06-08 (Q1=A per module, Q2=A soft warn, Q3=A substitute).
+> Status: done. Code merged 2026-06-08. Deploy pending user confirmation.
 >
 > Spec не было в docs/decisions — этот план становится source of truth.
 > После reшения: добавим раздел в `docs/Architecture.md` (§ Instructor zone)
