@@ -49,6 +49,10 @@ interface ProgrammeView {
 const programmesAll = await getCollection("programmes", (e: CollectionEntry<"programmes">) =>
   e.id.endsWith(`.${locale}`),
 );
+// bundle / individual — commercial-пакеты, не отдельные образовательные
+// треки (bundle = beginner+intermediate union, individual = by-request).
+// В matrix не показываем чтобы не дублировать checkbox'ы.
+const PACKAGE_SLUGS = new Set(["bundle", "individual"]);
 const programmes: ProgrammeView[] = programmesAll
   .map((p: CollectionEntry<"programmes">): ProgrammeView => {
     const data = p.data as { title?: string; modules?: string[] | null };
@@ -58,7 +62,7 @@ const programmes: ProgrammeView[] = programmesAll
       default_modules: data.modules ?? [],
     };
   })
-  .filter((p: ProgrammeView) => p.default_modules.length > 0);
+  .filter((p: ProgrammeView) => p.default_modules.length > 0 && !PACKAGE_SLUGS.has(p.slug));
 
 // Module titles из D1 для лучшего отображения
 const allModuleSlugs = Array.from(new Set(programmes.flatMap((p: ProgrammeView) => p.default_modules)));
