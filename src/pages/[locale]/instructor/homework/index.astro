@@ -1,0 +1,405 @@
+---
+/*
+ * /{locale}/instructor/homework — full pending queue page.
+ *
+ * Instructor LK v2 Q1 (закрыт 2026-06-08).
+ *
+ * Цель: одно место со всеми pending submissions всех cohorts preподa.
+ * Главный "work today" view — не нужно лазить по cohort cards.
+ *
+ * Filter chips:
+ *   - by cohort (multi, label = "Programme Start MMM YYYY")
+ *   - by programme (multi, окраска per slug)
+ *   - "Only late" toggle
+ *
+ * Sort фиксированный (priority='normal' DESC → uploaded_at ASC) —
+ * старшие и приоритетные сверху.
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../../../layouts/instructor/Layout.astro";
+import InstructorHero from "../../../../components/instructor/InstructorHero.astro";
+import { requireRole } from "../../../../lib/server/guards";
+import { getReviewQueue } from "../../../../lib/server/instructor-homework";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/instructor");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+
+const userOrRes = await requireRole(Astro, "instructor");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+const queue = await getReviewQueue(env, user.id, typedLocale);
+
+// Programme titles из Content Collection
+const programmeSlugs = Array.from(new Set(queue.map((q) => q.programme_slug)));
+const programmeTitleMap = new Map<string, string>();
+await Promise.all(programmeSlugs.map(async (slug) => {
+  const entry = await getEntry("programmes", `${slug}.${typedLocale}`);
+  if (entry) programmeTitleMap.set(slug, entry.data.title);
+}));
+
+// Cohort labels (programme + start_date) — нужны для filter chips
+const cohortIds = Array.from(new Set(queue.map((q) => q.cohort_id)));
+const cohortLabelMap = new Map<string, string>();
+if (cohortIds.length > 0) {
+  const placeholders = cohortIds.map(() => "?").join(",");
+  const rows = await env.DB.prepare(
+    `SELECT id, programme_id, start_date FROM cohorts WHERE id IN (${placeholders})`,
+  ).bind(...cohortIds).all<{ id: string; programme_id: string; start_date: number }>();
+  const intlLocale = ru ? "ru-RU" : "en-US";
+  const fmt = new Intl.DateTimeFormat(intlLocale, { month: "short", year: "numeric" });
+  for (const r of rows.results) {
+    const prog = programmeTitleMap.get(r.programme_id) ?? r.programme_id;
+    cohortLabelMap.set(r.id, `${prog} · ${fmt.format(new Date(r.start_date * 1000))}`);
+  }
+}
+
+const intlLocale = ru ? "ru-RU" : "en-US";
+const relFmt = new Intl.RelativeTimeFormat(intlLocale, { numeric: "auto" });
+function relativeFromNow(uploadedAt: number): string {
+  const diffSec = uploadedAt - Math.floor(Date.now() / 1000);
+  const absHr = Math.abs(diffSec / 3600);
+  if (absHr < 1) return relFmt.format(Math.round(diffSec / 60), "minute");
+  if (absHr < 48) return relFmt.format(Math.round(diffSec / 3600), "hour");
+  return relFmt.format(Math.round(diffSec / 86400), "day");
+}
+
+// Filter counts
+const programmeChipsList = programmeSlugs.map((slug) => ({
+  slug,
+  label: programmeTitleMap.get(slug) ?? slug,
+  count: queue.filter((q) => q.programme_slug === slug).length,
+})).sort((a, b) => a.label.localeCompare(b.label));
+
+const cohortChipsList = Array.from(cohortIds)
+  .map((id) => ({
+    id,
+    label: cohortLabelMap.get(id) ?? id,
+    count: queue.filter((q) => q.cohort_id === id).length,
+  }))
+  .sort((a, b) => a.label.localeCompare(b.label));
+
+const lateCount = queue.filter((q) => q.is_late === 1).length;
+
+const initialFilters = [
+  ...programmeChipsList.map((p) => `prog-${p.slug}`),
+  ...cohortChipsList.map((c) => `cohort-${c.id}`),
+].join(" ");
+
+const t = ru
+  ? {
+      eyebrow: "Преподаватель",
+      title: "Очередь проверки",
+      subtitle: queue.length === 0
+        ? "Очередь чиста"
+        : `${queue.length.toString()} работ${queue.length === 1 ? "а" : queue.length < 5 ? "ы" : ""} на проверке`,
+      empty: "Все работы проверены. ",
+      labelProgramme: "Программа",
+      labelCohort: "Когорта",
+      labelLate: "Только просрочка",
+      lateBadge: "Просрочка",
+      seo: { title: "Очередь проверки — Moirai", description: "Все ожидающие проверку ДЗ." },
+    }
+  : {
+      eyebrow: "Instructor",
+      title: "Review queue",
+      subtitle: queue.length === 0
+        ? "Queue clear"
+        : `${queue.length.toString()} submission${queue.length === 1 ? "" : "s"} awaiting review`,
+      empty: "All caught up.",
+      labelProgramme: "Programme",
+      labelCohort: "Cohort",
+      labelLate: "Late only",
+      lateBadge: "Late",
+      seo: { title: "Review queue — Moirai", description: "All pending homework submissions." },
+    };
+---
+
+<Layout
+  locale={typedLocale}
+  seo={t.seo}
+  currentNavKey="queue"
+  userRoles={user.roles}
+>
+  <InstructorHero eyebrow={t.eyebrow} title={t.title} subtitle={t.subtitle} />
+
+  <div class="queue-content">
+    {queue.length === 0 ? (
+      <p class="queue-empty">{t.empty}</p>
+    ) : (
+      <>
+        <div class="queue-filters" role="group" aria-label="Queue filters">
+          {programmeChipsList.length > 1 && (
+            <div class="queue-filters__group">
+              <span class="queue-filters__group-label">{t.labelProgramme}</span>
+              {programmeChipsList.map((p) => (
+                <button
+                  type="button"
+                  class:list={["queue-filter-chip", "queue-filter-chip--active", `queue-filter-chip--prog-${p.slug}`]}
+                  data-filter-key={`prog-${p.slug}`}
+                  aria-pressed="true"
+                >
+                  <span>{p.label}</span>
+                  <span class="queue-filter-chip__count">{p.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {cohortChipsList.length > 1 && (
+            <div class="queue-filters__group">
+              <span class="queue-filters__group-label">{t.labelCohort}</span>
+              {cohortChipsList.map((c) => (
+                <button
+                  type="button"
+                  class="queue-filter-chip queue-filter-chip--active"
+                  data-filter-key={`cohort-${c.id}`}
+                  aria-pressed="true"
+                >
+                  <span>{c.label}</span>
+                  <span class="queue-filter-chip__count">{c.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            class="queue-filter-chip queue-filter-chip--late-toggle"
+            data-filter-key="late-only"
+            aria-pressed="false"
+          >
+            <span>{t.labelLate}</span>
+            <span class="queue-filter-chip__count">{lateCount}</span>
+          </button>
+        </div>
+
+        <ul class="queue-list" data-filters={initialFilters}>
+          {queue.map((q) => (
+            <li
+              class:list={["queue-row", q.is_late ? "queue-row--late" : null]}
+              data-programme={q.programme_slug}
+              data-cohort={q.cohort_id}
+              data-late={q.is_late === 1 ? "1" : "0"}
+            >
+              <a class="queue-row__link" href={`/${typedLocale}/instructor/homework/${q.id}`}>
+                <div class="queue-row__main">
+                  <span class="queue-row__student">{q.student_name ?? q.student_email.split("@")[0]}</span>
+                  <span class="queue-row__sep">·</span>
+                  <span class={`queue-row__programme queue-row__programme--${q.programme_slug}`}>
+                    {programmeTitleMap.get(q.programme_slug) ?? q.programme_slug}
+                  </span>
+                  <span class="queue-row__sep">·</span>
+                  <span class="queue-row__module">{q.module_title ?? q.module_slug}</span>
+                </div>
+                <div class="queue-row__meta">
+                  {q.is_late === 1 && (
+                    <span class="queue-row__late-badge">{t.lateBadge}</span>
+                  )}
+                  <span class="queue-row__time">{relativeFromNow(q.uploaded_at)}</span>
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </>
+    )}
+  </div>
+</Layout>
+
+<script>
+  const list = document.querySelector<HTMLElement>(".queue-list");
+  const chips = document.querySelectorAll<HTMLButtonElement>(".queue-filter-chip");
+  if (list) {
+    const apply = () => {
+      const active: string[] = [];
+      chips.forEach((c) => {
+        if (c.getAttribute("aria-pressed") === "true") active.push(c.dataset.filterKey ?? "");
+      });
+      list.dataset.filters = active.join(" ");
+    };
+    chips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const pressed = chip.getAttribute("aria-pressed") === "true";
+        chip.setAttribute("aria-pressed", pressed ? "false" : "true");
+        chip.classList.toggle("queue-filter-chip--active", !pressed);
+        apply();
+      });
+    });
+    apply();
+  }
+</script>
+
+<style>
+  .queue-content {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .queue-empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-2xl);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    text-align: center;
+  }
+
+  /* Filters */
+  .queue-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-md) var(--space-lg);
+    margin: 0 0 var(--space-lg);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .queue-filters__group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+  }
+  .queue-filters__group-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-right: var(--space-xs);
+  }
+  .queue-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    color: var(--text-faint);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-out),
+                border-color var(--duration-fast) var(--ease-out);
+  }
+  .queue-filter-chip:hover {
+    color: var(--text-muted);
+    border-color: var(--text-muted);
+  }
+  .queue-filter-chip--active {
+    color: var(--text);
+    border-color: var(--text);
+  }
+  .queue-filter-chip--prog-beginner.queue-filter-chip--active {
+    color: var(--prog-beginner);
+    border-color: var(--prog-beginner);
+  }
+  .queue-filter-chip--prog-intermediate.queue-filter-chip--active {
+    color: var(--prog-intermediate);
+    border-color: var(--prog-intermediate);
+  }
+  .queue-filter-chip--prog-advanced.queue-filter-chip--active {
+    color: var(--prog-advanced);
+    border-color: var(--prog-advanced);
+  }
+  .queue-filter-chip__count {
+    color: var(--text-faint);
+    font-size: var(--type-micro-sm);
+  }
+  .queue-filter-chip--active .queue-filter-chip__count {
+    color: inherit;
+    opacity: 0.7;
+  }
+
+  /* List */
+  .queue-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .queue-row {
+    border-bottom: 1px solid var(--border);
+  }
+  .queue-row__link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) 0;
+    text-decoration: none;
+    color: var(--text-muted);
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+  .queue-row__link:hover { color: var(--text); }
+  .queue-row__main {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+  }
+  .queue-row__student {
+    font-family: var(--font-display);
+    font-size: var(--type-body-md);
+    color: var(--text);
+  }
+  .queue-row__sep { color: var(--text-faint); }
+  .queue-row__programme--beginner     { color: var(--prog-beginner); }
+  .queue-row__programme--intermediate { color: var(--prog-intermediate); }
+  .queue-row__programme--advanced     { color: var(--prog-advanced); }
+  .queue-row__module {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+  }
+  .queue-row__meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    flex-shrink: 0;
+  }
+  .queue-row__time {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    letter-spacing: var(--tracking-wide);
+  }
+  .queue-row__late-badge {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 2px;
+    background: var(--amber-faint);
+    color: var(--amber);
+  }
+</style>
+
+<style is:global>
+  /* Hide rows whose programme not in active filters, or late-only hides non-late. */
+  .queue-list:not([data-filters~="prog-beginner"])     .queue-row[data-programme="beginner"]     { display: none; }
+  .queue-list:not([data-filters~="prog-intermediate"]) .queue-row[data-programme="intermediate"] { display: none; }
+  .queue-list:not([data-filters~="prog-advanced"])     .queue-row[data-programme="advanced"]     { display: none; }
+  .queue-list[data-filters~="late-only"] .queue-row[data-late="0"] { display: none; }
+</style>
+
+<!-- Dynamic cohort filters — генерируем CSS из реальных cohort IDs.
+     Без этого нет способа в чистом CSS привязаться к UUID'у. -->
+<style is:global set:html={cohortChipsList.map((c) =>
+  `.queue-list:not([data-filters~="cohort-${c.id}"]) .queue-row[data-cohort="${c.id}"] { display: none; }`
+).join("\n")}></style>

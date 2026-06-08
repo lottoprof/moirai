@@ -28,6 +28,8 @@ export interface InstructorQueueItem {
   is_late: number;
   status: HomeworkStatus;
   priority: HomeworkPriority;
+  programme_slug: string;
+  cohort_id: string;
 }
 
 interface RawQueueRow {
@@ -42,6 +44,8 @@ interface RawQueueRow {
   is_late: number;
   status: string;
   priority: string;
+  programme_slug: string;
+  cohort_id: string;
 }
 
 export interface QueueFilters {
@@ -87,10 +91,13 @@ export async function getReviewQueue(
     `SELECT hs.id, hs.enrollment_id, e.user_id,
             u.name AS student_name, u.email AS student_email,
             hs.module_slug, m.title AS module_title,
-            hs.uploaded_at, hs.is_late, hs.status, hs.priority
+            hs.uploaded_at, hs.is_late, hs.status, hs.priority,
+            c.programme_id AS programme_slug, c.id AS cohort_id
        FROM homework_submissions hs
        JOIN enrollments e ON e.id = hs.enrollment_id
        JOIN users u ON u.id = e.user_id
+       JOIN applications a ON a.enrollment_id = e.id
+       JOIN cohorts c ON c.id = a.cohort_id
        LEFT JOIN modules m ON m.slug = hs.module_slug AND m.locale = ?
       WHERE ${where.join(' AND ')}
       ORDER BY (hs.priority = 'normal') DESC, hs.uploaded_at ASC
@@ -111,6 +118,8 @@ export async function getReviewQueue(
     is_late: r.is_late,
     status: r.status as HomeworkStatus,
     priority: r.priority as HomeworkPriority,
+    programme_slug: r.programme_slug,
+    cohort_id: r.cohort_id,
   }));
 }
 
