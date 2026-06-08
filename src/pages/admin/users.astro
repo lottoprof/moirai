@@ -242,7 +242,7 @@ const statusOf = (u: UserListRow): "active" | "inactive" | "pending" =>
                 </td>
                 <td class="admin-users__col-muted">{dateFmt.format(new Date(u.created_at * 1000))}</td>
                 <td>
-                  <a href={`?role=${roleFilter}&q=${encodeURIComponent(searchQuery)}&selected=${u.id}`}
+                  <a href={`?role=${roleFilter}&q=${encodeURIComponent(searchQuery)}&selected=${u.id}#drawer`}
                      class="admin-users__action">{t.profile} →</a>
                 </td>
               </tr>
@@ -254,7 +254,7 @@ const statusOf = (u: UserListRow): "active" | "inactive" | "pending" =>
 
     <!-- Drawer (когда selected) -->
     {selectedUser && (
-      <div class="admin-users__drawer" data-user-id={selectedUser.id}>
+      <div id="drawer" class="admin-users__drawer" data-user-id={selectedUser.id}>
         <div class="admin-users__drawer-header">
           <div>
             <h2 class="admin-users__drawer-name">{selectedUser.name?.trim() || selectedUser.email.split("@")[0]}</h2>

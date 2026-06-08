@@ -7,6 +7,7 @@
  * управляются через external methodist repo.
  */
 
+import { marked } from "marked";
 import Layout from "../../../layouts/admin/Layout.astro";
 import { requireRole } from "../../../lib/server/guards";
 
@@ -50,6 +51,31 @@ if (rows.results.length === 0) return new Response(null, { status: 404 });
 const enRow = rows.results.find((r) => r.locale === "en") ?? null;
 const ruRow = rows.results.find((r) => r.locale === "ru") ?? null;
 
+// Body preview — render markdown в админскую локаль (или fallback)
+const previewRow = adminLocale === "ru" ? (ruRow ?? enRow) : (enRow ?? ruRow);
+const previewLocale = previewRow?.locale ?? "en";
+
+let bodyHtml: string | null = null;
+let bodyError: string | null = null;
+if (previewRow?.body_r2_key) {
+  try {
+    const obj = await env.MODULE_CONTENT.get(previewRow.body_r2_key);
+    if (obj) {
+      const md = await obj.text();
+      const stripped = md.replace(/^---\n[\s\S]*?\n---\n/, "");
+      marked.setOptions({ gfm: true, breaks: false });
+      bodyHtml = await marked.parse(stripped);
+    } else {
+      bodyError = "missing_in_r2";
+    }
+  } catch (err) {
+    console.error("[admin module preview] R2 fetch failed:", err);
+    bodyError = "fetch_error";
+  }
+} else {
+  bodyError = "no_key";
+}
+
 const intlLocale = ru ? "ru-RU" : "en-US";
 const dateFmt = new Intl.DateTimeFormat(intlLocale, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
@@ -73,6 +99,13 @@ const t = ru
       featureVideo: "видео",
       featureHomework: "ДЗ",
       featureText: "текст",
+      previewTitle: "Просмотр",
+      previewHint: (loc: string) => `Тело модуля (${loc.toUpperCase()}). Загружено методистом.`,
+      previewMissing: "Body не загружен в R2.",
+      previewError: "Ошибка загрузки из R2.",
+      previewNoKey: "body_r2_key не задан.",
+      downloadPresentation: "Скачать презентацию",
+      downloadWorkbook: "Скачать workbook",
       r2Title: "R2-ключи (read-only)",
       r2Hint: "Тело модуля управляется через methodist repo. R2 keys показаны для отладки.",
       r2Body: "Body",
@@ -101,6 +134,13 @@ const t = ru
       featureVideo: "video",
       featureHomework: "homework",
       featureText: "text",
+      previewTitle: "Preview",
+      previewHint: (loc: string) => `Module body (${loc.toUpperCase()}). Uploaded by methodist.`,
+      previewMissing: "Body not uploaded to R2.",
+      previewError: "Failed to fetch from R2.",
+      previewNoKey: "body_r2_key not set.",
+      downloadPresentation: "Download presentation",
+      downloadWorkbook: "Download workbook",
       r2Title: "R2 keys (read-only)",
       r2Hint: "Module body managed via methodist repo. R2 keys shown for debugging.",
       r2Body: "Body",
@@ -175,6 +215,32 @@ const t = ru
         <span class="module-form__status" data-status hidden></span>
       </div>
     </form>
+
+    <section class="module-preview">
+      <h2 class="module-meta__title">{t.previewTitle}</h2>
+      <p class="module-preview__hint">{t.previewHint(previewLocale)}</p>
+      <div class="module-preview__downloads">
+        {previewRow?.presentation_r2_key && (
+          <a class="module-preview__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${previewLocale}/presentation`} target="_blank" rel="noopener">
+            {t.downloadPresentation}
+          </a>
+        )}
+        {previewRow?.workbook_r2_key && (
+          <a class="module-preview__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${previewLocale}/workbook`} target="_blank" rel="noopener">
+            {t.downloadWorkbook}
+          </a>
+        )}
+      </div>
+      {bodyHtml ? (
+        <article class="module-preview__body" set:html={bodyHtml} />
+      ) : (
+        <p class="module-preview__err">
+          {bodyError === "no_key" ? t.previewNoKey :
+           bodyError === "missing_in_r2" ? t.previewMissing :
+           t.previewError}
+        </p>
+      )}
+    </section>
 
     <section class="module-meta">
       <h2 class="module-meta__title">{t.metaTitle}</h2>
@@ -373,4 +439,51 @@ const t = ru
   }
   .module-r2__hint { color: var(--text-faint); font-size: var(--type-micro-md); margin: 0 0 var(--space-md); }
   .module-r2__key { color: var(--text-faint); font-family: var(--font-body); font-size: var(--type-micro-md); }
+
+  .module-preview {
+    margin-top: var(--space-xl);
+    padding: var(--space-md);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+  .module-preview__hint { color: var(--text-faint); margin: 0 0 var(--space-md); font-size: var(--type-micro-md); }
+  .module-preview__downloads { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-lg); }
+  .module-preview__btn {
+    padding: 8px 14px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    text-decoration: none;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    border-radius: 2px;
+  }
+  .module-preview__btn:hover { color: var(--text); border-color: var(--text); }
+  .module-preview__err { color: var(--text-faint); font-style: italic; }
+  .module-preview__body {
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    line-height: var(--leading-relaxed);
+  }
+  .module-preview__body :global(h1),
+  .module-preview__body :global(h2),
+  .module-preview__body :global(h3) {
+    font-family: var(--font-display);
+    font-weight: 400;
+    margin-top: var(--space-md);
+  }
+  .module-preview__body :global(code) {
+    background: var(--bg-elevated);
+    padding: 1px 4px;
+    border-radius: 2px;
+  }
+  .module-preview__body :global(pre) {
+    background: var(--bg-elevated);
+    padding: var(--space-sm);
+    overflow-x: auto;
+    border-radius: 2px;
+  }
 </style>

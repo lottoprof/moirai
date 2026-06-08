@@ -1,0 +1,180 @@
+---
+/*
+ * /{locale}/instructor/modules/{slug} — preview body + материалы модуля.
+ *
+ * Read-only mirror /admin/modules/[slug] для preподa. Без edit, без R2 keys.
+ */
+
+import { marked } from "marked";
+import Layout from "../../../../layouts/instructor/Layout.astro";
+import { requireRole } from "../../../../lib/server/guards";
+
+export const prerender = false;
+
+const { locale, slug } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/instructor");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+if (!slug || typeof slug !== "string") return new Response(null, { status: 404 });
+
+const userOrRes = await requireRole(Astro, "instructor");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+interface ModuleRow {
+  title: string;
+  track: string | null;
+  status: string;
+  has_video: number;
+  has_homework: number;
+  body_r2_key: string | null;
+  presentation_r2_key: string | null;
+  workbook_r2_key: string | null;
+}
+
+const row = await env.DB.prepare(
+  `SELECT title, track, status, has_video, has_homework,
+          body_r2_key, presentation_r2_key, workbook_r2_key
+     FROM modules WHERE slug = ? AND locale = ?`,
+).bind(slug, typedLocale).first<ModuleRow>();
+
+if (!row) return new Response(null, { status: 404 });
+
+let bodyHtml: string | null = null;
+let bodyError: string | null = null;
+if (row.body_r2_key) {
+  try {
+    const obj = await env.MODULE_CONTENT.get(row.body_r2_key);
+    if (obj) {
+      const md = await obj.text();
+      const stripped = md.replace(/^---\n[\s\S]*?\n---\n/, "");
+      marked.setOptions({ gfm: true, breaks: false });
+      bodyHtml = await marked.parse(stripped);
+    } else {
+      bodyError = "missing_in_r2";
+    }
+  } catch (err) {
+    console.error("[instructor module preview] R2 fetch failed:", err);
+    bodyError = "fetch_error";
+  }
+} else {
+  bodyError = "no_key";
+}
+
+const t = ru
+  ? {
+      backLink: "← К модулям",
+      previewMissing: "Body не загружен.",
+      previewError: "Ошибка загрузки.",
+      previewNoKey: "Body не настроен.",
+      downloadPresentation: "Скачать презентацию",
+      downloadWorkbook: "Скачать workbook",
+      seo: { title: `${row.title} — Преподаватель`, description: "Module preview" },
+    }
+  : {
+      backLink: "← Back to modules",
+      previewMissing: "Body not uploaded.",
+      previewError: "Fetch error.",
+      previewNoKey: "Body not configured.",
+      downloadPresentation: "Download presentation",
+      downloadWorkbook: "Download workbook",
+      seo: { title: `${row.title} — Instructor`, description: "Module preview" },
+    };
+---
+
+<Layout
+  locale={typedLocale}
+  seo={t.seo}
+  currentNavKey="modules"
+  userRoles={user.roles}
+>
+  <div class="instr-mod">
+    <a class="instr-mod__back" href={`/${typedLocale}/instructor/modules`}>{t.backLink}</a>
+
+    <header class="instr-mod__head">
+      <h1 class="instr-mod__title">{row.title}</h1>
+      <p class="instr-mod__slug">{slug}</p>
+    </header>
+
+    <div class="instr-mod__downloads">
+      {row.presentation_r2_key && (
+        <a class="instr-mod__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${typedLocale}/presentation`} target="_blank" rel="noopener">
+          {t.downloadPresentation}
+        </a>
+      )}
+      {row.workbook_r2_key && (
+        <a class="instr-mod__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${typedLocale}/workbook`} target="_blank" rel="noopener">
+          {t.downloadWorkbook}
+        </a>
+      )}
+    </div>
+
+    {bodyHtml ? (
+      <article class="instr-mod__body" set:html={bodyHtml} />
+    ) : (
+      <p class="instr-mod__err">
+        {bodyError === "no_key" ? t.previewNoKey :
+         bodyError === "missing_in_r2" ? t.previewMissing :
+         t.previewError}
+      </p>
+    )}
+  </div>
+</Layout>
+
+<style>
+  .instr-mod {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  .instr-mod__back {
+    display: inline-block;
+    color: var(--text-faint);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    margin-bottom: var(--space-md);
+  }
+  .instr-mod__back:hover { color: var(--text); }
+  .instr-mod__head { margin-bottom: var(--space-lg); }
+  .instr-mod__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .instr-mod__slug { color: var(--text-faint); font-family: var(--font-body); font-size: var(--type-micro-md); margin: 4px 0 0; }
+  .instr-mod__downloads { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-lg); }
+  .instr-mod__btn {
+    padding: 8px 14px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    text-decoration: none;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    border-radius: 2px;
+  }
+  .instr-mod__btn:hover { color: var(--text); border-color: var(--text); }
+  .instr-mod__err { color: var(--text-faint); font-style: italic; }
+  .instr-mod__body {
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    line-height: var(--leading-relaxed);
+  }
+  .instr-mod__body :global(h1),
+  .instr-mod__body :global(h2),
+  .instr-mod__body :global(h3) {
+    font-family: var(--font-display);
+    font-weight: 400;
+    margin-top: var(--space-lg);
+  }
+</style>

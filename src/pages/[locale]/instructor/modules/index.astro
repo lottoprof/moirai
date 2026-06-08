@@ -1,0 +1,194 @@
+---
+/*
+ * /{locale}/instructor/modules — список модулей для просмотра preподу.
+ *
+ * Read-only mirror /admin/modules без editing. Methodist загружает,
+ * instructor видит все модули независимо от unlock-статуса cohort'ы.
+ */
+
+import { getCollection } from "astro:content";
+import type { CollectionEntry } from "astro:content";
+import Layout from "../../../../layouts/instructor/Layout.astro";
+import { requireRole } from "../../../../lib/server/guards";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/instructor");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+
+const userOrRes = await requireRole(Astro, "instructor");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+interface ProgrammeView {
+  slug: string;
+  title: string;
+  module_slugs: string[];
+}
+
+const PACKAGE_SLUGS = new Set(["bundle", "individual"]);
+const programmesAll = await getCollection("programmes", (e: CollectionEntry<"programmes">) =>
+  e.id.endsWith(`.${typedLocale}`),
+);
+const programmes: ProgrammeView[] = programmesAll
+  .map((p: CollectionEntry<"programmes">): ProgrammeView => {
+    const data = p.data as { title?: string; modules?: string[] | null };
+    return {
+      slug: p.id.replace(`.${typedLocale}`, ""),
+      title: data.title ?? p.id,
+      module_slugs: data.modules ?? [],
+    };
+  })
+  .filter((p: ProgrammeView) => p.module_slugs.length > 0 && !PACKAGE_SLUGS.has(p.slug));
+
+const allModuleSlugs = Array.from(new Set(programmes.flatMap((p) => p.module_slugs)));
+
+interface ModuleTitleRow { slug: string; title: string; status: string }
+const titleMap = new Map<string, { title: string; status: string }>();
+if (allModuleSlugs.length > 0) {
+  const placeholders = allModuleSlugs.map(() => "?").join(",");
+  const rows = await env.DB.prepare(
+    `SELECT slug, title, status FROM modules
+      WHERE slug IN (${placeholders}) AND locale = ?`,
+  ).bind(...allModuleSlugs, typedLocale).all<ModuleTitleRow>();
+  for (const r of rows.results) titleMap.set(r.slug, { title: r.title, status: r.status });
+}
+
+const t = ru
+  ? {
+      title: "Модули",
+      subtitle: "Просмотр всех модулей программы. Методист загружает, преподаватель видит независимо от состояния когорты.",
+      empty: "Модулей нет.",
+      headerNum: "№",
+      headerTitle: "Название",
+      headerStatus: "Статус",
+      open: "Открыть",
+      statusLabels: { published: "Опубликован", draft: "Черновик", archived: "Архив" } as Record<string, string>,
+      seo: { title: "Модули — Преподаватель", description: "Просмотр модулей." },
+    }
+  : {
+      title: "Modules",
+      subtitle: "Browse all programme modules. Methodist uploads, instructor sees them regardless of cohort state.",
+      empty: "No modules.",
+      headerNum: "#",
+      headerTitle: "Title",
+      headerStatus: "Status",
+      open: "Open",
+      statusLabels: { published: "Published", draft: "Draft", archived: "Archived" } as Record<string, string>,
+      seo: { title: "Modules — Instructor", description: "Browse modules." },
+    };
+---
+
+<Layout
+  locale={typedLocale}
+  seo={t.seo}
+  currentNavKey="modules"
+  userRoles={user.roles}
+>
+  <div class="instr-modules">
+    <header class="instr-modules__head">
+      <h1 class="instr-modules__title">{t.title}</h1>
+      <p class="instr-modules__subtitle">{t.subtitle}</p>
+    </header>
+
+    {programmes.length === 0 ? (
+      <p class="instr-modules__empty">{t.empty}</p>
+    ) : (
+      <div class="instr-modules__stack">
+        {programmes.map((prog) => (
+          <section>
+            <h2 class={`instr-modules__prog instr-modules__prog--${prog.slug}`}>{prog.title}</h2>
+            <ul class="instr-modules__list">
+              {prog.module_slugs.map((slug, idx) => {
+                const meta = titleMap.get(slug);
+                return (
+                  <li class="instr-modules__row">
+                    <a class="instr-modules__row-link" href={`/${typedLocale}/instructor/modules/${encodeURIComponent(slug)}`}>
+                      <span class="instr-modules__num">{(idx + 1).toString().padStart(2, "0")}</span>
+                      <span class="instr-modules__name">{meta?.title ?? slug}</span>
+                      <span class={`instr-modules__status instr-modules__status--${meta?.status ?? "missing"}`}>
+                        {meta?.status ? (t.statusLabels[meta.status] ?? meta.status) : "—"}
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+    )}
+  </div>
+</Layout>
+
+<style>
+  .instr-modules {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .instr-modules__head { margin-bottom: var(--space-xl); }
+  .instr-modules__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .instr-modules__subtitle { color: var(--text-faint); margin: 4px 0 0; font-size: var(--type-body-sm); max-width: 60ch; }
+  .instr-modules__empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-2xl);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    text-align: center;
+  }
+  .instr-modules__stack { display: flex; flex-direction: column; gap: var(--space-xl); }
+  .instr-modules__prog {
+    font-family: var(--font-display);
+    font-size: var(--type-display-sm);
+    font-weight: 400;
+    margin: 0 0 var(--space-md);
+    color: var(--text);
+  }
+  .instr-modules__prog--beginner     { color: var(--prog-beginner); }
+  .instr-modules__prog--intermediate { color: var(--prog-intermediate); }
+  .instr-modules__prog--advanced     { color: var(--prog-advanced); }
+  .instr-modules__list { list-style: none; padding: 0; margin: 0; }
+  .instr-modules__row { border-bottom: 1px solid var(--border); }
+  .instr-modules__row-link {
+    display: grid;
+    grid-template-columns: 48px 1fr auto;
+    gap: var(--space-md);
+    align-items: center;
+    padding: var(--space-sm) 0;
+    text-decoration: none;
+    color: var(--text-muted);
+  }
+  .instr-modules__row-link:hover { color: var(--text); }
+  .instr-modules__num { color: var(--text-faint); font-family: var(--font-display); }
+  .instr-modules__name { color: var(--text); }
+  .instr-modules__status {
+    font-size: var(--type-micro-sm);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+    padding: 2px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+  }
+  .instr-modules__status--published {
+    color: var(--text-accent);
+    border-color: var(--amber);
+    background: var(--amber-faint);
+  }
+  .instr-modules__status--draft { color: var(--text-faint); border-style: dashed; }
+  .instr-modules__status--archived { color: var(--text-faint); font-style: italic; }
+  .instr-modules__status--missing { color: var(--amber); border-color: var(--amber); }
+</style>
