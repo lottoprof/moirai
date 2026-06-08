@@ -14,6 +14,7 @@
  */
 
 import { LK_CONFIG } from "../../lib/config/lk";
+import { formatSessionTime } from "../../lib/format-date";
 
 interface Props {
   locale: "en" | "ru";
@@ -53,11 +54,9 @@ const statusLabel = ru
   ? { open: "Открыта", running: "Идёт", completed: "Завершена", cancelled: "Отменена" }[status]
   : { open: "Open", running: "Running", completed: "Completed", cancelled: "Cancelled" }[status];
 
+// Все live-сессии — ET (FLOW-26 / migrations/0009).
 const nextSessionFmt = nextSessionAt
-  ? new Intl.DateTimeFormat(intlLocale, {
-      weekday: "short", month: "short", day: "numeric",
-      hour: "2-digit", minute: "2-digit",
-    }).format(new Date(nextSessionAt * 1000))
+  ? formatSessionTime(new Date(nextSessionAt * 1000), locale)
   : null;
 
 // Zoom CTA active если до session ≤ 15 min (или прямо в момент)

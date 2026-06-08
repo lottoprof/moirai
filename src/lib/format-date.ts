@@ -25,3 +25,23 @@ export function formatDate(date: Date, locale: Locale): string {
 export function formatDateIso(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
+
+/**
+ * Format live-session time в Eastern Time (America/New_York).
+ *
+ * FLOW-26 / migrations/0009: все live-сессии (slots/cohorts/sessions)
+ * привязаны к ET. UI ВСЕГДА показывает ET, не зависит от browser/user TZ.
+ *
+ * Пример: "Thu, Jun 11, 01:00 PM ET" (en) / "чт, 11 июн., 13:00 ET" (ru).
+ */
+export function formatSessionTime(date: Date, locale: Locale): string {
+  const fmt = new Intl.DateTimeFormat(INTL_LOCALES[locale], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+  }).format(date);
+  return `${fmt} ET`;
+}
