@@ -65,10 +65,12 @@ export async function setInstructorQualifications(
 ): Promise<Set<string>> {
   const now = Math.floor(Date.now() / 1000);
   const existing = await getInstructorQualifications(env, userId);
+  // Dedupe target — клиент может прислать дубликаты (например через UI
+  // где programme показывает одни и те же модули в разных секциях).
   const target = new Set(moduleSlugs);
 
   const toDelete = Array.from(existing).filter((s) => !target.has(s));
-  const toAdd = moduleSlugs.filter((s) => !existing.has(s));
+  const toAdd = Array.from(target).filter((s) => !existing.has(s));
 
   if (toDelete.length > 0) {
     const placeholders = toDelete.map(() => '?').join(',');

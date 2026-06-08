@@ -209,7 +209,8 @@ const qualifiedCount = qualified.size;
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const slugs = Array.from(document.querySelectorAll(".qual-module__cb:checked"))
-      .map((cb) => cb.getAttribute("data-module-slug"));
+      .map((cb) => cb.getAttribute("data-module-slug"))
+      .filter((s) => typeof s === "string" && s.length > 0);
     saveBtn.textContent = savingBtn;
     saveBtn.disabled = true;
     statusEl.hidden = true;
