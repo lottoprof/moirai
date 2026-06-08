@@ -13,7 +13,7 @@ import ZoneNav from "../shared/ZoneNav.astro";
 
 interface Props {
   locale: "en" | "ru";
-  currentKey: "overview" | "users" | "applications" | "enrollments" | "modules" | "instructors" | "queues" | "account";
+  currentKey: "overview" | "users" | "applications" | "enrollments" | "instructors" | "account";
   roles?: Set<Role>;
 }
 
@@ -26,11 +26,8 @@ const labels = locale === "ru"
       users: "Пользователи",
       applications: "Заявки",
       enrollments: "Записи",
-      modules: "Модули",
       instructors: "Преподаватели",
-      queues: "Очереди",
       account: "Аккаунт",
-      site: "На сайт",
       switchInstructor: "Преподавателю",
       switchDashboard: "Кабинет",
     }
@@ -40,11 +37,8 @@ const labels = locale === "ru"
       users: "Users",
       applications: "Applications",
       enrollments: "Enrollments",
-      modules: "Modules",
       instructors: "Instructors",
-      queues: "Queues",
       account: "Account",
-      site: "View site",
       switchInstructor: "Instructor",
       switchDashboard: "Dashboard",
     };
@@ -54,10 +48,8 @@ const items = [
   { key: "users",        label: labels.users,        href: `/admin/users` },
   { key: "applications", label: labels.applications, href: `/admin/applications` },
   { key: "enrollments",  label: labels.enrollments,  href: `/admin/cohorts` },
-  { key: "modules",     label: labels.modules,     href: `/admin/` },
-  { key: "instructors", label: labels.instructors, href: `/admin/instructors` },
-  { key: "queues",      label: labels.queues,      href: `/admin/` },
-  { key: "account",     label: labels.account,     href: `/${locale}/account` },
+  { key: "instructors",  label: labels.instructors,  href: `/admin/instructors` },
+  { key: "account",      label: labels.account,      href: `/${locale}/account` },
 ];
 
 const otherZones: { href: string; label: string }[] = [];
@@ -72,8 +64,6 @@ if (roles?.has("student")) {
 <ZoneNav
   brandHref={`/${locale}/`}
   brandAriaLabel="Moirai home"
-  siteHref={`/${locale}/`}
-  siteLabel={labels.site}
   ariaLabel={labels.aria}
   items={items}
   currentKey={currentKey}

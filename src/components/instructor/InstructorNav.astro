@@ -27,7 +27,6 @@ const labels = locale === "ru"
       students: "Студенты",
       schedule: "Расписание",
       account: "Аккаунт",
-      site: "На сайт",
       switchDashboard: "Кабинет",
       switchAdmin: "Админу",
     }
@@ -38,7 +37,6 @@ const labels = locale === "ru"
       students: "Students",
       schedule: "Schedule",
       account: "Account",
-      site: "View site",
       switchDashboard: "Dashboard",
       switchAdmin: "Admin",
     };
@@ -63,8 +61,6 @@ if (roles?.has("admin")) {
 <ZoneNav
   brandHref={`/${locale}/`}
   brandAriaLabel="Moirai home"
-  siteHref={`/${locale}/`}
-  siteLabel={labels.site}
   ariaLabel={labels.aria}
   items={items}
   currentKey={currentKey}
