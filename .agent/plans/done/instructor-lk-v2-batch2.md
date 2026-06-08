@@ -1,7 +1,10 @@
 # Instructor LK v2 — Batch 2
 
-> Status: active. Утверждено пользователем 2026-06-08 после прохода
-> по всем discovery-вопросам Q1..Q10.
+> Status: done. Deployed 2026-06-08 (cba750a7).
+>
+> S7 cron trigger setup вынесен в отдельный план
+> `cron-worker-setup.md` (active) — не блокер production'а, но
+> обязателен прежде чем instructor-digest начнёт реально отправляться.
 >
 > **В батче:** Q1 + Q3 + Q4 + Q5 + Q6 + Q9 + ET-fix.
 > **Deferred:** Q7, Q8.
