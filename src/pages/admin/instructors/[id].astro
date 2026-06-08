@@ -1,0 +1,341 @@
+---
+/*
+ * /admin/instructors/[id] — детальная страница preподa с qualifications matrix.
+ *
+ * Stage S3 (admin-instructor-management plan).
+ *
+ * Matrix: rows = programmes из Content Collection (default_modules),
+ * cols = module slugs программы. Checkbox toggle.
+ * Save → POST /api/admin/instructors/[id]/qualifications.
+ */
+
+import { getCollection } from "astro:content";
+import type { CollectionEntry } from "astro:content";
+import Layout from "../../../layouts/admin/Layout.astro";
+import { requireRole } from "../../../lib/server/guards";
+import { getInstructorQualifications } from "../../../lib/server/admin-instructors";
+
+export const prerender = false;
+
+const { id } = Astro.params;
+if (!id || typeof id !== "string") return new Response(null, { status: 404 });
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+const locale = user.locale ?? "en";
+const ru = locale === "ru";
+
+// Instructor profile
+const instructor = await env.DB.prepare(
+  `SELECT u.id, u.email, u.name
+     FROM users u
+     JOIN user_roles ur ON ur.user_id = u.id
+    WHERE u.id = ? AND ur.role = 'instructor'`,
+).bind(id).first<{ id: string; email: string; name: string | null }>();
+
+if (!instructor) return new Response(null, { status: 404 });
+
+const qualified = await getInstructorQualifications(env, id);
+
+// Programmes из Content Collection — default_modules как source of truth
+interface ProgrammeView {
+  slug: string;
+  title: string;
+  default_modules: string[];
+}
+const programmesAll = await getCollection("programmes", (e: CollectionEntry<"programmes">) =>
+  e.id.endsWith(`.${locale}`),
+);
+const programmes: ProgrammeView[] = programmesAll
+  .map((p: CollectionEntry<"programmes">): ProgrammeView => {
+    const data = p.data as { title?: string; default_modules?: string[] | null };
+    return {
+      slug: p.id.replace(`.${locale}`, ""),
+      title: data.title ?? p.id,
+      default_modules: data.default_modules ?? [],
+    };
+  })
+  .filter((p: ProgrammeView) => p.default_modules.length > 0);
+
+// Module titles из D1 для лучшего отображения
+const allModuleSlugs = Array.from(new Set(programmes.flatMap((p: ProgrammeView) => p.default_modules)));
+const moduleTitleMap = new Map<string, string>();
+if (allModuleSlugs.length > 0) {
+  const placeholders = allModuleSlugs.map(() => "?").join(",");
+  const titleRows = await env.DB.prepare(
+    `SELECT slug, title FROM modules WHERE slug IN (${placeholders}) AND locale = ?`,
+  ).bind(...allModuleSlugs, locale).all<{ slug: string; title: string }>();
+  for (const r of titleRows.results) moduleTitleMap.set(r.slug, r.title);
+}
+
+const t = ru
+  ? {
+      backLink: "← К преподавателям",
+      headerName: "Имя",
+      headerEmail: "Email",
+      qualifiedSummary: (n: number, total: number) => `Квалифицирован по ${n.toString()} из ${total.toString()} модулей`,
+      programmeTitle: "Программа",
+      moduleHeader: "Модуль",
+      qualifiedHeader: "Квалифицирован",
+      saveBtn: "Сохранить",
+      savingBtn: "Сохраняем...",
+      savedHint: "Сохранено",
+      failedHint: "Ошибка",
+      checkAll: "Выделить все",
+      uncheckAll: "Снять все",
+      seo: { title: `${instructor.name ?? instructor.email} — Admin`, description: "Quolifications" },
+    }
+  : {
+      backLink: "← Back to instructors",
+      headerName: "Name",
+      headerEmail: "Email",
+      qualifiedSummary: (n: number, total: number) => `Qualified for ${n.toString()} of ${total.toString()} modules`,
+      programmeTitle: "Programme",
+      moduleHeader: "Module",
+      qualifiedHeader: "Qualified",
+      saveBtn: "Save",
+      savingBtn: "Saving...",
+      savedHint: "Saved",
+      failedHint: "Failed",
+      checkAll: "Check all",
+      uncheckAll: "Uncheck all",
+      seo: { title: `${instructor.name ?? instructor.email} — Admin`, description: "Qualifications" },
+    };
+
+const totalModules = allModuleSlugs.length;
+const qualifiedCount = qualified.size;
+---
+
+<Layout
+  locale={locale}
+  seo={t.seo}
+  currentNavKey="instructors"
+  userRoles={user.roles}
+>
+  <div class="admin-page">
+    <a class="admin-page__back" href="/admin/instructors">{t.backLink}</a>
+
+    <header class="admin-page__head">
+      <h1 class="admin-page__title">{instructor.name ?? instructor.email.split("@")[0]}</h1>
+      <p class="admin-page__subtitle">{instructor.email}</p>
+      <p class="admin-page__summary" data-summary>
+        {t.qualifiedSummary(qualifiedCount, totalModules)}
+      </p>
+    </header>
+
+    <form data-qual-form class="qual-form">
+      {programmes.map((prog: ProgrammeView) => (
+        <section class="qual-programme">
+          <header class="qual-programme__head">
+            <h2 class="qual-programme__title">{prog.title}</h2>
+            <div class="qual-programme__actions">
+              <button type="button" class="qual-bulk" data-bulk={`prog-${prog.slug}-on`}>{t.checkAll}</button>
+              <button type="button" class="qual-bulk" data-bulk={`prog-${prog.slug}-off`}>{t.uncheckAll}</button>
+            </div>
+          </header>
+          <ul class="qual-modules" data-prog-slug={prog.slug}>
+            {prog.default_modules.map((slug: string, idx: number) => (
+              <li class="qual-module">
+                <label class="qual-module__label">
+                  <input
+                    type="checkbox"
+                    class="qual-module__cb"
+                    data-module-slug={slug}
+                    checked={qualified.has(slug)}
+                  />
+                  <span class="qual-module__num">{String(idx + 1).padStart(2, "0")}</span>
+                  <span class="qual-module__title">{moduleTitleMap.get(slug) ?? slug}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+
+      <div class="qual-form__actions">
+        <button type="submit" class="qual-save" data-save-btn>{t.saveBtn}</button>
+        <span class="qual-form__status" data-status hidden></span>
+      </div>
+    </form>
+  </div>
+</Layout>
+
+<script is:inline define:vars={{
+  userId: id,
+  savedHint: t.savedHint,
+  failedHint: t.failedHint,
+  savingBtn: t.savingBtn,
+  saveBtnLabel: t.saveBtn,
+  summaryFmt: (n: number) => t.qualifiedSummary(n, totalModules),
+}}>
+  const form = document.querySelector("[data-qual-form]");
+  const saveBtn = document.querySelector("[data-save-btn]");
+  const statusEl = document.querySelector("[data-status]");
+  const summaryEl = document.querySelector("[data-summary]");
+
+  function updateSummary() {
+    const n = document.querySelectorAll(".qual-module__cb:checked").length;
+    summaryEl.textContent = summaryFmt(n);
+  }
+
+  document.querySelectorAll(".qual-module__cb").forEach((cb) => {
+    cb.addEventListener("change", updateSummary);
+  });
+
+  document.querySelectorAll("[data-bulk]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const key = btn.getAttribute("data-bulk");
+      const m = key.match(/^prog-(.+)-(on|off)$/);
+      if (!m) return;
+      const progSlug = m[1];
+      const on = m[2] === "on";
+      const list = document.querySelector(`[data-prog-slug="${progSlug}"]`);
+      if (!list) return;
+      list.querySelectorAll(".qual-module__cb").forEach((cb) => {
+        cb.checked = on;
+      });
+      updateSummary();
+    });
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const slugs = Array.from(document.querySelectorAll(".qual-module__cb:checked"))
+      .map((cb) => cb.getAttribute("data-module-slug"));
+    saveBtn.textContent = savingBtn;
+    saveBtn.disabled = true;
+    statusEl.hidden = true;
+    try {
+      const res = await fetch(`/api/admin/instructors/${encodeURIComponent(userId)}/qualifications`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ module_slugs: slugs }),
+      });
+      if (!res.ok) throw new Error("save_failed");
+      statusEl.textContent = savedHint;
+      statusEl.hidden = false;
+      setTimeout(() => { statusEl.hidden = true; }, 2000);
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = failedHint;
+      statusEl.hidden = false;
+    } finally {
+      saveBtn.textContent = saveBtnLabel;
+      saveBtn.disabled = false;
+    }
+  });
+</script>
+
+<style>
+  .admin-page {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .admin-page__back {
+    display: inline-block;
+    color: var(--text-faint);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    margin-bottom: var(--space-md);
+  }
+  .admin-page__back:hover { color: var(--text); }
+  .admin-page__head { margin-bottom: var(--space-xl); }
+  .admin-page__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .admin-page__subtitle {
+    color: var(--text-faint);
+    margin: 4px 0 0;
+    font-size: var(--type-body-sm);
+  }
+  .admin-page__summary {
+    color: var(--text-muted);
+    margin: var(--space-sm) 0 0;
+    font-size: var(--type-body-md);
+  }
+
+  .qual-form { display: flex; flex-direction: column; gap: var(--space-xl); }
+  .qual-programme { border: 1px solid var(--border); border-radius: 2px; padding: var(--space-md); }
+  .qual-programme__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+  }
+  .qual-programme__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-sm);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .qual-programme__actions { display: flex; gap: var(--space-xs); }
+  .qual-bulk {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-faint);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    padding: 4px 10px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .qual-bulk:hover { color: var(--text); border-color: var(--text); }
+
+  .qual-modules { list-style: none; padding: 0; margin: 0; }
+  .qual-module { border-bottom: 1px solid var(--border); }
+  .qual-module:last-child { border-bottom: none; }
+  .qual-module__label {
+    display: grid;
+    grid-template-columns: 24px 36px 1fr;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: var(--space-xs) 0;
+    cursor: pointer;
+  }
+  .qual-module__cb { accent-color: var(--amber); }
+  .qual-module__num { color: var(--text-faint); font-family: var(--font-display); }
+  .qual-module__title { color: var(--text); }
+
+  .qual-form__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border);
+  }
+  .qual-save {
+    padding: 10px 20px;
+    background: var(--amber);
+    border: 1px solid var(--amber);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .qual-save:hover { background: var(--amber-light); border-color: var(--amber-light); }
+  .qual-save:disabled { opacity: 0.5; cursor: wait; }
+  .qual-form__status {
+    color: var(--text-accent);
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+</style>

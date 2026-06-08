@@ -1,0 +1,149 @@
+---
+/*
+ * /admin/instructors — overview всех instructors с qualifications counts.
+ *
+ * Stage S3 (admin-instructor-management plan).
+ */
+
+import Layout from "../../../layouts/admin/Layout.astro";
+import { requireRole } from "../../../lib/server/guards";
+import { listInstructorsWithQualifications } from "../../../lib/server/admin-instructors";
+
+export const prerender = false;
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+const locale = user.locale ?? "en";
+const ru = locale === "ru";
+const rows = await listInstructorsWithQualifications(env);
+
+const t = ru
+  ? {
+      title: "Преподаватели",
+      subtitle: `${rows.length.toString()} преподавател${rows.length === 1 ? "ь" : "ей"}`,
+      empty: "Преподавателей пока нет.",
+      headerName: "Имя",
+      headerEmail: "Email",
+      headerQualified: "Модули",
+      headerLead: "Активные группы",
+      open: "Открыть",
+      seo: { title: "Преподаватели — Admin", description: "Управление преподавателями." },
+    }
+  : {
+      title: "Instructors",
+      subtitle: `${rows.length.toString()} instructor${rows.length === 1 ? "" : "s"}`,
+      empty: "No instructors yet.",
+      headerName: "Name",
+      headerEmail: "Email",
+      headerQualified: "Modules",
+      headerLead: "Active cohorts",
+      open: "Open",
+      seo: { title: "Instructors — Admin", description: "Manage instructors." },
+    };
+---
+
+<Layout
+  locale={locale}
+  seo={t.seo}
+  currentNavKey="instructors"
+  userRoles={user.roles}
+>
+  <div class="admin-page">
+    <header class="admin-page__head">
+      <h1 class="admin-page__title">{t.title}</h1>
+      <p class="admin-page__subtitle">{t.subtitle}</p>
+    </header>
+
+    {rows.length === 0 ? (
+      <p class="admin-page__empty">{t.empty}</p>
+    ) : (
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>{t.headerName}</th>
+            <th>{t.headerEmail}</th>
+            <th class="admin-table__num">{t.headerQualified}</th>
+            <th class="admin-table__num">{t.headerLead}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr>
+              <td>{r.name ?? r.email.split("@")[0]}</td>
+              <td class="admin-table__email">{r.email}</td>
+              <td class="admin-table__num">{r.qualified_count}</td>
+              <td class="admin-table__num">{r.active_lead_count}</td>
+              <td>
+                <a class="admin-table__link" href={`/admin/instructors/${r.user_id}`}>{t.open}</a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+</Layout>
+
+<style>
+  .admin-page {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .admin-page__head { margin-bottom: var(--space-xl); }
+  .admin-page__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .admin-page__subtitle {
+    color: var(--text-faint);
+    margin: 4px 0 0;
+    font-size: var(--type-body-sm);
+  }
+  .admin-page__empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-2xl);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    text-align: center;
+  }
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+  }
+  .admin-table th {
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+  }
+  .admin-table td {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .admin-table__num { text-align: right; }
+  .admin-table__email { color: var(--text-faint); font-size: var(--type-micro-md); }
+  .admin-table__link {
+    color: var(--text-accent);
+    text-decoration: none;
+    text-transform: uppercase;
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+  }
+  .admin-table__link:hover { color: var(--text); }
+</style>
