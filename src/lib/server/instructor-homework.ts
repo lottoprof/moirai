@@ -322,6 +322,228 @@ export async function listInstructorCohorts(
 }
 
 // ============================================================
+// Cohort detail — matrix view (Q11)
+// ============================================================
+
+export interface CohortMatrixCell {
+  module_slug: string;
+  status: 'done' | 'active' | 'locked' | 'pending' | 'needs_revision';
+  /** id последней submission для этого (enrollment, module) — null если ничего */
+  last_submission_id: string | null;
+  /** True если есть unlock_override для этого (enrollment, module) */
+  has_override: boolean;
+}
+
+export interface CohortMatrixStudent {
+  enrollment_id: string;
+  user_id: string;
+  student_name: string;
+  student_email: string;
+  cells: CohortMatrixCell[];
+}
+
+export interface CohortMatrix {
+  cohort_id: string;
+  programme_slug: string;
+  start_date: number;
+  status: string;
+  modules: { slug: string; title: string | null; order_idx: number }[];
+  students: CohortMatrixStudent[];
+  meeting_provider: string | null;
+  meeting_join_url: string | null;
+  next_session_at: number | null;
+}
+
+/**
+ * Build full matrix для /instructor/cohorts/[id].
+ * ACL: instructor must lead the cohort (via slot.instructor_id OR
+ * enrollment.lead_instructor_id).
+ *
+ * Status derivation per cell:
+ *   - submission approved/auto_approved → done
+ *   - submission needs_revision        → needs_revision
+ *   - submission pending               → pending
+ *   - no submission + unlocked         → active
+ *   - no submission + locked           → locked
+ *
+ * Unlock: now >= session.scheduled_at − unlock_lead_hours OR has override.
+ */
+export async function getCohortMatrix(
+  env: Cloudflare.Env,
+  instructorId: string,
+  cohortId: string,
+  locale: 'en' | 'ru',
+): Promise<CohortMatrix | null> {
+  // ACL + meta
+  const cohort = await env.DB.prepare(
+    `SELECT c.id, c.programme_id, c.start_date, c.status,
+            c.meeting_provider, c.meeting_url, c.meeting_host_url,
+            c.modules_snapshot_json
+       FROM cohorts c
+      WHERE c.id = ?
+        AND (
+          c.slot_id IN (SELECT id FROM slots WHERE instructor_id = ?)
+          OR c.id IN (
+            SELECT DISTINCT cohort_id FROM applications a
+              JOIN enrollments e ON e.id = a.enrollment_id
+             WHERE e.lead_instructor_id = ? AND e.archived_at IS NULL
+          )
+        )
+      LIMIT 1`,
+  )
+    .bind(cohortId, instructorId, instructorId)
+    .first<{
+      id: string;
+      programme_id: string;
+      start_date: number;
+      status: string;
+      meeting_provider: string | null;
+      meeting_url: string | null;
+      meeting_host_url: string | null;
+      modules_snapshot_json: string;
+    }>();
+
+  if (!cohort) return null;
+
+  // Modules from snapshot
+  let moduleSlugs: string[];
+  try {
+    moduleSlugs = JSON.parse(cohort.modules_snapshot_json) as string[];
+  } catch {
+    moduleSlugs = [];
+  }
+  if (moduleSlugs.length === 0) {
+    return {
+      cohort_id: cohort.id,
+      programme_slug: cohort.programme_id,
+      start_date: cohort.start_date,
+      status: cohort.status,
+      modules: [],
+      students: [],
+      meeting_provider: cohort.meeting_provider,
+      meeting_join_url: cohort.meeting_host_url ?? cohort.meeting_url,
+      next_session_at: null,
+    };
+  }
+
+  const placeholders = moduleSlugs.map(() => '?').join(',');
+  const moduleTitleRows = await env.DB.prepare(
+    `SELECT slug, title FROM modules WHERE slug IN (${placeholders}) AND locale = ?`,
+  )
+    .bind(...moduleSlugs, locale)
+    .all<{ slug: string; title: string }>();
+  const moduleTitleMap = new Map(moduleTitleRows.results.map((r) => [r.slug, r.title]));
+  const modules = moduleSlugs.map((slug, i) => ({
+    slug,
+    title: moduleTitleMap.get(slug) ?? null,
+    order_idx: i,
+  }));
+
+  // Students
+  const studentRows = await env.DB.prepare(
+    `SELECT e.id AS enrollment_id, e.user_id, u.name, u.email
+       FROM applications a
+       JOIN enrollments e ON e.id = a.enrollment_id
+       JOIN users u ON u.id = e.user_id
+      WHERE a.cohort_id = ?
+        AND e.status = 'active'
+        AND e.archived_at IS NULL
+      ORDER BY u.name, u.email`,
+  )
+    .bind(cohortId)
+    .all<{ enrollment_id: string; user_id: string; name: string | null; email: string }>();
+
+  // Sessions для unlock dates
+  const sessionRows = await env.DB.prepare(
+    `SELECT module_slug, scheduled_at, status FROM sessions WHERE cohort_id = ?`,
+  )
+    .bind(cohortId)
+    .all<{ module_slug: string; scheduled_at: number; status: string }>();
+  const sessionMap = new Map<string, { scheduled_at: number; status: string }>();
+  for (const s of sessionRows.results) sessionMap.set(s.module_slug, { scheduled_at: s.scheduled_at, status: s.status });
+
+  const now = Math.floor(Date.now() / 1000);
+  const futureSessions = sessionRows.results
+    .filter((s) => s.scheduled_at > now && s.status === 'scheduled')
+    .sort((a, b) => a.scheduled_at - b.scheduled_at);
+  const nextSessionAt = futureSessions[0]?.scheduled_at ?? null;
+
+  // Per-student cells
+  const UNLOCK_LEAD_SEC = 6 * 3600;
+  const students: CohortMatrixStudent[] = [];
+
+  for (const s of studentRows.results) {
+    const submissions = await env.DB.prepare(
+      `SELECT id, module_slug, status, uploaded_at
+         FROM homework_submissions
+        WHERE enrollment_id = ?
+        ORDER BY uploaded_at DESC`,
+    )
+      .bind(s.enrollment_id)
+      .all<{ id: string; module_slug: string; status: string; uploaded_at: number }>();
+
+    const latestPerModule = new Map<string, { id: string; status: string }>();
+    for (const sub of submissions.results) {
+      if (!latestPerModule.has(sub.module_slug)) {
+        latestPerModule.set(sub.module_slug, { id: sub.id, status: sub.status });
+      }
+    }
+
+    const overrideRows = await env.DB.prepare(
+      `SELECT module_slug FROM enrollment_modules
+        WHERE enrollment_id = ? AND unlock_override_at IS NOT NULL`,
+    )
+      .bind(s.enrollment_id)
+      .all<{ module_slug: string }>();
+    const overrideSet = new Set(overrideRows.results.map((r) => r.module_slug));
+
+    const cells: CohortMatrixCell[] = moduleSlugs.map((slug) => {
+      const sub = latestPerModule.get(slug);
+      const session = sessionMap.get(slug);
+      const hasOverride = overrideSet.has(slug);
+
+      let cellStatus: CohortMatrixCell['status'];
+      if (sub) {
+        if (sub.status === 'approved' || sub.status === 'auto_approved') cellStatus = 'done';
+        else if (sub.status === 'needs_revision') cellStatus = 'needs_revision';
+        else cellStatus = 'pending';
+      } else {
+        const unlocked = hasOverride
+          || (session != null && now >= session.scheduled_at - UNLOCK_LEAD_SEC);
+        cellStatus = unlocked ? 'active' : 'locked';
+      }
+
+      return {
+        module_slug: slug,
+        status: cellStatus,
+        last_submission_id: sub?.id ?? null,
+        has_override: hasOverride,
+      };
+    });
+
+    students.push({
+      enrollment_id: s.enrollment_id,
+      user_id: s.user_id,
+      student_name: s.name?.trim() || s.email.split('@')[0],
+      student_email: s.email,
+      cells,
+    });
+  }
+
+  return {
+    cohort_id: cohort.id,
+    programme_slug: cohort.programme_id,
+    start_date: cohort.start_date,
+    status: cohort.status,
+    modules,
+    students,
+    meeting_provider: cohort.meeting_provider,
+    meeting_join_url: cohort.meeting_host_url ?? cohort.meeting_url,
+    next_session_at: nextSessionAt,
+  };
+}
+
+// ============================================================
 // Submission detail для review page
 // ============================================================
 

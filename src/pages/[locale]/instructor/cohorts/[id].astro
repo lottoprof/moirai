@@ -1,0 +1,648 @@
+---
+/*
+ * /{locale}/instructor/cohorts/{id} — детальная страница cohort'ы с
+ * матрицей student × module.
+ *
+ * Instructor LK v2 Q11 (закрыт 2026-06-08).
+ *
+ * Layout:
+ *   - Hero: programme name + start_date + status + Zoom join (if active)
+ *   - Matrix: sticky-left student names, sticky-top module headers,
+ *     cells colored by status
+ *   - Click cell → right-side drawer с submission detail + actions
+ *
+ * ACL: instructor lead этого cohort'a (via slot.instructor_id OR
+ *      enrollment.lead_instructor_id).
+ *
+ * Spec: instructor-lk-v2-discovery.md Q11.
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../../../layouts/instructor/Layout.astro";
+import { requireRole } from "../../../../lib/server/guards";
+import { getCohortMatrix } from "../../../../lib/server/instructor-homework";
+import Lock from "../../../../components/icons/Lock.astro";
+import Check from "../../../../components/icons/Check.astro";
+import X from "../../../../components/icons/X.astro";
+import { LK_CONFIG } from "../../../../lib/config/lk";
+
+export const prerender = false;
+
+const { locale, id } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/instructor");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+if (!id || typeof id !== "string") return new Response(null, { status: 404 });
+
+const userOrRes = await requireRole(Astro, "instructor");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+const matrix = await getCohortMatrix(env, user.id, id, typedLocale);
+if (!matrix) return new Response(null, { status: 404 });
+
+const programmeEntry = await getEntry("programmes", `${matrix.programme_slug}.${typedLocale}`);
+const programmeTitle = programmeEntry?.data.title ?? matrix.programme_slug;
+
+const intlLocale = ru ? "ru-RU" : "en-US";
+const startDateFmt = new Intl.DateTimeFormat(intlLocale, {
+  month: "long", day: "numeric", year: "numeric",
+}).format(new Date(matrix.start_date * 1000));
+
+const nextSessionFmt = matrix.next_session_at
+  ? new Intl.DateTimeFormat(intlLocale, {
+      weekday: "short", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    }).format(new Date(matrix.next_session_at * 1000))
+  : null;
+
+const now = Math.floor(Date.now() / 1000);
+const zoomActive = matrix.next_session_at != null
+  && matrix.meeting_join_url != null
+  && now >= matrix.next_session_at - LK_CONFIG.zoom_join_window_minutes_before * 60
+  && now <= matrix.next_session_at + 4 * 3600;
+
+const t = ru
+  ? {
+      backLink: "← К когортам",
+      startLabel: "Старт",
+      nextSession: "Ближайшее занятие",
+      noSession: "Нет запланированных",
+      students: "студент",
+      modules: "модул",
+      empty: "В когорте ещё нет студентов.",
+      joinZoom: matrix.meeting_provider === "teams" ? "Подключиться (Teams)" :
+                matrix.meeting_provider === "gmeet" ? "Подключиться (Meet)" :
+                "Подключиться (Zoom)",
+      drawerClose: "Закрыть",
+      drawerLoading: "Загрузка...",
+      drawerStudent: "Студент",
+      drawerModule: "Модуль",
+      drawerStatus: "Статус",
+      drawerOpenReview: "Открыть проверку",
+      drawerOverride: "Открыть досрочно",
+      drawerRemoveOverride: "Отменить override",
+      drawerNoSubmission: "Студент пока не сдавал ДЗ по этому модулю.",
+      seo: { title: `${programmeTitle} — Moirai`, description: "Cohort detail" },
+    }
+  : {
+      backLink: "← Cohorts",
+      startLabel: "Started",
+      nextSession: "Next session",
+      noSession: "No sessions scheduled",
+      students: "student",
+      modules: "module",
+      empty: "No students in this cohort yet.",
+      joinZoom: matrix.meeting_provider === "teams" ? "Join Teams" :
+                matrix.meeting_provider === "gmeet" ? "Join Meet" :
+                "Join Zoom",
+      drawerClose: "Close",
+      drawerLoading: "Loading...",
+      drawerStudent: "Student",
+      drawerModule: "Module",
+      drawerStatus: "Status",
+      drawerOpenReview: "Open review",
+      drawerOverride: "Unlock now",
+      drawerRemoveOverride: "Remove override",
+      drawerNoSubmission: "Student hasn't submitted homework for this module yet.",
+      seo: { title: `${programmeTitle} — Moirai`, description: "Cohort detail" },
+    };
+
+const studentCount = matrix.students.length;
+const moduleCount = matrix.modules.length;
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+---
+
+<Layout
+  locale={typedLocale}
+  seo={t.seo}
+  currentNavKey="queue"
+  userRoles={user.roles}
+>
+  <div class="cohort-detail">
+    <a href={`/${typedLocale}/instructor`} class="cohort-detail__back">{t.backLink}</a>
+
+    <header class="cohort-detail__head">
+      <div>
+        <h1 class="cohort-detail__title">{programmeTitle}</h1>
+        <p class="cohort-detail__meta">
+          {t.startLabel}: {startDateFmt} · {studentCount} {t.students}{studentCount === 1 ? "" : "s"} · {moduleCount} {t.modules}{moduleCount === 1 ? "" : "s"}
+        </p>
+      </div>
+      <div class="cohort-detail__session">
+        <p class="cohort-detail__session-label">{t.nextSession}</p>
+        {nextSessionFmt ? (
+          <p class="cohort-detail__session-date">{nextSessionFmt}</p>
+        ) : (
+          <p class="cohort-detail__session-empty">{t.noSession}</p>
+        )}
+        {zoomActive && matrix.meeting_join_url && (
+          <a class="cohort-detail__zoom-cta" href={matrix.meeting_join_url} target="_blank" rel="noopener">
+            {t.joinZoom}
+          </a>
+        )}
+      </div>
+    </header>
+
+    {matrix.students.length === 0 ? (
+      <p class="cohort-detail__empty">{t.empty}</p>
+    ) : (
+      <div class="matrix-wrap">
+        <table class="matrix" data-cohort-id={matrix.cohort_id}>
+          <thead>
+            <tr>
+              <th class="matrix__corner">{ru ? "Студент" : "Student"}</th>
+              {matrix.modules.map((m) => (
+                <th class="matrix__module" title={m.title ?? m.slug}>
+                  <span class="matrix__module-num">{String(m.order_idx + 1).padStart(2, "0")}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.students.map((s) => (
+              <tr>
+                <th class="matrix__student" title={s.student_email}>
+                  <span class="matrix__student-name">{s.student_name}</span>
+                </th>
+                {s.cells.map((cell) => (
+                  <td class:list={["matrix__cell", `matrix__cell--${cell.status}`, cell.has_override && "matrix__cell--override"]}
+                      data-enrollment={s.enrollment_id}
+                      data-module={cell.module_slug}
+                      data-student={s.student_name}
+                      data-module-title={matrix.modules.find((m) => m.slug === cell.module_slug)?.title ?? cell.module_slug}
+                      data-submission-id={cell.last_submission_id ?? ""}
+                      data-status={cell.status}
+                      data-override={cell.has_override ? "1" : "0"}
+                      title={cell.status}
+                      tabindex="0">
+                    {cell.status === "done" && <Check size={12} class="matrix__cell-icon" />}
+                    {cell.status === "locked" && <Lock size={12} class="matrix__cell-icon" />}
+                    {cell.status === "pending" && <span class="matrix__cell-dot" aria-label="pending"></span>}
+                    {cell.status === "needs_revision" && <span class="matrix__cell-dot matrix__cell-dot--alert" aria-label="needs revision"></span>}
+                    {cell.status === "active" && <span class="matrix__cell-dot matrix__cell-dot--neutral" aria-label="unlocked"></span>}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+
+    <!-- Drawer (slide-in from right) -->
+    <aside class="cell-drawer" data-cell-drawer hidden aria-labelledby="cell-drawer-title">
+      <header class="cell-drawer__head">
+        <h2 class="cell-drawer__title" id="cell-drawer-title">{t.drawerStudent}</h2>
+        <button type="button" class="cell-drawer__close" data-cell-drawer-close aria-label={t.drawerClose}>
+          <X size={20} />
+        </button>
+      </header>
+      <div class="cell-drawer__body">
+        <dl class="cell-drawer__meta">
+          <div><dt>{t.drawerStudent}</dt><dd data-drawer-student></dd></div>
+          <div><dt>{t.drawerModule}</dt><dd data-drawer-module></dd></div>
+          <div><dt>{t.drawerStatus}</dt><dd data-drawer-status></dd></div>
+        </dl>
+        <p class="cell-drawer__empty" data-drawer-empty hidden>{t.drawerNoSubmission}</p>
+        <div class="cell-drawer__actions">
+          <a class="cell-drawer__btn cell-drawer__btn--primary"
+             data-drawer-review-link hidden
+             href="#"
+             data-review-base={`/${typedLocale}/instructor/homework/`}>
+            {t.drawerOpenReview}
+          </a>
+          <button type="button" class="cell-drawer__btn" data-drawer-override hidden>
+            {t.drawerOverride}
+          </button>
+          <button type="button" class="cell-drawer__btn cell-drawer__btn--danger" data-drawer-remove-override hidden>
+            {t.drawerRemoveOverride}
+          </button>
+        </div>
+        <p class="cell-drawer__action-status" data-drawer-action-status hidden></p>
+      </div>
+    </aside>
+    <div class="cell-drawer-backdrop" data-cell-drawer-backdrop hidden></div>
+  </div>
+</Layout>
+
+<style>
+  .cohort-detail {
+    padding: var(--space-lg) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .cohort-detail__back {
+    display: inline-block;
+    margin-bottom: var(--space-md);
+    color: var(--text-faint);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+  .cohort-detail__back:hover { color: var(--text); }
+
+  .cohort-detail__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-lg);
+    padding-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-xl);
+  }
+  .cohort-detail__title {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0 0 var(--space-xs);
+  }
+  .cohort-detail__meta {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    margin: 0;
+  }
+  .cohort-detail__session {
+    text-align: right;
+    min-width: 200px;
+  }
+  .cohort-detail__session-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 4px;
+  }
+  .cohort-detail__session-date {
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    color: var(--text);
+    margin: 0;
+  }
+  .cohort-detail__session-empty {
+    color: var(--text-faint);
+    font-style: italic;
+    font-size: var(--type-body-sm);
+    margin: 0;
+  }
+  .cohort-detail__zoom-cta {
+    display: inline-block;
+    margin-top: var(--space-sm);
+    padding: 8px 16px;
+    background: var(--amber);
+    color: var(--ink);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    border-radius: 2px;
+  }
+  .cohort-detail__zoom-cta:hover { background: var(--amber-light); }
+
+  .cohort-detail__empty {
+    color: var(--text-faint);
+    font-style: italic;
+    text-align: center;
+    padding: var(--space-2xl);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+  }
+
+  /* Matrix */
+  .matrix-wrap {
+    overflow: auto;
+    max-height: 70vh;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+  .matrix {
+    border-collapse: collapse;
+    background: var(--bg-elevated);
+  }
+  .matrix__corner,
+  .matrix__module {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg-elevated);
+    border-bottom: 2px solid var(--border-strong);
+    padding: 8px 4px;
+    text-align: center;
+  }
+  .matrix__corner {
+    left: 0;
+    z-index: 3;
+    text-align: left;
+    padding: 8px 12px;
+    min-width: 200px;
+    border-right: 2px solid var(--border-strong);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .matrix__module {
+    min-width: 40px;
+    max-width: 40px;
+    cursor: help;
+  }
+  .matrix__module-num {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+  }
+  .matrix__student {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--bg-elevated);
+    border-right: 2px solid var(--border-strong);
+    padding: 8px 12px;
+    min-width: 200px;
+    max-width: 240px;
+    text-align: left;
+    font-weight: 400;
+  }
+  .matrix__student-name {
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+  .matrix__cell {
+    width: 40px;
+    height: 36px;
+    border: 1px solid var(--border);
+    text-align: center;
+    cursor: pointer;
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .matrix__cell:hover { background: color-mix(in srgb, var(--paper) 6%, transparent); }
+  .matrix__cell:focus { outline: 2px solid var(--amber); outline-offset: -2px; }
+  .matrix__cell--locked { color: var(--text-faint); }
+  .matrix__cell--done { color: var(--text-muted); background: color-mix(in srgb, var(--paper) 4%, transparent); }
+  .matrix__cell--needs_revision { background: var(--amber-faint); }
+  .matrix__cell--override { box-shadow: inset 0 0 0 2px var(--amber); }
+  .matrix__cell-icon { display: inline-block; vertical-align: middle; }
+  .matrix__cell-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--amber);
+    vertical-align: middle;
+  }
+  .matrix__cell-dot--alert { background: var(--amber); }
+  .matrix__cell-dot--neutral { background: var(--text-faint); }
+
+  /* Drawer */
+  .cell-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 400px;
+    max-width: 90vw;
+    background: var(--bg-elevated);
+    border-left: 1px solid var(--border);
+    z-index: 200;
+    transform: translateX(100%);
+    transition: transform var(--duration-normal) var(--ease-out);
+    overflow-y: auto;
+  }
+  .cell-drawer[data-open] { transform: translateX(0); }
+  .cell-drawer__head {
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .cell-drawer__title {
+    font-family: var(--font-display);
+    font-size: var(--type-body-lg);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .cell-drawer__close {
+    background: transparent;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 4px;
+  }
+  .cell-drawer__close:hover { color: var(--text); }
+  .cell-drawer__body { padding: var(--space-lg); }
+  .cell-drawer__meta {
+    margin: 0 0 var(--space-lg);
+  }
+  .cell-drawer__meta > div {
+    padding: var(--space-xs) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .cell-drawer__meta dt {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 2px;
+  }
+  .cell-drawer__meta dd {
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    color: var(--text);
+    margin: 0;
+  }
+  .cell-drawer__empty {
+    color: var(--text-faint);
+    font-style: italic;
+    font-size: var(--type-body-sm);
+    margin: 0 0 var(--space-md);
+  }
+  .cell-drawer__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .cell-drawer__btn {
+    padding: 10px 16px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    cursor: pointer;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: var(--text-muted);
+    text-decoration: none;
+    text-align: center;
+  }
+  .cell-drawer__btn:hover { color: var(--text); border-color: var(--text); }
+  .cell-drawer__btn--primary {
+    background: var(--amber);
+    color: var(--ink);
+    border-color: var(--amber);
+  }
+  .cell-drawer__btn--primary:hover { background: var(--amber-light); }
+  .cell-drawer__btn--danger {
+    color: var(--text-accent);
+    border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+  }
+  .cell-drawer__action-status {
+    margin-top: var(--space-sm);
+    color: var(--text-faint);
+    font-size: var(--type-body-sm);
+  }
+
+  .cell-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 199;
+  }
+</style>
+
+<script>
+  interface DrawerData {
+    enrollment: string;
+    module: string;
+    student: string;
+    moduleTitle: string;
+    submissionId: string;
+    status: string;
+    override: boolean;
+  }
+
+  const drawer = document.querySelector<HTMLElement>("[data-cell-drawer]");
+  const backdrop = document.querySelector<HTMLElement>("[data-cell-drawer-backdrop]");
+  const studentEl = document.querySelector<HTMLElement>("[data-drawer-student]");
+  const moduleEl = document.querySelector<HTMLElement>("[data-drawer-module]");
+  const statusEl = document.querySelector<HTMLElement>("[data-drawer-status]");
+  const emptyEl = document.querySelector<HTMLElement>("[data-drawer-empty]");
+  const reviewLink = document.querySelector<HTMLAnchorElement>("[data-drawer-review-link]");
+  const overrideBtn = document.querySelector<HTMLButtonElement>("[data-drawer-override]");
+  const removeOverrideBtn = document.querySelector<HTMLButtonElement>("[data-drawer-remove-override]");
+  const actionStatusEl = document.querySelector<HTMLElement>("[data-drawer-action-status]");
+  const closeBtn = document.querySelector<HTMLElement>("[data-cell-drawer-close]");
+
+  let currentData: DrawerData | null = null;
+
+  function openDrawer(data: DrawerData) {
+    currentData = data;
+    if (!drawer || !backdrop || !studentEl || !moduleEl || !statusEl || !reviewLink || !overrideBtn || !removeOverrideBtn || !emptyEl || !actionStatusEl) return;
+
+    studentEl.textContent = data.student;
+    moduleEl.textContent = data.moduleTitle;
+    statusEl.textContent = data.status;
+    actionStatusEl.hidden = true;
+    actionStatusEl.textContent = "";
+
+    if (data.submissionId) {
+      const base = reviewLink.dataset.reviewBase ?? "/";
+      reviewLink.href = `${base}${data.submissionId}`;
+      reviewLink.hidden = false;
+      emptyEl.hidden = true;
+    } else {
+      reviewLink.hidden = true;
+      emptyEl.hidden = false;
+    }
+
+    if (data.override) {
+      overrideBtn.hidden = true;
+      removeOverrideBtn.hidden = false;
+    } else if (data.status === "locked") {
+      overrideBtn.hidden = false;
+      removeOverrideBtn.hidden = true;
+    } else {
+      overrideBtn.hidden = true;
+      removeOverrideBtn.hidden = true;
+    }
+
+    drawer.setAttribute("data-open", "");
+    backdrop.hidden = false;
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeDrawer() {
+    if (!drawer || !backdrop) return;
+    drawer.removeAttribute("data-open");
+    backdrop.hidden = true;
+    document.body.style.overflow = "";
+    currentData = null;
+  }
+
+  closeBtn?.addEventListener("click", closeDrawer);
+  backdrop?.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+
+  // Bind matrix cells
+  document.querySelectorAll<HTMLElement>(".matrix__cell").forEach((cell) => {
+    cell.addEventListener("click", () => {
+      openDrawer({
+        enrollment: cell.dataset.enrollment ?? "",
+        module: cell.dataset.module ?? "",
+        student: cell.dataset.student ?? "",
+        moduleTitle: cell.dataset.moduleTitle ?? "",
+        submissionId: cell.dataset.submissionId ?? "",
+        status: cell.dataset.status ?? "",
+        override: cell.dataset.override === "1",
+      });
+    });
+    cell.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        cell.click();
+      }
+    });
+  });
+
+  // Override actions
+  async function callOverride(method: "POST" | "DELETE") {
+    if (!currentData || !actionStatusEl) return;
+    actionStatusEl.hidden = false;
+    actionStatusEl.textContent = "Saving...";
+    try {
+      const res = await fetch(
+        `/api/instructor/enrollment-modules/${encodeURIComponent(currentData.enrollment)}/${encodeURIComponent(currentData.module)}/unlock-override`,
+        {
+          method,
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: method === "POST" ? JSON.stringify({}) : undefined,
+        },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status.toString()}`);
+      actionStatusEl.textContent = "Saved. Reloading...";
+      setTimeout(() => { window.location.reload(); }, 500);
+    } catch (err) {
+      console.error("[matrix override]", err);
+      if (actionStatusEl) actionStatusEl.textContent = "Failed. Try again.";
+    }
+  }
+
+  overrideBtn?.addEventListener("click", () => {
+    if (!confirm("Open this module to the student before its scheduled date?")) return;
+    void callOverride("POST");
+  });
+  removeOverrideBtn?.addEventListener("click", () => {
+    if (!confirm("Remove the manual override?")) return;
+    void callOverride("DELETE");
+  });
+</script>
