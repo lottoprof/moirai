@@ -164,6 +164,13 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       {!isVideo && !isImage && !isPdf && (
         <p class="review-page__no-preview">No inline preview. Use download.</p>
       )}
+      <div class="review-page__file-missing" data-file-missing hidden>
+        <p>
+          {ru
+            ? "Файл недоступен в хранилище. Возможно, это тестовая запись или файл был удалён."
+            : "File is not available in storage. This may be a test record or the file was deleted."}
+        </p>
+      </div>
       <button type="button" class="review-page__download-btn" data-action="download-file">
         {t.downloadCta}
       </button>
@@ -325,6 +332,15 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
     font-style: italic;
     margin: 0;
   }
+  .review-page__file-missing {
+    padding: var(--space-md);
+    border: 1px dashed var(--border-strong);
+    border-radius: 2px;
+    background: var(--amber-faint);
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+  }
+  .review-page__file-missing p { margin: 0; }
   .review-page__download-btn,
   .review-page__upload-btn {
     background: transparent;
@@ -435,10 +451,24 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       } catch { return null; }
     }
 
-    // Auto-load preview URL on page mount (for inline player/img/iframe)
+    const missingEl = page.querySelector<HTMLElement>("[data-file-missing]");
+    function showMissing(): void {
+      if (missingEl) missingEl.hidden = false;
+      if (videoSrc?.parentElement) videoSrc.parentElement.style.display = "none";
+      if (imgEl) imgEl.style.display = "none";
+      if (iframeEl) iframeEl.style.display = "none";
+    }
+
+    // Auto-load preview URL on page mount. Делаем HEAD-проверку
+    // прежде чем привязать к iframe/img/video, чтобы не показывать
+    // R2 NoSuchKey XML напрямую в UI (тестовые / удалённые файлы).
     if (videoSrc || imgEl || iframeEl) {
-      getFileUrl().then((url) => {
-        if (!url) return;
+      getFileUrl().then(async (url) => {
+        if (!url) { showMissing(); return; }
+        try {
+          const head = await fetch(url, { method: "HEAD" });
+          if (!head.ok) { showMissing(); return; }
+        } catch { showMissing(); return; }
         if (videoSrc) {
           videoSrc.src = url;
           const video = videoSrc.parentElement;
@@ -446,7 +476,7 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
         }
         if (imgEl) imgEl.src = url;
         if (iframeEl) iframeEl.src = url;
-      });
+      }).catch(() => { showMissing(); });
     }
 
     // Download button
