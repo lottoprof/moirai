@@ -23,7 +23,7 @@ import type {
 // ============================================================
 
 const USER_COLUMNS =
-  "id, email, email_verified_at, name, locale, referral_code, deactivated_at, marketing_opt_in, created_at, updated_at";
+  "id, email, email_verified_at, name, locale, referral_code, deactivated_at, marketing_opt_in, notifications_email, instructor_digest_opt_in, deleted_at, created_at, updated_at";
 
 /** SELECT user by email (case-insensitive). */
 export async function findUserByEmail(

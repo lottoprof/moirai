@@ -11,10 +11,11 @@
  * Auth: Bearer <CRON_SECRET>.
  *
  * Jobs:
- *   - auto-approve       (recommended every 15 min)
- *   - retention          (daily ~03:00 UTC)
- *   - pre-archive-email  (daily ~04:00 UTC)
- *   - orphan-cleanup     (daily ~05:00 UTC)
+ *   - auto-approve        (recommended every 15 min)
+ *   - retention           (daily ~03:00 UTC)
+ *   - pre-archive-email   (daily ~04:00 UTC)
+ *   - orphan-cleanup      (daily ~05:00 UTC)
+ *   - instructor-digest   (daily ~13:00 UTC ≈ 09:00 EDT)
  *
  * Spec: docs/student-lk-v2-spec.md § 6.
  */
@@ -24,6 +25,7 @@ import { runAutoApprove } from '../../../../lib/server/cron/auto-approve';
 import { runRetention } from '../../../../lib/server/cron/retention';
 import { runPreArchiveEmail } from '../../../../lib/server/cron/pre-archive-email';
 import { runOrphanCleanup } from '../../../../lib/server/cron/orphan-cleanup';
+import { runInstructorDigest } from '../../../../lib/server/cron/instructor-digest';
 
 export const prerender = false;
 
@@ -54,6 +56,7 @@ export const POST: APIRoute = async (ctx) => {
       case 'retention':          result = await runRetention(env); break;
       case 'pre-archive-email':  result = await runPreArchiveEmail(env); break;
       case 'orphan-cleanup':     result = await runOrphanCleanup(env); break;
+      case 'instructor-digest':  result = await runInstructorDigest(env); break;
       default: return jsonError('unknown_job', 400);
     }
   } catch (err) {

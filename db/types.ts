@@ -167,6 +167,10 @@ export interface UserRow {
    *  Default 1 (включено). 0 = студент opt-out'нулся через /account UI.
    *  Stage A: optional. */
   notifications_email?: number;
+  /** Instructor LK v2 Q9 (migration 0017): opt-in/out на ежедневный
+   *  digest preподa (pending + late + сегодняшние sessions).
+   *  Default 1. Поле есть у всех users, но cron шлёт только role=instructor. */
+  instructor_digest_opt_in?: number;
   created_at: number;
   updated_at: number;
 }
