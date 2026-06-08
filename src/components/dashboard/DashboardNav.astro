@@ -79,8 +79,7 @@ if (roles?.has("admin")) {
         <List size={20} />
       </button>
     )}
-    <a href={`/${locale}/dashboard`} class="dashboard-nav__logo" aria-label="Moirai dashboard"><Logo height={26} /></a>
-    <a href={`/${locale}/`} class="dashboard-nav__site">{labels.site}</a>
+    <a href={`/${locale}/`} class="dashboard-nav__logo" aria-label="Moirai home"><Logo height={26} /></a>
   </div>
   <ul class="dashboard-nav__list" role="list">
     {items.map((item) => (

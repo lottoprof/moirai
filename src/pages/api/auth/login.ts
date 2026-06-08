@@ -104,6 +104,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return jsonError("invalid_login", 401);
   }
 
+  // Reset rate limit counter on successful auth — legitimate users не должны
+  // быть наказаны за frequent re-login (logout/login flow, multi-device).
+  // Brute-force защита остаётся: failed attempts продолжают накапливаться.
+  await env.KV_RATELIMIT.delete(`rl:login:email:${email.toLowerCase()}`);
+  await env.KV_RATELIMIT.delete(`rl:login:ip:${ip}`);
+
   // Success: refresh session + access JWT + audit
   const { sessionId, cookieHeader } = await createRefreshSession(
     env,
