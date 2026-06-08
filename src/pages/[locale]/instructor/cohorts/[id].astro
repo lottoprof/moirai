@@ -205,8 +205,9 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       </div>
     )}
 
-    <!-- Drawer (slide-in from right) -->
-    <aside class="cell-drawer" data-cell-drawer hidden aria-labelledby="cell-drawer-title">
+    <!-- Drawer (slide-in from right) — изначально translateX(100%) offscreen,
+         поэтому без hidden HTML-атрибута (hidden убил бы transform-анимацию). -->
+    <aside class="cell-drawer" data-cell-drawer aria-labelledby="cell-drawer-title" aria-hidden="true">
       <header class="cell-drawer__head">
         <h2 class="cell-drawer__title" id="cell-drawer-title">{t.drawerStudent}</h2>
         <button type="button" class="cell-drawer__close" data-cell-drawer-close aria-label={t.drawerClose}>
@@ -680,6 +681,7 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
     }
 
     drawer.setAttribute("data-open", "");
+    drawer.setAttribute("aria-hidden", "false");
     backdrop.hidden = false;
     document.body.style.overflow = "hidden";
   }
@@ -687,6 +689,7 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
   function closeDrawer() {
     if (!drawer || !backdrop) return;
     drawer.removeAttribute("data-open");
+    drawer.setAttribute("aria-hidden", "true");
     backdrop.hidden = true;
     document.body.style.overflow = "";
     currentData = null;
