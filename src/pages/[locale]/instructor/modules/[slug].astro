@@ -5,7 +5,6 @@
  * Read-only mirror /admin/modules/[slug] для preподa. Без edit, без R2 keys.
  */
 
-import { marked } from "marked";
 import Layout from "../../../../layouts/instructor/Layout.astro";
 import { requireRole } from "../../../../lib/server/guards";
 
@@ -43,42 +42,18 @@ const row = await env.DB.prepare(
 
 if (!row) return new Response(null, { status: 404 });
 
-let bodyHtml: string | null = null;
-let bodyError: string | null = null;
-if (row.body_r2_key) {
-  try {
-    const obj = await env.MODULE_CONTENT.get(row.body_r2_key);
-    if (obj) {
-      const md = await obj.text();
-      const stripped = md.replace(/^---\n[\s\S]*?\n---\n/, "");
-      marked.setOptions({ gfm: true, breaks: false });
-      bodyHtml = await marked.parse(stripped);
-    } else {
-      bodyError = "missing_in_r2";
-    }
-  } catch (err) {
-    console.error("[instructor module preview] R2 fetch failed:", err);
-    bodyError = "fetch_error";
-  }
-} else {
-  bodyError = "no_key";
-}
 
 const t = ru
   ? {
       backLink: "← К модулям",
-      previewMissing: "Body не загружен.",
-      previewError: "Ошибка загрузки.",
-      previewNoKey: "Body не настроен.",
+      viewBody: "Открыть body (Markdown)",
       downloadPresentation: "Скачать презентацию",
       downloadWorkbook: "Скачать workbook",
       seo: { title: `${row.title} — Преподаватель`, description: "Module preview" },
     }
   : {
       backLink: "← Back to modules",
-      previewMissing: "Body not uploaded.",
-      previewError: "Fetch error.",
-      previewNoKey: "Body not configured.",
+      viewBody: "Open body (Markdown)",
       downloadPresentation: "Download presentation",
       downloadWorkbook: "Download workbook",
       seo: { title: `${row.title} — Instructor`, description: "Module preview" },
@@ -100,6 +75,11 @@ const t = ru
     </header>
 
     <div class="instr-mod__downloads">
+      {row.body_r2_key && (
+        <a class="instr-mod__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${typedLocale}/body`} target="_blank" rel="noopener">
+          {t.viewBody}
+        </a>
+      )}
       {row.presentation_r2_key && (
         <a class="instr-mod__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${typedLocale}/presentation`} target="_blank" rel="noopener">
           {t.downloadPresentation}
@@ -111,16 +91,6 @@ const t = ru
         </a>
       )}
     </div>
-
-    {bodyHtml ? (
-      <article class="instr-mod__body" set:html={bodyHtml} />
-    ) : (
-      <p class="instr-mod__err">
-        {bodyError === "no_key" ? t.previewNoKey :
-         bodyError === "missing_in_r2" ? t.previewMissing :
-         t.previewError}
-      </p>
-    )}
   </div>
 </Layout>
 

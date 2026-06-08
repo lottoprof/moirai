@@ -98,6 +98,51 @@ const counts = await env.DB.prepare(`
 // Selected user — для drawer'а
 const selectedUser = selectedId ? users.find((u) => u.id === selectedId) ?? null : null;
 
+// Drawer extras: instructor cohorts + student enrollments (Stage B)
+interface InstructorLeadCohort {
+  cohort_id: string;
+  programme_slug: string;
+  start_date: number;
+  status: string;
+}
+interface StudentEnrollment {
+  enrollment_id: string;
+  cohort_id: string;
+  programme_slug: string;
+  cohort_start_date: number;
+  status: string;
+  pending_count: number;
+}
+
+let drawerInstructorLeadCohorts: InstructorLeadCohort[] = [];
+let drawerStudentEnrollments: StudentEnrollment[] = [];
+if (selectedUser) {
+  if (selectedUser.roles.includes("instructor")) {
+    const r = await env.DB.prepare(
+      `SELECT id AS cohort_id, programme_id AS programme_slug, start_date, status
+         FROM cohorts
+        WHERE lead_instructor_id = ?
+          AND status IN ('open','running')
+        ORDER BY start_date ASC`,
+    ).bind(selectedUser.id).all<InstructorLeadCohort>();
+    drawerInstructorLeadCohorts = r.results;
+  }
+  if (selectedUser.roles.includes("student")) {
+    const r = await env.DB.prepare(
+      `SELECT e.id AS enrollment_id, a.cohort_id, c.programme_id AS programme_slug,
+              c.start_date AS cohort_start_date, e.status,
+              (SELECT COUNT(*) FROM homework_submissions hs
+                WHERE hs.enrollment_id = e.id AND hs.status = 'pending') AS pending_count
+         FROM enrollments e
+         JOIN applications a ON a.enrollment_id = e.id
+         JOIN cohorts c ON c.id = a.cohort_id
+        WHERE e.user_id = ? AND e.archived_at IS NULL
+        ORDER BY c.start_date DESC`,
+    ).bind(selectedUser.id).all<StudentEnrollment>();
+    drawerStudentEnrollments = r.results;
+  }
+}
+
 const t = locale === "ru"
   ? {
       eyebrow: "Пользователи",
@@ -306,6 +351,56 @@ const statusOf = (u: UserListRow): "active" | "inactive" | "pending" =>
           </div>
           <p class="admin-users__form-status" role="status"></p>
         </form>
+
+        {drawerInstructorLeadCohorts.length > 0 && (
+          <section class="admin-users__sub-section">
+            <h3 class="admin-users__sub-title">
+              {locale === "ru" ? "Активные группы (lead)" : "Active cohorts (lead)"}
+            </h3>
+            <ul class="admin-users__sub-list">
+              {drawerInstructorLeadCohorts.map((c) => (
+                <li class="admin-users__sub-row">
+                  <a class={`admin-users__sub-prog admin-users__sub-prog--${c.programme_slug}`}
+                     href={`/admin/cohorts/${c.cohort_id}`}>
+                    {c.programme_slug}
+                  </a>
+                  <span>{dateFmt.format(new Date(c.start_date * 1000))}</span>
+                  <span class={`admin-users__sub-status admin-users__sub-status--${c.status}`}>{c.status}</span>
+                </li>
+              ))}
+            </ul>
+            <div class="admin-users__sub-actions">
+              <a class="admin-users__btn admin-users__btn--primary" href={`/admin/instructors/${selectedUser.id}`}>
+                {locale === "ru" ? "Квалификации" : "Qualifications"}
+              </a>
+              <a class="admin-users__btn" href={`/admin/users/${selectedUser.id}/handover`}>
+                {locale === "ru" ? "Передать группы" : "Handover cohorts"}
+              </a>
+            </div>
+          </section>
+        )}
+
+        {drawerStudentEnrollments.length > 0 && (
+          <section class="admin-users__sub-section">
+            <h3 class="admin-users__sub-title">
+              {locale === "ru" ? "Записи" : "Enrollments"}
+            </h3>
+            <ul class="admin-users__sub-list">
+              {drawerStudentEnrollments.map((e) => (
+                <li class="admin-users__sub-row">
+                  <span class={`admin-users__sub-prog admin-users__sub-prog--${e.programme_slug}`}>{e.programme_slug}</span>
+                  <span>{dateFmt.format(new Date(e.cohort_start_date * 1000))}</span>
+                  <span class={`admin-users__sub-status admin-users__sub-status--${e.status}`}>{e.status}</span>
+                  {e.pending_count > 0 && (
+                    <span class="admin-users__sub-pending">
+                      {e.pending_count} {locale === "ru" ? "на проверке" : "pending"}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     )}
   </div>
@@ -700,4 +795,51 @@ const statusOf = (u: UserListRow): "active" | "inactive" | "pending" =>
     .admin-users__form-grid { grid-template-columns: 1fr; }
     .admin-users__table { font-size: 11px; }
   }
+
+  .admin-users__sub-section {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border);
+  }
+  .admin-users__sub-title {
+    font-family: var(--font-display);
+    font-size: var(--type-body-lg);
+    font-weight: 400;
+    margin: 0 0 var(--space-sm);
+    color: var(--text);
+  }
+  .admin-users__sub-list { list-style: none; padding: 0; margin: 0 0 var(--space-md); }
+  .admin-users__sub-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-md);
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .admin-users__sub-prog {
+    font-family: var(--font-body);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    color: var(--text);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+  }
+  .admin-users__sub-prog--beginner { color: var(--prog-beginner); }
+  .admin-users__sub-prog--intermediate { color: var(--prog-intermediate); }
+  .admin-users__sub-prog--advanced { color: var(--prog-advanced); }
+  .admin-users__sub-status {
+    font-size: var(--type-micro-sm);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+  }
+  .admin-users__sub-status--running, .admin-users__sub-status--active {
+    color: var(--text-accent);
+  }
+  .admin-users__sub-pending {
+    color: var(--text-accent);
+    font-size: var(--type-micro-md);
+  }
+  .admin-users__sub-actions { display: flex; gap: var(--space-sm); margin-top: var(--space-sm); }
 </style>

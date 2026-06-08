@@ -13,6 +13,7 @@ import type { APIRoute } from "astro";
 import { requireRoleApi } from "../../../../../lib/server/guards";
 import { findUserById } from "../../../../../lib/server/user-ops";
 import { logAuth } from "../../../../../lib/server/audit";
+import { checkAccountDeleteBlocked } from "../../../../../lib/server/admin-instructors";
 
 export const prerender = false;
 
@@ -36,6 +37,15 @@ export const POST: APIRoute = async (ctx) => {
   if (!target) return jsonError("not_found", 404);
   if (target.deactivated_at !== null) {
     return jsonError("already_deactivated", 409);
+  }
+
+  // Block если user — lead в open/running cohort (S7 admin-instructor-management)
+  const blockingCohorts = await checkAccountDeleteBlocked(env, userId);
+  if (blockingCohorts.length > 0) {
+    return new Response(
+      JSON.stringify({ error: "blocked_active_cohorts", cohorts: blockingCohorts }),
+      { status: 409, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   // Last-admin invariant: считаем других active admin'ов

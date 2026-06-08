@@ -19,6 +19,7 @@ import type { APIRoute } from "astro";
 import { requireRoleApi } from "../../../../../lib/server/guards";
 import { findUserById } from "../../../../../lib/server/user-ops";
 import { logAuth } from "../../../../../lib/server/audit";
+import { checkAccountDeleteBlocked } from "../../../../../lib/server/admin-instructors";
 
 export const prerender = false;
 
@@ -43,6 +44,15 @@ export const POST: APIRoute = async (ctx) => {
 
   // Запрет self-anonymize — admin не должен случайно прибить себя
   if (userId === admin.id) return jsonError("cannot_anonymize_self", 409);
+
+  // Block если user — lead в open/running cohort (S7 admin-instructor-management)
+  const blockingCohorts = await checkAccountDeleteBlocked(env, userId);
+  if (blockingCohorts.length > 0) {
+    return new Response(
+      JSON.stringify({ error: "blocked_active_cohorts", cohorts: blockingCohorts }),
+      { status: 409, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   // Last-admin invariant
   const rolesRow = await env.DB.prepare(

@@ -51,10 +51,11 @@ if (rows.results.length === 0) return new Response(null, { status: 404 });
 const enRow = rows.results.find((r) => r.locale === "en") ?? null;
 const ruRow = rows.results.find((r) => r.locale === "ru") ?? null;
 
-// Body preview — render markdown в админскую локаль (или fallback)
+// Preview locale — выбираем что показать (admin locale fallback)
 const previewRow = adminLocale === "ru" ? (ruRow ?? enRow) : (enRow ?? ruRow);
 const previewLocale = previewRow?.locale ?? "en";
 
+// Body markdown — рендерим inline (если есть). Download остаётся опциональным.
 let bodyHtml: string | null = null;
 let bodyError: string | null = null;
 if (previewRow?.body_r2_key) {
@@ -63,13 +64,13 @@ if (previewRow?.body_r2_key) {
     if (obj) {
       const md = await obj.text();
       const stripped = md.replace(/^---\n[\s\S]*?\n---\n/, "");
-      marked.setOptions({ gfm: true, breaks: false });
-      bodyHtml = await marked.parse(stripped);
+      const parsed = marked.parse(stripped, { async: false }) as string;
+      bodyHtml = parsed;
     } else {
       bodyError = "missing_in_r2";
     }
   } catch (err) {
-    console.error("[admin module preview] R2 fetch failed:", err);
+    console.error("[admin module preview] body fetch/parse failed:", err);
     bodyError = "fetch_error";
   }
 } else {
@@ -100,12 +101,13 @@ const t = ru
       featureHomework: "ДЗ",
       featureText: "текст",
       previewTitle: "Просмотр",
-      previewHint: (loc: string) => `Тело модуля (${loc.toUpperCase()}). Загружено методистом.`,
-      previewMissing: "Body не загружен в R2.",
-      previewError: "Ошибка загрузки из R2.",
-      previewNoKey: "body_r2_key не задан.",
+      previewHint: (loc: string) => `Материалы модуля (${loc.toUpperCase()}). Загружено методистом.`,
+      viewBody: "Открыть body (raw)",
       downloadPresentation: "Скачать презентацию",
       downloadWorkbook: "Скачать workbook",
+      previewMissing: "Body не загружен в R2.",
+      previewError: "Ошибка загрузки body.",
+      previewNoKey: "body_r2_key не задан.",
       r2Title: "R2-ключи (read-only)",
       r2Hint: "Тело модуля управляется через methodist repo. R2 keys показаны для отладки.",
       r2Body: "Body",
@@ -135,12 +137,13 @@ const t = ru
       featureHomework: "homework",
       featureText: "text",
       previewTitle: "Preview",
-      previewHint: (loc: string) => `Module body (${loc.toUpperCase()}). Uploaded by methodist.`,
-      previewMissing: "Body not uploaded to R2.",
-      previewError: "Failed to fetch from R2.",
-      previewNoKey: "body_r2_key not set.",
+      previewHint: (loc: string) => `Module materials (${loc.toUpperCase()}). Uploaded by methodist.`,
+      viewBody: "Open body (raw)",
       downloadPresentation: "Download presentation",
       downloadWorkbook: "Download workbook",
+      previewMissing: "Body not uploaded to R2.",
+      previewError: "Failed to fetch / parse body.",
+      previewNoKey: "body_r2_key not set.",
       r2Title: "R2 keys (read-only)",
       r2Hint: "Module body managed via methodist repo. R2 keys shown for debugging.",
       r2Body: "Body",
@@ -220,6 +223,11 @@ const t = ru
       <h2 class="module-meta__title">{t.previewTitle}</h2>
       <p class="module-preview__hint">{t.previewHint(previewLocale)}</p>
       <div class="module-preview__downloads">
+        {previewRow?.body_r2_key && (
+          <a class="module-preview__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${previewLocale}/body`} target="_blank" rel="noopener">
+            {t.viewBody}
+          </a>
+        )}
         {previewRow?.presentation_r2_key && (
           <a class="module-preview__btn" href={`/api/modules/preview/${encodeURIComponent(slug)}/${previewLocale}/presentation`} target="_blank" rel="noopener">
             {t.downloadPresentation}
