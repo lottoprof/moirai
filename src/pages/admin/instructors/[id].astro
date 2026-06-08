@@ -81,6 +81,8 @@ const t = ru
       headerName: "Имя",
       headerEmail: "Email",
       qualifiedSummary: (n: number, total: number) => `Квалифицирован по ${n.toString()} из ${total.toString()} модулей`,
+      summaryPrefix: "Квалифицирован по",
+      summarySuffixFmt: (total: number) => `из ${total.toString()} модулей`,
       programmeTitle: "Программа",
       moduleHeader: "Модуль",
       qualifiedHeader: "Квалифицирован",
@@ -97,6 +99,8 @@ const t = ru
       headerName: "Name",
       headerEmail: "Email",
       qualifiedSummary: (n: number, total: number) => `Qualified for ${n.toString()} of ${total.toString()} modules`,
+      summaryPrefix: "Qualified for",
+      summarySuffixFmt: (total: number) => `of ${total.toString()} modules`,
       programmeTitle: "Programme",
       moduleHeader: "Module",
       qualifiedHeader: "Qualified",
@@ -173,7 +177,8 @@ const qualifiedCount = qualified.size;
   failedHint: t.failedHint,
   savingBtn: t.savingBtn,
   saveBtnLabel: t.saveBtn,
-  summaryFmt: (n: number) => t.qualifiedSummary(n, totalModules),
+  summaryPrefix: t.summaryPrefix,
+  summarySuffix: t.summarySuffixFmt(totalModules),
 }}>
   const form = document.querySelector("[data-qual-form]");
   const saveBtn = document.querySelector("[data-save-btn]");
@@ -182,7 +187,7 @@ const qualifiedCount = qualified.size;
 
   function updateSummary() {
     const n = document.querySelectorAll(".qual-module__cb:checked").length;
-    summaryEl.textContent = summaryFmt(n);
+    summaryEl.textContent = `${summaryPrefix} ${n.toString()} ${summarySuffix}`;
   }
 
   document.querySelectorAll(".qual-module__cb").forEach((cb) => {
