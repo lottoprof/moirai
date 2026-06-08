@@ -38,6 +38,9 @@ coverage/
 .agent/worktrees/
 .playwright-mcp/
 *.png
+
+# D1 backups (могут содержать sensitive user data — email, etc.)
+backups/
 # Брендированный OG-fallback — единственный коммитнутый PNG в public/.
 # Генерится scripts/generate-og-default.mjs, регенится при rebrand.
 !public/og-default.png
