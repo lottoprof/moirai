@@ -1,0 +1,375 @@
+---
+/*
+ * /{locale}/instructor/students/{id} — профиль студента.
+ *
+ * Instructor LK v2 Q4b (закрыт 2026-06-08).
+ *
+ * Содержит:
+ *   - Header: name, email, programme (окраска), cohort label, joined date
+ *   - Modules timeline: список всех 11/13 модулей со статусами
+ *   - Recent submissions: last 10 со ссылками на review
+ *
+ * ACL: student должен быть в одном из enrollment'ов где
+ * preподa = lead_instructor.
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../../../layouts/instructor/Layout.astro";
+import { requireRole } from "../../../../lib/server/guards";
+import { getInstructorStudentDetail } from "../../../../lib/server/instructor-homework";
+import { formatDate } from "../../../../lib/format-date";
+import Check from "../../../../components/icons/Check.astro";
+import Lock from "../../../../components/icons/Lock.astro";
+
+export const prerender = false;
+
+const { locale, id } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/instructor");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+if (!id || typeof id !== "string") return new Response(null, { status: 404 });
+
+const userOrRes = await requireRole(Astro, "instructor");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+const detail = await getInstructorStudentDetail(env, user.id, id, typedLocale);
+if (!detail) return new Response(null, { status: 404 });
+
+const programmeEntry = await getEntry("programmes", `${detail.programme_slug}.${typedLocale}`);
+const programmeTitle = programmeEntry?.data.title ?? detail.programme_slug;
+
+const joinedFmt = formatDate(new Date(detail.joined_at * 1000), typedLocale);
+const cohortFmt = formatDate(new Date(detail.cohort_start_date * 1000), typedLocale);
+
+const intlLocale = ru ? "ru-RU" : "en-US";
+const submissionDateFmt = new Intl.DateTimeFormat(intlLocale, {
+  month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+});
+
+const studentName = detail.student_name?.trim() || detail.student_email.split("@")[0];
+
+const doneCount = detail.modules.filter((m) => m.status === "done").length;
+const totalCount = detail.modules.length;
+const progressPct = totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100);
+
+const t = ru
+  ? {
+      backLink: "← К студентам",
+      headerEmail: "Email",
+      headerProgramme: "Программа",
+      headerCohort: "Когорта",
+      headerJoined: "Записан",
+      headerProgress: "Прогресс",
+      modulesTitle: "Модули",
+      submissionsTitle: "Последние сдачи",
+      submissionsEmpty: "Студент ещё не сдавал ДЗ.",
+      lateTag: "просрочка",
+      reviewBtn: "Открыть",
+      statusLabels: {
+        done: "Завершён", active: "Активен", locked: "Заблокирован",
+        pending: "На проверке", needs_revision: "На доработку", approved: "Принят",
+        auto_approved: "Принят (auto)", expired: "Истёк",
+      } as Record<string, string>,
+      seo: { title: `${studentName} — Moirai`, description: "Профиль студента" },
+    }
+  : {
+      backLink: "← Students",
+      headerEmail: "Email",
+      headerProgramme: "Programme",
+      headerCohort: "Cohort",
+      headerJoined: "Joined",
+      headerProgress: "Progress",
+      modulesTitle: "Modules",
+      submissionsTitle: "Recent submissions",
+      submissionsEmpty: "Student hasn't submitted any homework yet.",
+      lateTag: "late",
+      reviewBtn: "Open",
+      statusLabels: {
+        done: "Done", active: "Active", locked: "Locked",
+        pending: "Pending", needs_revision: "Needs revision", approved: "Approved",
+        auto_approved: "Auto-approved", expired: "Expired",
+      } as Record<string, string>,
+      seo: { title: `${studentName} — Moirai`, description: "Student profile" },
+    };
+
+Astro.response.headers.set("Cache-Control", "private, no-store");
+---
+
+<Layout
+  locale={typedLocale}
+  seo={t.seo}
+  currentNavKey="students"
+  userRoles={user.roles}
+>
+  <div class="student-detail">
+    <a class="student-detail__back" href={`/${typedLocale}/instructor/students`}>{t.backLink}</a>
+
+    <header class="student-detail__head">
+      <div>
+        <h1 class="student-detail__name">{studentName}</h1>
+        <dl class="student-detail__meta">
+          <div><dt>{t.headerEmail}</dt><dd>{detail.student_email}</dd></div>
+          <div>
+            <dt>{t.headerProgramme}</dt>
+            <dd class={`student-detail__prog student-detail__prog--${detail.programme_slug}`}>{programmeTitle}</dd>
+          </div>
+          <div><dt>{t.headerCohort}</dt><dd>{cohortFmt}</dd></div>
+          <div><dt>{t.headerJoined}</dt><dd>{joinedFmt}</dd></div>
+        </dl>
+      </div>
+      <div class="student-detail__progress-block">
+        <p class="student-detail__progress-label">{t.headerProgress}</p>
+        <p class="student-detail__progress-num">{doneCount}/{totalCount}</p>
+        <p class="student-detail__progress-pct">{progressPct}%</p>
+      </div>
+    </header>
+
+    <section class="student-detail__section">
+      <h2 class="student-detail__h2">{t.modulesTitle}</h2>
+      <ul class="modules-timeline">
+        {detail.modules.map((m) => (
+          <li class:list={["module-row", `module-row--${m.status}`]}>
+            <span class="module-row__num">{String(m.order_idx + 1).padStart(2, "0")}</span>
+            <span class="module-row__title">{m.module_title ?? m.module_slug}</span>
+            <span class={`module-row__status module-row__status--${m.status}`}>
+              {m.status === "done" && <Check size={12} />}
+              {m.status === "locked" && <Lock size={12} />}
+              <span>{t.statusLabels[m.status] ?? m.status}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="student-detail__section">
+      <h2 class="student-detail__h2">{t.submissionsTitle}</h2>
+      {detail.recent_submissions.length === 0 ? (
+        <p class="student-detail__empty">{t.submissionsEmpty}</p>
+      ) : (
+        <ul class="submissions-list">
+          {detail.recent_submissions.map((s) => (
+            <li class="submission-row">
+              <a class="submission-row__link" href={`/${typedLocale}/instructor/homework/${s.id}`}>
+                <div class="submission-row__main">
+                  <span class="submission-row__module">{s.module_title ?? s.module_slug}</span>
+                  <span class={`submission-row__status submission-row__status--${s.status}`}>
+                    {t.statusLabels[s.status] ?? s.status}
+                  </span>
+                  {s.is_late === 1 && <span class="submission-row__late">{t.lateTag}</span>}
+                </div>
+                <span class="submission-row__date">{submissionDateFmt.format(new Date(s.uploaded_at * 1000))}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  </div>
+</Layout>
+
+<style>
+  .student-detail {
+    padding: var(--space-lg) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .student-detail__back {
+    display: inline-block;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+    text-decoration: none;
+    margin-bottom: var(--space-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+  }
+  .student-detail__back:hover { color: var(--text); }
+
+  .student-detail__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-xl);
+    padding: var(--space-lg) 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-xl);
+    flex-wrap: wrap;
+  }
+  .student-detail__name {
+    font-family: var(--font-display);
+    font-size: var(--type-display-sm);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0 0 var(--space-sm);
+  }
+  .student-detail__meta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px var(--space-md);
+    margin: 0;
+    font-size: var(--type-body-sm);
+  }
+  .student-detail__meta > div { display: contents; }
+  .student-detail__meta dt {
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    align-self: center;
+  }
+  .student-detail__meta dd {
+    margin: 0;
+    color: var(--text);
+  }
+  .student-detail__prog--beginner     { color: var(--prog-beginner); }
+  .student-detail__prog--intermediate { color: var(--prog-intermediate); }
+  .student-detail__prog--advanced     { color: var(--prog-advanced); }
+
+  .student-detail__progress-block {
+    text-align: right;
+    min-width: 120px;
+  }
+  .student-detail__progress-label {
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0;
+  }
+  .student-detail__progress-num {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    color: var(--text);
+    margin: 4px 0 0;
+    line-height: 1;
+  }
+  .student-detail__progress-pct {
+    font-size: var(--type-body-md);
+    color: var(--text-accent);
+    margin: 4px 0 0;
+  }
+
+  .student-detail__section { margin-bottom: var(--space-xl); }
+  .student-detail__h2 {
+    font-family: var(--font-display);
+    font-size: var(--type-display-sm);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0 0 var(--space-md);
+  }
+  .student-detail__empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-lg);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+  }
+
+  /* Modules timeline */
+  .modules-timeline {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+  .module-row {
+    display: grid;
+    grid-template-columns: 48px 1fr auto;
+    gap: var(--space-md);
+    align-items: center;
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border);
+  }
+  .module-row:last-child { border-bottom: none; }
+  .module-row__num {
+    font-family: var(--font-display);
+    font-size: var(--type-body-md);
+    color: var(--text-faint);
+  }
+  .module-row__title { color: var(--text); }
+  .module-row--locked .module-row__title { color: var(--text-faint); }
+  .module-row__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+  }
+  .module-row__status--done {
+    color: var(--text-accent);
+    border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+    background: var(--amber-faint);
+  }
+  .module-row__status--needs_revision {
+    color: var(--amber);
+    border-color: var(--amber);
+  }
+  .module-row__status--pending {
+    color: var(--text);
+    border-color: var(--text);
+  }
+  .module-row__status--locked {
+    color: var(--text-faint);
+    border-style: dashed;
+  }
+
+  /* Submissions list */
+  .submissions-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .submission-row { border-bottom: 1px solid var(--border); }
+  .submission-row__link {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) 0;
+    text-decoration: none;
+    color: var(--text-muted);
+  }
+  .submission-row__link:hover { color: var(--text); }
+  .submission-row__main {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+  .submission-row__module { color: var(--text); font-size: var(--type-body-md); }
+  .submission-row__status {
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 2px;
+    border: 1px solid var(--border-strong);
+  }
+  .submission-row__status--approved, .submission-row__status--auto_approved {
+    color: var(--text-accent);
+    border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+  }
+  .submission-row__status--pending { color: var(--text); border-color: var(--text); }
+  .submission-row__status--needs_revision { color: var(--amber); border-color: var(--amber); }
+  .submission-row__late {
+    font-size: var(--type-micro-sm);
+    color: var(--amber);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+  }
+  .submission-row__date {
+    font-size: var(--type-micro-md);
+    color: var(--text-faint);
+  }
+</style>

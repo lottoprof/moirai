@@ -888,3 +888,218 @@ export async function removeOverride(
     .run();
   return result.meta.changes > 0;
 }
+
+// ============================================================
+// Students list + detail (Q4)
+// ============================================================
+
+export interface InstructorStudentRow {
+  user_id: string;
+  enrollment_id: string;
+  student_name: string | null;
+  student_email: string;
+  programme_slug: string;
+  cohort_id: string;
+  cohort_start_date: number;
+  current_module_slug: string | null;
+  current_module_title: string | null;
+  progress_pct: number;          // % завершённых модулей (status='done')
+  pending_count: number;         // pending submissions у этого студента
+}
+
+/**
+ * Список всех студентов preподa с прогресс-метриками.
+ * ACL: students в cohorts где slot.instructor_id или lead_instructor.
+ */
+export async function listInstructorStudents(
+  env: Cloudflare.Env,
+  instructorId: string,
+  locale: 'en' | 'ru',
+): Promise<InstructorStudentRow[]> {
+  // Enrollments preпода (через lead_instructor — основной путь сейчас)
+  const enrollments = await env.DB.prepare(
+    `SELECT e.id AS enrollment_id, e.user_id,
+            u.name AS student_name, u.email AS student_email,
+            c.id AS cohort_id, c.programme_id AS programme_slug, c.start_date AS cohort_start_date
+       FROM enrollments e
+       JOIN users u ON u.id = e.user_id
+       JOIN applications a ON a.enrollment_id = e.id
+       JOIN cohorts c ON c.id = a.cohort_id
+      WHERE e.lead_instructor_id = ?
+        AND e.archived_at IS NULL
+        AND e.status IN ('active','completed')
+      ORDER BY u.name ASC`,
+  ).bind(instructorId).all<{
+    enrollment_id: string;
+    user_id: string;
+    student_name: string | null;
+    student_email: string;
+    cohort_id: string;
+    programme_slug: string;
+    cohort_start_date: number;
+  }>();
+
+  const rows: InstructorStudentRow[] = [];
+  for (const e of enrollments.results) {
+    // Module stats
+    const mods = await env.DB.prepare(
+      `SELECT status FROM enrollment_modules WHERE enrollment_id = ?`,
+    ).bind(e.enrollment_id).all<{ status: string }>();
+    const total = mods.results.length;
+    const done = mods.results.filter((m) => m.status === 'done').length;
+    const progressPct = total === 0 ? 0 : Math.round((done / total) * 100);
+
+    // Current module — first active (lowest order_idx with status='active' or 'pending')
+    const current = await env.DB.prepare(
+      `SELECT em.module_slug, m.title
+         FROM enrollment_modules em
+         LEFT JOIN modules m ON m.slug = em.module_slug AND m.locale = ?
+        WHERE em.enrollment_id = ? AND em.status IN ('active','pending')
+        ORDER BY em.order_idx ASC
+        LIMIT 1`,
+    ).bind(locale, e.enrollment_id).first<{ module_slug: string; title: string | null }>();
+
+    // Pending count
+    const pending = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM homework_submissions
+        WHERE enrollment_id = ? AND status = 'pending'`,
+    ).bind(e.enrollment_id).first<{ n: number }>();
+
+    rows.push({
+      user_id: e.user_id,
+      enrollment_id: e.enrollment_id,
+      student_name: e.student_name,
+      student_email: e.student_email,
+      programme_slug: e.programme_slug,
+      cohort_id: e.cohort_id,
+      cohort_start_date: e.cohort_start_date,
+      current_module_slug: current?.module_slug ?? null,
+      current_module_title: current?.title ?? null,
+      progress_pct: progressPct,
+      pending_count: pending?.n ?? 0,
+    });
+  }
+
+  return rows;
+}
+
+export interface InstructorStudentModule {
+  module_slug: string;
+  module_title: string | null;
+  order_idx: number;
+  status: string;             // done/active/locked/pending/needs_revision (derived)
+}
+
+export interface InstructorStudentSubmission {
+  id: string;
+  module_slug: string;
+  module_title: string | null;
+  status: string;
+  uploaded_at: number;
+  is_late: number;
+}
+
+export interface InstructorStudentDetail {
+  user_id: string;
+  enrollment_id: string;
+  student_name: string | null;
+  student_email: string;
+  joined_at: number;
+  programme_slug: string;
+  cohort_id: string;
+  cohort_start_date: number;
+  modules: InstructorStudentModule[];
+  recent_submissions: InstructorStudentSubmission[];
+}
+
+/**
+ * Профиль студента (timeline модулей + recent submissions).
+ * ACL: instructor должен быть lead этого enrollment'а.
+ */
+export async function getInstructorStudentDetail(
+  env: Cloudflare.Env,
+  instructorId: string,
+  studentUserId: string,
+  locale: 'en' | 'ru',
+): Promise<InstructorStudentDetail | null> {
+  const enr = await env.DB.prepare(
+    `SELECT e.id AS enrollment_id, e.user_id, e.created_at AS joined_at,
+            u.name AS student_name, u.email AS student_email,
+            c.id AS cohort_id, c.programme_id AS programme_slug, c.start_date AS cohort_start_date
+       FROM enrollments e
+       JOIN users u ON u.id = e.user_id
+       JOIN applications a ON a.enrollment_id = e.id
+       JOIN cohorts c ON c.id = a.cohort_id
+      WHERE e.user_id = ?
+        AND e.lead_instructor_id = ?
+        AND e.archived_at IS NULL
+      LIMIT 1`,
+  ).bind(studentUserId, instructorId).first<{
+    enrollment_id: string;
+    user_id: string;
+    joined_at: number;
+    student_name: string | null;
+    student_email: string;
+    cohort_id: string;
+    programme_slug: string;
+    cohort_start_date: number;
+  }>();
+  if (!enr) return null;
+
+  // Modules timeline
+  const modules = await env.DB.prepare(
+    `SELECT em.module_slug, em.order_idx, em.status, m.title
+       FROM enrollment_modules em
+       LEFT JOIN modules m ON m.slug = em.module_slug AND m.locale = ?
+      WHERE em.enrollment_id = ?
+      ORDER BY em.order_idx ASC`,
+  ).bind(locale, enr.enrollment_id).all<{
+    module_slug: string;
+    order_idx: number;
+    status: string;
+    title: string | null;
+  }>();
+
+  // Recent 10 submissions
+  const subs = await env.DB.prepare(
+    `SELECT hs.id, hs.module_slug, m.title AS module_title,
+            hs.status, hs.uploaded_at, hs.is_late
+       FROM homework_submissions hs
+       LEFT JOIN modules m ON m.slug = hs.module_slug AND m.locale = ?
+      WHERE hs.enrollment_id = ?
+      ORDER BY hs.uploaded_at DESC
+      LIMIT 10`,
+  ).bind(locale, enr.enrollment_id).all<{
+    id: string;
+    module_slug: string;
+    module_title: string | null;
+    status: string;
+    uploaded_at: number;
+    is_late: number;
+  }>();
+
+  return {
+    user_id: enr.user_id,
+    enrollment_id: enr.enrollment_id,
+    student_name: enr.student_name,
+    student_email: enr.student_email,
+    joined_at: enr.joined_at,
+    programme_slug: enr.programme_slug,
+    cohort_id: enr.cohort_id,
+    cohort_start_date: enr.cohort_start_date,
+    modules: modules.results.map((m) => ({
+      module_slug: m.module_slug,
+      module_title: m.title,
+      order_idx: m.order_idx,
+      status: m.status,
+    })),
+    recent_submissions: subs.results.map((s) => ({
+      id: s.id,
+      module_slug: s.module_slug,
+      module_title: s.module_title,
+      status: s.status,
+      uploaded_at: s.uploaded_at,
+      is_late: s.is_late,
+    })),
+  };
+}

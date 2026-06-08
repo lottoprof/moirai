@@ -1,0 +1,366 @@
+---
+/*
+ * /{locale}/instructor/students — список всех студентов preподa.
+ *
+ * Instructor LK v2 Q4a (закрыт 2026-06-08).
+ *
+ * Колонки:
+ *   - Name (link → detail)
+ *   - Programme (с окраской per slug)
+ *   - Cohort label ("MMM YYYY")
+ *   - Current module
+ *   - Progress %
+ *   - Pending count
+ *
+ * Filter chips: by programme (multi), by cohort (multi).
+ * Sort: name ASC (server-side).
+ */
+
+import { getEntry } from "astro:content";
+import Layout from "../../../../layouts/instructor/Layout.astro";
+import InstructorHero from "../../../../components/instructor/InstructorHero.astro";
+import { requireRole } from "../../../../lib/server/guards";
+import { listInstructorStudents } from "../../../../lib/server/instructor-homework";
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+if (locale !== "en" && locale !== "ru") {
+  return Astro.redirect("/en/instructor");
+}
+const typedLocale: "en" | "ru" = locale;
+const ru = typedLocale === "ru";
+
+const userOrRes = await requireRole(Astro, "instructor");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+
+const rows = await listInstructorStudents(env, user.id, typedLocale);
+
+const programmeSlugs = Array.from(new Set(rows.map((r) => r.programme_slug)));
+const programmeTitleMap = new Map<string, string>();
+await Promise.all(programmeSlugs.map(async (slug) => {
+  const entry = await getEntry("programmes", `${slug}.${typedLocale}`);
+  if (entry) programmeTitleMap.set(slug, entry.data.title);
+}));
+
+const intlLocale = ru ? "ru-RU" : "en-US";
+const cohortFmt = new Intl.DateTimeFormat(intlLocale, { month: "short", year: "numeric" });
+
+const cohortIds = Array.from(new Set(rows.map((r) => r.cohort_id)));
+const cohortLabelMap = new Map<string, string>();
+for (const row of rows) {
+  const prog = programmeTitleMap.get(row.programme_slug) ?? row.programme_slug;
+  cohortLabelMap.set(row.cohort_id, `${prog} · ${cohortFmt.format(new Date(row.cohort_start_date * 1000))}`);
+}
+
+const programmeChipsList = programmeSlugs.map((slug) => ({
+  slug,
+  label: programmeTitleMap.get(slug) ?? slug,
+  count: rows.filter((r) => r.programme_slug === slug).length,
+})).sort((a, b) => a.label.localeCompare(b.label));
+
+const cohortChipsList = cohortIds.map((id) => ({
+  id,
+  label: cohortLabelMap.get(id) ?? id,
+  count: rows.filter((r) => r.cohort_id === id).length,
+})).sort((a, b) => a.label.localeCompare(b.label));
+
+const initialFilters = [
+  ...programmeChipsList.map((p) => `prog-${p.slug}`),
+  ...cohortChipsList.map((c) => `cohort-${c.id}`),
+].join(" ");
+
+const t = ru
+  ? {
+      eyebrow: "Преподаватель",
+      title: "Студенты",
+      subtitle: `${rows.length.toString()} студент${rows.length === 1 ? "" : rows.length < 5 ? "а" : "ов"}`,
+      empty: "Студенты ещё не назначены.",
+      labelProgramme: "Программа",
+      labelCohort: "Когорта",
+      headerName: "Имя",
+      headerProgramme: "Программа",
+      headerCohort: "Когорта",
+      headerModule: "Текущий модуль",
+      headerProgress: "Прогресс",
+      headerPending: "На проверке",
+      noCurrent: "—",
+      seo: { title: "Студенты — Moirai", description: "Все студенты преподавателя." },
+    }
+  : {
+      eyebrow: "Instructor",
+      title: "Students",
+      subtitle: `${rows.length.toString()} student${rows.length === 1 ? "" : "s"}`,
+      empty: "No students assigned yet.",
+      labelProgramme: "Programme",
+      labelCohort: "Cohort",
+      headerName: "Name",
+      headerProgramme: "Programme",
+      headerCohort: "Cohort",
+      headerModule: "Current module",
+      headerProgress: "Progress",
+      headerPending: "Pending",
+      noCurrent: "—",
+      seo: { title: "Students — Moirai", description: "All instructor students." },
+    };
+---
+
+<Layout
+  locale={typedLocale}
+  seo={t.seo}
+  currentNavKey="students"
+  userRoles={user.roles}
+>
+  <InstructorHero eyebrow={t.eyebrow} title={t.title} subtitle={t.subtitle} />
+
+  <div class="students-content">
+    {rows.length === 0 ? (
+      <p class="students-empty">{t.empty}</p>
+    ) : (
+      <>
+        <div class="students-filters" role="group" aria-label="Student filters">
+          {programmeChipsList.length > 1 && (
+            <div class="students-filters__group">
+              <span class="students-filters__group-label">{t.labelProgramme}</span>
+              {programmeChipsList.map((p) => (
+                <button
+                  type="button"
+                  class:list={["students-filter-chip", "students-filter-chip--active", `students-filter-chip--prog-${p.slug}`]}
+                  data-filter-key={`prog-${p.slug}`}
+                  aria-pressed="true"
+                >
+                  <span>{p.label}</span>
+                  <span class="students-filter-chip__count">{p.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {cohortChipsList.length > 1 && (
+            <div class="students-filters__group">
+              <span class="students-filters__group-label">{t.labelCohort}</span>
+              {cohortChipsList.map((c) => (
+                <button
+                  type="button"
+                  class="students-filter-chip students-filter-chip--active"
+                  data-filter-key={`cohort-${c.id}`}
+                  aria-pressed="true"
+                >
+                  <span>{c.label}</span>
+                  <span class="students-filter-chip__count">{c.count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <table class="students-table" data-filters={initialFilters}>
+          <thead>
+            <tr>
+              <th>{t.headerName}</th>
+              <th>{t.headerProgramme}</th>
+              <th>{t.headerCohort}</th>
+              <th>{t.headerModule}</th>
+              <th class="students-table__num">{t.headerProgress}</th>
+              <th class="students-table__num">{t.headerPending}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr
+                data-programme={r.programme_slug}
+                data-cohort={r.cohort_id}
+              >
+                <td>
+                  <a class="students-table__name-link" href={`/${typedLocale}/instructor/students/${r.user_id}`}>
+                    {r.student_name ?? r.student_email.split("@")[0]}
+                  </a>
+                </td>
+                <td>
+                  <span class={`students-table__prog students-table__prog--${r.programme_slug}`}>
+                    {programmeTitleMap.get(r.programme_slug) ?? r.programme_slug}
+                  </span>
+                </td>
+                <td class="students-table__cohort">
+                  {cohortFmt.format(new Date(r.cohort_start_date * 1000))}
+                </td>
+                <td class="students-table__module">
+                  {r.current_module_title ?? r.current_module_slug ?? t.noCurrent}
+                </td>
+                <td class="students-table__num">
+                  <div class="progress-bar">
+                    <div class="progress-bar__fill" style={`width: ${r.progress_pct.toString()}%`}></div>
+                    <span class="progress-bar__label">{r.progress_pct}%</span>
+                  </div>
+                </td>
+                <td class:list={["students-table__num", r.pending_count > 0 ? "students-table__num--accent" : null]}>
+                  {r.pending_count}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </>
+    )}
+  </div>
+</Layout>
+
+<script>
+  const table = document.querySelector<HTMLElement>(".students-table");
+  const chips = document.querySelectorAll<HTMLButtonElement>(".students-filter-chip");
+  if (table) {
+    const apply = () => {
+      const active: string[] = [];
+      chips.forEach((c) => {
+        if (c.getAttribute("aria-pressed") === "true") active.push(c.dataset.filterKey ?? "");
+      });
+      table.dataset.filters = active.join(" ");
+    };
+    chips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const pressed = chip.getAttribute("aria-pressed") === "true";
+        chip.setAttribute("aria-pressed", pressed ? "false" : "true");
+        chip.classList.toggle("students-filter-chip--active", !pressed);
+        apply();
+      });
+    });
+    apply();
+  }
+</script>
+
+<style>
+  .students-content {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .students-empty {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: var(--space-2xl);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
+    text-align: center;
+  }
+
+  .students-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-md) var(--space-lg);
+    margin: 0 0 var(--space-lg);
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .students-filters__group { display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap; }
+  .students-filters__group-label {
+    font-family: var(--font-body);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-right: var(--space-xs);
+  }
+  .students-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    border-radius: 2px;
+    color: var(--text-faint);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-out),
+                border-color var(--duration-fast) var(--ease-out);
+  }
+  .students-filter-chip:hover { color: var(--text-muted); border-color: var(--text-muted); }
+  .students-filter-chip--active { color: var(--text); border-color: var(--text); }
+  .students-filter-chip--prog-beginner.students-filter-chip--active     { color: var(--prog-beginner); border-color: var(--prog-beginner); }
+  .students-filter-chip--prog-intermediate.students-filter-chip--active { color: var(--prog-intermediate); border-color: var(--prog-intermediate); }
+  .students-filter-chip--prog-advanced.students-filter-chip--active     { color: var(--prog-advanced); border-color: var(--prog-advanced); }
+  .students-filter-chip__count { color: var(--text-faint); font-size: var(--type-micro-sm); }
+  .students-filter-chip--active .students-filter-chip__count { color: inherit; opacity: 0.7; }
+
+  /* Table */
+  .students-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+  }
+  .students-table th {
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+  }
+  .students-table td {
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+  .students-table__num { text-align: right; }
+  .students-table__num--accent { color: var(--text-accent); font-weight: 500; }
+  .students-table__name-link {
+    color: var(--text);
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-size: var(--type-body-md);
+  }
+  .students-table__name-link:hover { color: var(--text-accent); }
+  .students-table__prog--beginner     { color: var(--prog-beginner); }
+  .students-table__prog--intermediate { color: var(--prog-intermediate); }
+  .students-table__prog--advanced     { color: var(--prog-advanced); }
+  .students-table__cohort { color: var(--text-faint); font-size: var(--type-micro-md); }
+  .students-table__module { color: var(--text-muted); }
+
+  .progress-bar {
+    position: relative;
+    width: 100%;
+    height: 14px;
+    background: var(--bg-elevated);
+    border-radius: 2px;
+    overflow: hidden;
+    min-width: 80px;
+  }
+  .progress-bar__fill {
+    height: 100%;
+    background: var(--amber-faint);
+    transition: width var(--duration-normal) var(--ease-out);
+  }
+  .progress-bar__label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--type-micro-sm);
+    color: var(--text);
+  }
+
+  @media (max-width: 640px) {
+    .students-table { font-size: var(--type-micro-md); }
+    .students-table th, .students-table td { padding: var(--space-xs) var(--space-sm); }
+  }
+</style>
+
+<style is:global>
+  .students-table:not([data-filters~="prog-beginner"])     tr[data-programme="beginner"]     { display: none; }
+  .students-table:not([data-filters~="prog-intermediate"]) tr[data-programme="intermediate"] { display: none; }
+  .students-table:not([data-filters~="prog-advanced"])     tr[data-programme="advanced"]     { display: none; }
+</style>
+
+<style is:global set:html={cohortChipsList.map((c) =>
+  `.students-table:not([data-filters~="cohort-${c.id}"]) tr[data-cohort="${c.id}"] { display: none; }`
+).join("\n")}></style>
