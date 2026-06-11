@@ -133,3 +133,63 @@
   lead в open/running. Handover flow на /admin/users/[id]/handover —
   forward-only. Migration 0018. Spec: docs/Architecture.md §
   Instructor management.
+
+- **2026-06-11** — Cohort conflict Q1 (instructor lead в двух cohorts):
+  Sprint 1 = soft warn (текущее `findQualifiedInstructors` поведение,
+  звёздочка в dropdown без блока submit). Hybrid block (warn 1-2,
+  block >50% future sessions) — Sprint 2 когда появится evidence что
+  конфликты случайно прокрадываются. Spec:
+  .agent/plans/active/cohort-conflict-policy-discussion.md § Q1.
+
+- **2026-06-11** — Cohort conflict Q2 (substitute time conflict):
+  повторяет Q1 → A → C. Sprint 1 = soft warn (передать conflictWindow
+  в substitute dropdown /admin/cohorts/[id], сейчас не передаётся —
+  TODO при implementation). Hybrid block на Sprint 2.
+
+- **2026-06-11** — Cohort conflict Q3 (slot vs slot overlap для одного
+  instructor): A — hard block. Constraint per-(instructor_id × day ×
+  time_et). Разные instructors с одинаковыми time/days разрешены
+  (параллельные группы — основной use case при добавлении нового
+  preподa). Implementation: API-level validation через
+  findInstructorSlotConflicts helper (schema-light путь).
+
+- **2026-06-11** — Cohort conflict Q4 (student-side overlap для bundle):
+  B — допускаем overlap. На checkout warning ("Sessions ... одновременно
+  в двух cohorts. Recording доступен"), student подтверждает. Recording
+  покрывает edge case. Implementation отложен до первой реальной bundle
+  sale (текущий bundle apply flow не запущен).
+
+- **2026-06-11** — Cohort conflict Q5 (reschedule session конфликт):
+  A → C — единый pattern с Q1/Q2. Sprint 1 soft warn в reschedule UI,
+  hybrid block на Sprint 2 (вероятно block для lead-конфликта, warn для
+  student-конфликта — recording спасает per Q4). Reschedule UI пока не
+  существует — при implementation сразу с soft warn.
+
+- **2026-06-11** — Cohort conflict Q6 (rest time between sessions): B —
+  hard rule ≥30 min gap между live-sessions одного instructor'а (lead
+  или substitute). UI блок в cohort assignment / substitute / reschedule.
+  Constant MIN_INSTRUCTOR_REST_MIN=30 в lib/config/lk.ts. Implementation:
+  расширить findQualifiedInstructors.conflictWindow до [from-30, to+30].
+
+- **2026-06-11** — Cohort conflict Q7 (handover каскад на substitute):
+  C — hybrid. Past sessions с substitute_instructor_id=X сохраняем (audit
+  trail), future sessions очищаем при handover X. Implementation в
+  /api/admin/users/[id]/handover: UPDATE sessions SET
+  substitute_instructor_id=NULL WHERE substitute_instructor_id=? AND
+  scheduled_at > unixepoch().
+
+- **2026-06-11** — Cohort conflict Q8 (display параллельных cohorts
+  клиенту): D — клиент не видит instructor names. Apply UI показывает
+  "Group A / B / C". Backend при confirm выбирает по admin priority
+  (новое поле cohorts.public_priority INT NULL) с round-robin fallback.
+  Работает для сценария "instructor уволился до старта" — admin меняет
+  lead, клиент не замечает. Migration: добавить cohorts.public_priority
+  + опц. cohorts.public_label.
+
+- **2026-06-11** — Cohort conflict Q9 (admin calendar UI): A —
+  FullCalendar v6+ vanilla JS adapter. Bundle ~80kb gzip, admin-only
+  page. Цветовая кодировка через --prog-* CSS vars. Initial view: week,
+  toggle month/quarter. Drag event → reschedule API (новый endpoint
+  /api/admin/sessions/[id]/reschedule с soft warn по Q5). Click →
+  /admin/cohorts/[id] drawer. CF free tier check WebFetch перед
+  installation.
