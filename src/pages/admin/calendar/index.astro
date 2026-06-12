@@ -114,20 +114,39 @@ const t = ru
       <span class="cal-legend__item cal-legend__item--advanced">Advanced</span>
     </div>
 
-    <div id="calendar" class="cal-root"></div>
+    <div id="calendar" class="cal-root"
+         data-locale={locale}
+         data-events={JSON.stringify(events)}></div>
   </div>
 </Layout>
 
-<script define:vars={{ events, locale }}>
-  // FullCalendar v6 vanilla integration
-  import("@fullcalendar/core").then(async ({ Calendar }) => {
-    const [{ default: dayGridPlugin }, { default: timeGridPlugin }, { default: interactionPlugin }] = await Promise.all([
-      import("@fullcalendar/daygrid"),
-      import("@fullcalendar/timegrid"),
-      import("@fullcalendar/interaction"),
-    ]);
-    const el = document.getElementById("calendar");
-    if (!el) return;
+<script>
+  // FullCalendar v6 — bundled через Vite (без is:inline, без define:vars).
+  import { Calendar } from "@fullcalendar/core";
+  import dayGridPlugin from "@fullcalendar/daygrid";
+  import timeGridPlugin from "@fullcalendar/timegrid";
+  import interactionPlugin from "@fullcalendar/interaction";
+
+  interface RescheduleConflict {
+    kind: 'lead' | 'substitute' | 'student';
+    user_id: string;
+    user_name: string | null;
+    conflicting_session_id: string;
+    conflicting_scheduled_at: number;
+  }
+  interface RescheduleResp {
+    ok?: boolean;
+    error?: string;
+    needs_confirm?: boolean;
+    conflicts?: RescheduleConflict[];
+  }
+
+  const el = document.getElementById("calendar");
+  if (el) {
+    const locale = el.dataset.locale ?? "en";
+    let events: unknown[] = [];
+    try { events = JSON.parse(el.dataset.events ?? "[]") as unknown[]; }
+    catch { events = []; }
 
     const calendar = new Calendar(el, {
       plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
@@ -141,16 +160,17 @@ const t = ru
       slotMinTime: "06:00:00",
       slotMaxTime: "23:00:00",
       timeZone: "America/New_York",
-      events,
+      events: events as never[],
       eventClassNames: (info) => [
-        `cal-event--${info.event.extendedProps.programme}`,
+        `cal-event--${info.event.extendedProps.programme as string}`,
       ],
       eventClick: (info) => {
-        const cohortId = info.event.extendedProps.cohortId;
+        const cohortId = info.event.extendedProps.cohortId as string;
         window.location.href = `/admin/cohorts/${encodeURIComponent(cohortId)}`;
       },
       editable: true,
       eventDrop: async (info) => {
+        if (!info.event.start) { info.revert(); return; }
         const newAt = Math.floor(info.event.start.getTime() / 1000);
         try {
           const res = await fetch(`/api/admin/sessions/${encodeURIComponent(info.event.id)}/reschedule`, {
@@ -159,20 +179,17 @@ const t = ru
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ scheduled_at: newAt }),
           });
-          const data = await res.json();
+          const data = await res.json() as RescheduleResp;
           if (!res.ok) {
             info.revert();
-            alert("Reschedule failed: " + (data.error ?? "unknown"));
+            window.alert("Reschedule failed: " + (data.error ?? "unknown"));
             return;
           }
           if (data.needs_confirm) {
-            const msg = "Conflicts detected:\n" + data.conflicts.map((c) =>
-              `  ${c.kind}: ${c.user_name ?? c.user_id}`
+            const msg = "Conflicts detected:\n" + (data.conflicts ?? []).map((c) =>
+              `  ${c.kind}: ${c.user_name ?? c.user_id}`,
             ).join("\n") + "\n\nProceed anyway?";
-            if (!window.confirm(msg)) {
-              info.revert();
-              return;
-            }
+            if (!window.confirm(msg)) { info.revert(); return; }
             const res2 = await fetch(`/api/admin/sessions/${encodeURIComponent(info.event.id)}/reschedule?confirm=1`, {
               method: "POST",
               credentials: "same-origin",
@@ -181,7 +198,7 @@ const t = ru
             });
             if (!res2.ok) {
               info.revert();
-              alert("Reschedule (confirmed) failed");
+              window.alert("Reschedule (confirmed) failed");
             }
           }
         } catch (err) {
@@ -191,9 +208,7 @@ const t = ru
       },
     });
     calendar.render();
-  }).catch((err) => {
-    console.error("[admin/calendar] FullCalendar load failed", err);
-  });
+  }
 </script>
 
 <style is:global>
