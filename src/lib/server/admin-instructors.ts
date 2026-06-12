@@ -272,3 +272,63 @@ export async function listActiveLeadCohortsForUser(
 ): Promise<BlockingCohort[]> {
   return checkAccountDeleteBlocked(env, userId); // same query
 }
+
+export interface InstructorSlotConflict {
+  slot_id: string;
+  programme_id: string;
+  conflicting_days: string[];     // intersection of requested days with existing slot's days
+  time_et: string;
+}
+
+/**
+ * Q3 (decisions_archive 2026-06-11) — найти конфликты по structural
+ * расписанию для instructor'а: existing slots где (day, time_et) совпадает
+ * с запрошенным.
+ *
+ * Используется при создании/редактировании slot'а:
+ *   1. Если возвращает не-пустой список — UI hard-block (Q3 = A).
+ *   2. Constraint per-instructor: разные instructors могут иметь одинаковое
+ *      расписание (параллельные группы — основной use case).
+ *
+ * @param days   weekday codes ['mon','thu'] для нового/edited slot
+ * @param timeEt 'HH:MM' формат
+ * @param excludeSlotId  при PATCH — id того же slot'а, чтобы не сравнивать с собой
+ */
+export async function findInstructorSlotConflicts(
+  env: Cloudflare.Env,
+  instructorId: string,
+  days: string[],
+  timeEt: string,
+  excludeSlotId?: string,
+): Promise<InstructorSlotConflict[]> {
+  if (days.length === 0) return [];
+
+  const rows = await env.DB.prepare(
+    `SELECT id, programme_id, days_json, time_et
+       FROM slots
+      WHERE instructor_id = ?
+        AND active = 1
+        AND time_et = ?
+        ${excludeSlotId ? 'AND id != ?' : ''}`,
+  )
+    .bind(...[instructorId, timeEt, ...(excludeSlotId ? [excludeSlotId] : [])])
+    .all<{ id: string; programme_id: string; days_json: string; time_et: string }>();
+
+  const requestedSet = new Set(days);
+  const conflicts: InstructorSlotConflict[] = [];
+  for (const r of rows.results) {
+    let existingDays: string[];
+    try { existingDays = JSON.parse(r.days_json) as string[]; }
+    catch { continue; }
+    const overlap = existingDays.filter((d) => requestedSet.has(d));
+    if (overlap.length > 0) {
+      conflicts.push({
+        slot_id: r.id,
+        programme_id: r.programme_id,
+        conflicting_days: overlap,
+        time_et: r.time_et,
+      });
+    }
+  }
+  return conflicts;
+}
