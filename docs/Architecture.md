@@ -434,10 +434,51 @@ Admin полностью отвечает за назначения. Три ур
 **APIs:**
 - `POST /api/admin/instructors/[id]/qualifications` — full-replace
 - `POST /api/admin/cohorts/[id]/assign-instructor`
+- `POST /api/admin/cohorts/[id]/public-display` — public_label/priority (Q8)
 - `POST /api/admin/sessions/[id]/substitute`
-- `POST /api/admin/users/[id]/handover` — batch reassign
-- `GET  /api/admin/qualified-instructors?module=X` / `?modules=X,Y,Z`
+- `POST /api/admin/sessions/[id]/reschedule` — soft warn (Q5)
+- `POST /api/admin/slots` + `PATCH /api/admin/slots/[id]` — slot CRUD
+  с hard-block если structural overlap (Q3)
+- `POST /api/admin/users/[id]/handover` — batch reassign + cascade
+  substitute clear (Q7)
+- `GET  /api/admin/qualified-instructors?module=X[&session_id=Y]` —
+  опциональный session_id для conflict window padding (Q2/Q6)
 - `POST /api/account/delete` — 409 если есть blocking cohorts
+
+### Cohort conflict policy (migration 0019)
+
+Cohort scheduling/assignment имеет 9 правил, обсуждённых в
+`.agent/plans/done/cohort-conflict-policy-discussion.md` (полные записи —
+`.agent/rules/decisions_archive.md § 2026-06-11`).
+
+**Hard block rules:**
+- **Q3** — Slot per (instructor × day × time_et). UI блокирует создание
+  пересекающихся slots одного instructor'а. Разные instructors с
+  одинаковыми time/days — разрешено (параллельные группы).
+- **Q6** — Минимум **30 min gap** между live-sessions одного instructor'а
+  (как lead, так и substitute). `LK_CONFIG.min_instructor_rest_min`.
+
+**Soft warn (Sprint 1) → hybrid block (Sprint 2):**
+- **Q1** — Instructor lead в двух cohorts одновременно: `*` в dropdown.
+- **Q2** — Substitute time conflict: conflictWindow в
+  `findQualifiedInstructors` через `?session_id=` query.
+- **Q5** — Reschedule conflict: 2-step confirm через
+  `POST /api/admin/sessions/[id]/reschedule` (с `?confirm=1` пропуск).
+
+**Other:**
+- **Q4** — Student bundle overlap: warning на checkout (TBD Sprint
+  после первой реальной bundle sale).
+- **Q7** — Handover cascade: future sessions с
+  `substitute_instructor_id = X` очищаются при handover X. Past —
+  сохраняются для audit.
+- **Q8** — Display параллельных cohorts клиенту: "Group A/B" labels
+  через `cohorts.public_label` + `cohorts.public_priority` (migration
+  0019). Instructor names не показываются клиенту.
+- **Q9** — Admin calendar: `/admin/calendar` FullCalendar v6 vanilla,
+  drag для reschedule, click → cohort detail.
+
+**Cohort даты immutable** (decided 2026-06-08). Auto-publish cohorts
+не используется — admin manually публикует через UI (Q9).
 
 ### Auto-resolve `requires_modules`
 
