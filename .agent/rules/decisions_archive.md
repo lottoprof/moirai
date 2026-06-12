@@ -1202,3 +1202,234 @@ convenience layer когда workflow устаканится.
 - 2026-05-17 §модули — оригинальная модель modules in external repo + D1+R2
 - 2026-05-17 §programmes — programmes как Content Collection wrappers
 
+
+---
+
+## 2026-06-11: cohort conflict policy — 9 Qs
+
+Серия решений по обработке временных конфликтов при назначении
+instructors/cohorts/sessions/students. Поднято после mock seed второго
+instructor'а (nastya 2026-06-08) когда стало ясно что параллельные
+cohorts с одинаковым time/days возможны и нужна явная политика.
+
+Подробный план обсуждения с вариантами и implementation notes —
+`.agent/plans/done/cohort-conflict-policy-discussion.md`.
+
+### Q1 — Instructor lead в двух cohorts одновременно
+
+**Контекст.** Admin assign `cohorts.lead_instructor_id = X`, а у X уже
+есть live-session в другой active cohort в overlapping time window.
+`findQualifiedInstructors` уже умеет conflictWindow и отмечает
+`available=false`, но submit разрешён.
+
+**Решение.** A → C. Sprint 1 — soft warn (текущее поведение, звёздочка
+в dropdown без блока). Hybrid block добавим в Sprint 2 когда появится
+evidence что conflicts случайно прокрадываются. Threshold (1-2 vs >50%
+future sessions) обсудим тогда.
+
+**Альтернативы.** B — hard block с самого начала: излишне жёстко для
+edge case'ов когда admin намеренно перегружает препода на 1 день
+(например, известно что коллега подменит). C сразу — преждевременно,
+threshold ещё не понят.
+
+**Причина.** Soft warn даёт admin'у гибкость и видимость; нет evidence
+что без блока есть систематическая проблема. Hybrid правильнее
+проектировать на основе реальных данных Sprint 1.
+
+### Q2 — Session substitute time conflict
+
+**Контекст.** Admin задаёт `sessions.substitute_instructor_id = Y`,
+а у Y уже есть session в той же дате/часе как lead или substitute где-то.
+В `/admin/cohorts/[id]` substitute dropdown сейчас вызывает helper
+**без** conflictWindow — конфликт не детектится.
+
+**Решение.** A → C (повторяет Q1). Sprint 1 — передать conflictWindow
+в substitute dropdown helper, показывать звёздочку для занятых.
+Hybrid block — Sprint 2.
+
+**Альтернативы.** B (hard block) — те же argumentation что в Q1.
+
+**Причина.** Симметрия с Q1: substitute и lead — две стороны одной
+проблемы конфликта, должны решаться одинаково.
+
+### Q3 — Slot vs slot overlap для одного instructor
+
+**Контекст.** Два разных slot'а одного instructor'а с пересекающимся
+time/days (e.g., lottoprof Mon/Thu 09:00 + lottoprof Tue/Thu 09:00 —
+overlap на Thu 09:00). Это структурный конфликт расписания, проявится
+на каждой будущей session.
+
+**Решение.** A — hard block. Constraint per-(`instructor_id × day_of_week
+× time_et`). Применяется при создании/edit slot'а. Реализация через
+helper `findInstructorSlotConflicts(env, instructorId, days[], timeEt)`
+с API-level проверкой (вариант ii из плана), не через DB constraint —
+`slots.days_json` это JSON array, UNIQUE на нём не работает напрямую.
+
+**Важно:** constraint per-instructor. Разные instructors могут иметь
+одинаковые time/days — это разрешает 2 параллельные группы с одной
+программой в один час (lottoprof Mon 09:00 + nastya Mon 09:00 — OK).
+Этот сценарий — основной use case при добавлении нового preподa
+("новый учитель → новая параллельная группа").
+
+**Альтернативы.** B (soft warn) — недостаточно для структурной ошибки;
+admin случайно подтвердит и получит конфликт на каждой sessions. C
+(no restriction) — chaos на больших масштабах.
+
+**Причина.** Структурные конфликты должны блокироваться by design.
+Они не имеют legitimate edge case'ов — это явно ошибка ввода. В
+отличие от Q1/Q2 (разовые конфликты, могут быть intentional).
+
+### Q4 — Student-side bundle overlap
+
+**Контекст.** Клиент покупает bundle (beginner+intermediate). Apply
+flow создаёт 2 enrollments, по одному в каждую cohort'у. Если sessions
+пересекаются — student физически не в двух местах. Текущий bundle apply
+flow не запущен в production.
+
+**Решение.** B. Допускаем overlap. На checkout показываем warning
+("Sessions Mon 09:00 будут одновременно в двух cohorts. Recording
+доступен"), student подтверждает или не покупает.
+
+**Альтернативы.** A (enforce non-overlapping) — может сузить выбор
+если нет non-overlapping cohorts в ближайший месяц, потеря sales.
+C (hard block) — самое строгое, reduces conversion.
+
+**Причина.** Recordings уже архитектурно покрывают edge case (student
+может посмотреть пропущенную session). Маркетинговый позитив
+сохраняется ("all-live + recordings"), не теряем sales. Implementation
+отложен до первой реальной bundle sale.
+
+### Q5 — Reschedule session conflict
+
+**Контекст.** Admin переносит одну session (`status='rescheduled'`,
+новое `scheduled_at`). Новое время может конфликтовать с lead'ом /
+substitute'ом / students этой cohort'ы (в bundle scenario).
+Reschedule UI пока не существует — только status в БД.
+
+**Решение.** A → C (Sprint 2 hybrid). Sprint 1 — soft warn в reschedule
+UI (показать конфликты с lead / substitute / students, admin
+подтверждает). Hybrid block — Sprint 2: вероятно block для
+lead-конфликта (instructor physically не в двух местах), warn для
+student-конфликта (recording спасает по Q4).
+
+**Альтернативы.** B (hard block) — не разрешает intentional reschedule
+когда admin знает что substitute назначит. C сразу — threshold не понят.
+
+**Причина.** Единый pattern с Q1/Q2: soft warn → hybrid block на Sprint
+2. При implementation первой reschedule action — сразу с soft warn,
+чтобы не создавать legacy без conflict check.
+
+### Q6 — Минимальный gap между sessions (rest time)
+
+**Контекст.** Препод может вести 4 sessions подряд (back-to-back, без
+gap). Технически возможно по нашему текущему DB — ничего не enforce.
+
+**Решение.** B — hard rule ≥30 min gap между live-sessions одного
+instructor'а (как lead, так и substitute). UI блок в:
+- cohort assignment (новый lead создаёт session-цепочку с gap <30 min)
+- session substitute (substitute даёт <30 min gap)
+- reschedule (новое время даёт <30 min gap)
+
+Constant `MIN_INSTRUCTOR_REST_MIN = 30` в `src/lib/config/lk.ts`.
+Implementation — расширить `findQualifiedInstructors.conflictWindow`
+до `[from - 30min, to + 30min]`.
+
+**Альтернативы.** A (no enforce) — admin может случайно перегрузить,
+особенно при работе с несколькими slot'ами отдельно. C (per-instructor
+config) — зависит от user.min_session_gap_min field, добавляет
+сложность.
+
+**Причина.** Защищаем preподов by design. 30 min — здравый smell test
+(перерыв на кофе/break между Zoom). Если в будущем потребуется
+per-programme или per-instructor config — извлекаем константу.
+
+### Q7 — Handover каскад на substitute_instructor_id
+
+**Контекст.** Admin делает handover preподa X через
+`/admin/users/[id]/handover` (already shipped). Все active cohorts X →
+новым leads. Что с sessions у которых уже задан
+`substitute_instructor_id = X` (X — substitute, не lead)?
+
+**Решение.** C — hybrid. Past sessions с `substitute_instructor_id = X`
+сохраняем (audit trail: видно что X реально подменял в прошлом),
+future sessions очищаем (защищаем от silent failure в день session'ы
+когда X уже уволен).
+
+Implementation в `/api/admin/users/[id]/handover` batch UPDATE после
+установки нового cohort lead:
+```sql
+UPDATE sessions SET substitute_instructor_id = NULL,
+                    updated_at = unixepoch()
+ WHERE substitute_instructor_id = ?
+   AND scheduled_at > unixepoch();
+```
+
+**Альтернативы.** A (keep) — silent failure в день session'ы. B
+(clear all) — теряем audit history.
+
+**Причина.** Audit полезен (forensic trail для финансовой отчётности
+или дисциплинарных дел). Будущее защищено (новый lead покрывает).
+
+### Q8 — Display параллельных cohorts клиенту в apply flow
+
+**Контекст.** Admin создал 2 cohorts beginner с одинаковой start_date
+и time_et (разные slots + instructors — разрешено по Q3 решению).
+Клиент видит "Beginner — Mon Sep 14, 09:00 ET" — как выбирает?
+
+**Решение.** D — клиент не видит instructor names. Apply UI показывает
+cohort'ы как "Group A / Group B / Group C" (label на основе DB поля
+`cohorts.public_label` или index per (programme, start_date)). При
+checkout/apply confirm — backend выбирает cohort по правилу:
+(i) admin priority через новое поле `cohorts.public_priority INT NULL`;
+(ii) round-robin по paid_count при равном priority.
+
+Migration:
+```sql
+ALTER TABLE cohorts ADD COLUMN public_priority INTEGER;
+ALTER TABLE cohorts ADD COLUMN public_label TEXT;
+```
+
+Admin задаёт через `/admin/cohorts/[id]`.
+
+**Альтернативы.** A (show instructor names) — "favoritism risk":
+известный преподаватель выбирается чаще, новый остаётся пустым; reveals
+internal staff structure клиентам. B (hidden, manual admin assign) —
+admin не контролирует балансировку без priority. C (round-robin
+without admin control) — нет контроля для admin'а.
+
+**Причина.** Покрывает edge case "instructor нанялся и уволился до
+старта" — admin меняет lead другого preподa, клиентское ожидание не
+нарушено (никогда не знал, кто будет вести). Также сохраняет
+flexibility для balanced load + admin контроля через priority.
+
+### Q9 — Admin calendar UI
+
+**Контекст.** Текущий `/admin/cohorts` — table. Для управления
+параллельными cohorts (Q8), reschedule (Q5), rest gap visualization
+(Q6), handover preview (Q7) — table недостаточен.
+
+**Решение.** A — FullCalendar v6+ vanilla JS adapter (без React/Vue).
+Bundle ~80kb gzip, admin-only страница. Цветовая кодировка через
+existing `--prog-beginner / --prog-intermediate / --prog-advanced` CSS
+vars из tokens.css. Initial view: week. Toggle month / quarter.
+
+UX flows:
+- Click event → opens existing `/admin/cohorts/[id]` detail в drawer
+- Drag event → новый endpoint POST
+  `/api/admin/sessions/[id]/reschedule` с soft warn payload (Q5)
+
+**CF free tier sanity** (per cf-free-tier.md hard-rule): FullCalendar —
+client-only lib, static asset через CF Pages. Workers Free лимиты не
+задеты (только bundle size в client cache). Pre-implementation —
+WebFetch CF Workers static asset size limit.
+
+**Альтернативы.** B (простой CSS grid week × time-slot) — MVP variant,
+меньше детализации (нет duration / overlap визуализации). C
+(quarter-level cohort cards) — простая overview, но не подходит для
+session-level операций (reschedule, substitute).
+
+**Причина.** FullCalendar даёт полный контроль над всеми
+session-level операциями через единый интерфейс. Drag-resize прямо
+вписывается в reschedule workflow. Visual gap detection помогает
+admin'у видеть Q6 violations. Bundle size приемлем для admin-only
+страницы (не публичный слой).

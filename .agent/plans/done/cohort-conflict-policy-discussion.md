@@ -1,11 +1,13 @@
-# Cohort Conflict Policy — Discussion Plan
+# Cohort Conflict Policy — Discussion (closed)
 
-> Status: active (discussion). Поднято 2026-06-08 после mock seed
-> второго instructor'а (nastya). Принципиальные ответы зафиксируем
-> в decisions_archive + закодим в admin/instructor flow.
+> Status: done (decisions). Закрыто 2026-06-11 после прохода по 9 Q.
+> Полные записи решений с альтернативами и причинами — в
+> `.agent/rules/decisions_archive.md` § 2026-06-11.
+> Implementation работы — отдельным планом
+> `.agent/plans/active/cohort-conflict-implementation.md`.
 >
-> Цель: исключить ambiguity при назначении instructors/cohorts/sessions
-> в условиях когда возможны временные конфликты.
+> Цель discussion-фазы: исключить ambiguity при назначении
+> instructors/cohorts/sessions в условиях возможных временных конфликтов.
 
 ## Background
 
@@ -272,4 +274,6 @@ Workers static asset size limit (вроде 25MB total).
 
 ## Lifecycle
 
-После всех Q ответов и implementation → `git mv` в done/.
+Discussion-фаза закрыта 2026-06-11 — план переходит в `done/`.
+Implementation — отдельный план
+`.agent/plans/active/cohort-conflict-implementation.md`.
