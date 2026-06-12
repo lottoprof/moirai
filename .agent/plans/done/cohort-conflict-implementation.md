@@ -1,6 +1,9 @@
 # Cohort Conflict Policy — Implementation
 
-> Status: active. Sprint 1 work для 9 решений зафиксированных в
+> Status: done (code merged). Sprint 1 закрыт 2026-06-12 (S1-S8 все
+> commits). Production deploy + migration apply — отдельно.
+>
+> Sprint 1 work для 9 решений зафиксированных в
 > `.agent/plans/done/cohort-conflict-policy-discussion.md` + полные
 > записи в `.agent/rules/decisions_archive.md` § 2026-06-11.
 
