@@ -73,6 +73,18 @@ export const POST: APIRoute = async (ctx) => {
     results.push({ cohort_id: a.cohort_id, ok: updated });
   }
 
+  // Q7 (decisions_archive 2026-06-11) — cascade на substitute_instructor_id
+  // future sessions. Past sessions сохраняем для audit trail.
+  // Применяется глобально по target user (если уволился, везде убираем
+  // его substitute из будущих sessions).
+  await env.DB.prepare(
+    `UPDATE sessions
+        SET substitute_instructor_id = NULL,
+            updated_at = unixepoch()
+      WHERE substitute_instructor_id = ?
+        AND scheduled_at > unixepoch()`,
+  ).bind(targetUserId).run();
+
   return new Response(JSON.stringify({ results }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
