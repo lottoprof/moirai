@@ -168,6 +168,19 @@ const t = ru
         const cohortId = info.event.extendedProps.cohortId as string;
         window.location.href = `/admin/cohorts/${encodeURIComponent(cohortId)}`;
       },
+      // Drag select на пустые даты → редирект на форму создания cohort'ы
+      // с предзаполненной датой (start пары).
+      selectable: true,
+      selectMirror: false,
+      select: (info) => {
+        // info.start — Date в timeZone ('America/New_York')
+        const d = info.start;
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const dateStr = `${y}-${m}-${dd}`;
+        window.location.href = `/admin/cohorts/new?start=${encodeURIComponent(dateStr)}`;
+      },
       editable: true,
       eventDrop: async (info) => {
         if (!info.event.start) { info.revert(); return; }

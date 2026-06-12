@@ -426,6 +426,108 @@ function nextWeekdayAtOrAfter(sec: number, targetWeekday: number): number {
 }
 
 // ============================================================
+// Compute sessions для cohort'ы (ET wall-clock aware)
+// ============================================================
+// Port из scripts/lib/compute-session-dates.mjs — Stage F note сбылась.
+
+const WEEKDAY_INDEX: Record<string, number> = {
+  sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
+};
+
+/** ET wall-clock дата (YYYY-MM-DD) из unix UTC seconds. */
+function unixToEtDateStr(unixSec: number): string {
+  const dtf = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  });
+  return dtf.format(new Date(unixSec * 1000));
+}
+
+/** YYYY-MM-DD + ET HH:MM → unix UTC seconds. DST-aware. */
+function etToUtcUnix(dateStr: string, timeStr: string): number {
+  const naiveMs = new Date(`${dateStr}T${timeStr}:00Z`).getTime();
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "2-digit", hour12: false,
+    timeZoneName: "shortOffset",
+  });
+  const parts = dtf.formatToParts(new Date(naiveMs));
+  const offsetPart = parts.find((p) => p.type === "timeZoneName");
+  if (!offsetPart) throw new Error("Cannot get timezone offset");
+  const m = /GMT([+-])(\d{1,2})(?::(\d{2}))?/.exec(offsetPart.value);
+  if (!m) throw new Error(`Cannot parse timezone offset: ${offsetPart.value}`);
+  const sign = m[1] === "+" ? 1 : -1;
+  const hours = Number.parseInt(m[2], 10);
+  const minutes = m[3] ? Number.parseInt(m[3], 10) : 0;
+  const offsetMs = sign * (hours * 3600 + minutes * 60) * 1000;
+  return Math.floor((naiveMs - offsetMs) / 1000);
+}
+
+function addDaysIso(dateStr: string, n: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  const yy = dt.getUTCFullYear().toString();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+function isoDateWeekday(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/**
+ * Compute session UTC timestamps для cohort'ы.
+ *
+ * cohort.start_date — это ET wall-clock дата (cohort starts in ET).
+ * Если start day не в days[] — найти первый matching день после start.
+ */
+export function computeSessionDates(params: {
+  startUnix: number;
+  count: number;
+  days: string[];
+  timeEt: string;
+}): number[] {
+  const { startUnix, count, days, timeEt } = params;
+  if (!Array.isArray(days) || days.length === 0) throw new Error("days required");
+  for (const d of days) {
+    if (!(d in WEEKDAY_INDEX)) throw new Error(`Unknown weekday: ${d}`);
+  }
+  const wantedSet = new Set(days.map((d) => WEEKDAY_INDEX[d]));
+
+  let currentDateStr = unixToEtDateStr(startUnix);
+  const startWeekday = isoDateWeekday(currentDateStr);
+  if (!wantedSet.has(startWeekday)) {
+    let cursor = currentDateStr;
+    for (let i = 0; i < 14; i++) {
+      cursor = addDaysIso(cursor, 1);
+      if (wantedSet.has(isoDateWeekday(cursor))) {
+        currentDateStr = cursor;
+        break;
+      }
+    }
+  }
+
+  const result: number[] = [];
+  for (let i = 0; i < count; i++) {
+    result.push(etToUtcUnix(currentDateStr, timeEt));
+    if (i < count - 1) {
+      let cursor = currentDateStr;
+      for (let j = 0; j < 14; j++) {
+        cursor = addDaysIso(cursor, 1);
+        if (wantedSet.has(isoDateWeekday(cursor))) {
+          currentDateStr = cursor;
+          break;
+        }
+      }
+    }
+  }
+  return result;
+}
+
+// ============================================================
 // Helpers для UI (spot display, FLOW-13)
 // ============================================================
 

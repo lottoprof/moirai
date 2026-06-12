@@ -1,0 +1,295 @@
+---
+/*
+ * /admin/cohorts/new — create cohort form.
+ *
+ * Поддерживает ?start=YYYY-MM-DD (ET wall-clock date) для предзаполнения.
+ * Открывается из:
+ *   - /admin/cohorts кнопка "+ New cohort"
+ *   - /admin/calendar drag-select на пустые даты (через redirect)
+ *
+ * Form fields:
+ *   - programme — select из Content Collection (skipping bundle/individual)
+ *   - slot — select из active slots (filtered after programme pick via JS)
+ *   - start_date — date input (HTML5)
+ *
+ * Submit:
+ *   1. Resolve modules из programme.modules
+ *   2. POST /api/admin/cohorts с этим payload
+ *   3. Redirect на /admin/cohorts/[new_id]
+ */
+
+import { getCollection } from "astro:content";
+import type { CollectionEntry } from "astro:content";
+import Layout from "../../../layouts/admin/Layout.astro";
+import { requireRole } from "../../../lib/server/guards";
+
+export const prerender = false;
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+const locale = user.locale ?? "en";
+const ru = locale === "ru";
+
+const prefillStart = Astro.url.searchParams.get("start") ?? "";
+
+// Programmes из Content Collection (skip bundle/individual)
+const PACKAGE_SLUGS = new Set(["bundle", "individual"]);
+const programmesAll = await getCollection("programmes", (e: CollectionEntry<"programmes">) =>
+  e.id.endsWith(`.${locale}`),
+);
+interface ProgrammeOpt {
+  slug: string;
+  title: string;
+  modules: string[];
+}
+const programmes: ProgrammeOpt[] = programmesAll
+  .map((p: CollectionEntry<"programmes">) => {
+    const data = p.data as { title?: string; modules?: string[] | null };
+    return {
+      slug: p.id.replace(`.${locale}`, ""),
+      title: data.title ?? p.id,
+      modules: data.modules ?? [],
+    };
+  })
+  .filter((p: ProgrammeOpt) => p.modules.length > 0 && !PACKAGE_SLUGS.has(p.slug));
+
+interface SlotOpt {
+  id: string;
+  programme_id: string;
+  days_json: string;
+  time_et: string;
+  instructor_name: string | null;
+}
+const slotRows = await env.DB.prepare(
+  `SELECT s.id, s.programme_id, s.days_json, s.time_et,
+          u.name AS instructor_name
+     FROM slots s
+     LEFT JOIN users u ON u.id = s.instructor_id
+    WHERE s.active = 1
+    ORDER BY s.programme_id, s.time_et`,
+).all<SlotOpt>();
+const slots = slotRows.results;
+
+const t = ru
+  ? {
+      backLink: "← К когортам",
+      title: "Новая когорта",
+      programmeLabel: "Программа",
+      slotLabel: "Slot (расписание + инструктор)",
+      slotEmpty: "Сначала выбери программу",
+      startLabel: "Старт (ET дата)",
+      submitBtn: "Создать когорту",
+      submitting: "Создаём...",
+      seo: { title: "Новая когорта — Admin", description: "Create cohort" },
+    }
+  : {
+      backLink: "← Back to cohorts",
+      title: "New cohort",
+      programmeLabel: "Programme",
+      slotLabel: "Slot (schedule + instructor)",
+      slotEmpty: "Pick a programme first",
+      startLabel: "Start (ET date)",
+      submitBtn: "Create cohort",
+      submitting: "Creating...",
+      seo: { title: "New cohort — Admin", description: "Create cohort" },
+    };
+---
+
+<Layout
+  locale={locale}
+  seo={t.seo}
+  currentNavKey="enrollments"
+  userRoles={user.roles}
+>
+  <div class="admin-page">
+    <a href="/admin/cohorts" class="admin-page__back">{t.backLink}</a>
+    <header class="admin-page__head">
+      <h1 class="admin-page__title">{t.title}</h1>
+    </header>
+
+    <form data-cohort-form class="cohort-form"
+          data-programmes={JSON.stringify(programmes)}
+          data-slots={JSON.stringify(slots)}>
+      <label class="cohort-form__field">
+        <span class="cohort-form__label">{t.programmeLabel}</span>
+        <select name="programme_id" required data-programme-select>
+          <option value="">—</option>
+          {programmes.map((p) => (
+            <option value={p.slug}>{p.title}</option>
+          ))}
+        </select>
+      </label>
+
+      <label class="cohort-form__field">
+        <span class="cohort-form__label">{t.slotLabel}</span>
+        <select name="slot_id" required data-slot-select disabled>
+          <option value="">{t.slotEmpty}</option>
+        </select>
+      </label>
+
+      <label class="cohort-form__field">
+        <span class="cohort-form__label">{t.startLabel}</span>
+        <input type="date" name="start_date" required value={prefillStart} />
+      </label>
+
+      <div class="cohort-form__actions">
+        <button type="submit" class="cohort-form__submit" data-submit>{t.submitBtn}</button>
+        <span class="cohort-form__status" data-status hidden></span>
+      </div>
+    </form>
+  </div>
+</Layout>
+
+<script>
+  interface ProgrammeData { slug: string; title: string; modules: string[] }
+  interface SlotData {
+    id: string;
+    programme_id: string;
+    days_json: string;
+    time_et: string;
+    instructor_name: string | null;
+  }
+  interface CreateResp { cohort_id?: string; error?: string }
+
+  const form = document.querySelector("[data-cohort-form]") as HTMLFormElement | null;
+  if (form) {
+    const programmes = JSON.parse(form.dataset.programmes ?? "[]") as ProgrammeData[];
+    const slots = JSON.parse(form.dataset.slots ?? "[]") as SlotData[];
+    const programmeSel = form.querySelector("[data-programme-select]") as HTMLSelectElement | null;
+    const slotSel = form.querySelector("[data-slot-select]") as HTMLSelectElement | null;
+    const statusEl = form.querySelector("[data-status]") as HTMLElement | null;
+    const submitBtn = form.querySelector("[data-submit]") as HTMLButtonElement | null;
+    if (!programmeSel || !slotSel || !statusEl || !submitBtn) throw new Error("missing form elements");
+
+    programmeSel.addEventListener("change", () => {
+      const progId = programmeSel.value;
+      slotSel.innerHTML = "";
+      if (!progId) {
+        slotSel.disabled = true;
+        return;
+      }
+      const matching = slots.filter((s) => s.programme_id === progId);
+      slotSel.disabled = matching.length === 0;
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "—";
+      slotSel.appendChild(placeholder);
+      for (const s of matching) {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        const days = JSON.parse(s.days_json) as string[];
+        const instr = s.instructor_name ?? "no instructor";
+        opt.textContent = `${days.join("/")} ${s.time_et} ET — ${instr}`;
+        slotSel.appendChild(opt);
+      }
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const programme_id = (fd.get("programme_id") as string) || "";
+      const slot_id = (fd.get("slot_id") as string) || "";
+      const start_str = (fd.get("start_date") as string) || "";
+      if (!programme_id || !slot_id || !start_str) return;
+      const prog = programmes.find((p) => p.slug === programme_id);
+      if (!prog) return;
+
+      // Convert YYYY-MM-DD to unix UTC midnight (server will interpret as ET wall date)
+      const [y, m, d] = start_str.split("-").map(Number);
+      const start_date = Math.floor(Date.UTC(y, m - 1, d) / 1000);
+
+      submitBtn.disabled = true;
+      statusEl.hidden = false;
+      statusEl.textContent = "...";
+      try {
+        const res = await fetch("/api/admin/cohorts", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            programme_id,
+            slot_id,
+            start_date,
+            modules: prog.modules,
+          }),
+        });
+        const data = await res.json() as CreateResp;
+        if (!res.ok) {
+          statusEl.textContent = "Failed: " + (data.error ?? "unknown");
+          submitBtn.disabled = false;
+          return;
+        }
+        if (data.cohort_id) {
+          window.location.href = `/admin/cohorts/${encodeURIComponent(data.cohort_id)}`;
+        }
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = "Network error";
+        submitBtn.disabled = false;
+      }
+    });
+  }
+</script>
+
+<style>
+  .admin-page {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .admin-page__back {
+    display: inline-block;
+    color: var(--text-faint);
+    text-decoration: none;
+    font-size: var(--type-micro-md);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    margin-bottom: var(--space-md);
+  }
+  .admin-page__back:hover { color: var(--text); }
+  .admin-page__head { margin-bottom: var(--space-xl); }
+  .admin-page__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .cohort-form { display: flex; flex-direction: column; gap: var(--space-lg); }
+  .cohort-form__field { display: flex; flex-direction: column; gap: 4px; }
+  .cohort-form__label {
+    font-size: var(--type-micro-sm);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+  }
+  .cohort-form select,
+  .cohort-form input[type="date"] {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 8px 10px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    border-radius: 2px;
+  }
+  .cohort-form__actions { display: flex; align-items: center; gap: var(--space-md); margin-top: var(--space-md); }
+  .cohort-form__submit {
+    background: var(--amber);
+    border: 1px solid var(--amber);
+    color: var(--ink);
+    padding: 10px 20px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .cohort-form__submit:hover { background: var(--amber-light); border-color: var(--amber-light); }
+  .cohort-form__submit:disabled { opacity: 0.5; cursor: wait; }
+  .cohort-form__status { color: var(--text-accent); font-size: var(--type-micro-md); text-transform: uppercase; }
+</style>
