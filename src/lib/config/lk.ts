@@ -46,6 +46,15 @@ export const LK_CONFIG = {
   // --- Cron (Stage F) ---
   cron_batch_size: 50,
   orphan_cleanup_max_objects_per_run: 1000,
+
+  // --- Instructor conflict policy (decisions_archive 2026-06-11 Q6) ---
+  /** Минимальный gap между live-sessions одного instructor'а
+   *  (как lead, так и substitute). Hard rule — UI блокирует
+   *  cohort assignment / substitute / reschedule при нарушении. */
+  min_instructor_rest_min: 30,
+  /** Дефолтная длительность live-session для расчёта conflict
+   *  window. Per-module override — TBD (Sprint 2). */
+  default_session_duration_min: 60,
 } as const;
 
 export type LkConfig = typeof LK_CONFIG;

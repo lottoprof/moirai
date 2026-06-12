@@ -504,6 +504,13 @@ export interface CohortRow {
    *  /admin/cohorts покажет warning badge.
    *  При создании cohort'ы из slot — backfill (см. migration 0018). */
   lead_instructor_id?: string | null;
+  /** Cohort conflict policy Q8 (migration 0019): sort order на apply UI
+   *  когда есть параллельные cohorts с одинаковой (programme, start_date).
+   *  Lower = first. NULL = в конце. Admin задаёт через /admin/cohorts/[id]. */
+  public_priority?: number | null;
+  /** Cohort conflict policy Q8 (migration 0019): override "Group A" label
+   *  для apply UI. NULL → UI генерирует index per (programme, start_date). */
+  public_label?: string | null;
   created_at: number;
   updated_at: number;
 }
