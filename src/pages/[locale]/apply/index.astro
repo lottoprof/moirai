@@ -279,6 +279,34 @@ function cohortWeeks(programmeId: string): number | null {
 }
 
 const isEmpty = cohorts.length === 0;
+
+// Q8 (decisions_archive 2026-06-11): группируем cohorts по
+// (programme_id, start_date, time_et). Если в группе 2+ cohorts —
+// каждая получает Group label "A/B/C" (public_label override если есть).
+// Cohorts уже отсортированы SQL'ем по public_priority ASC NULLS LAST.
+const groupKey = (c: CohortWithSlot): string =>
+  `${c.programme_id}|${c.start_date.toString()}|${c.slot.time_et}`;
+const groupCountByKey = new Map<string, number>();
+for (const c of cohorts) {
+  const k = groupKey(c);
+  groupCountByKey.set(k, (groupCountByKey.get(k) ?? 0) + 1);
+}
+const cohortGroupIndex = new Map<string, number>();    // cohort.id → 0,1,2...
+const groupSeen = new Map<string, number>();
+for (const c of cohorts) {
+  const k = groupKey(c);
+  const i = groupSeen.get(k) ?? 0;
+  cohortGroupIndex.set(c.id, i);
+  groupSeen.set(k, i + 1);
+}
+function groupLabel(c: CohortWithSlot): string | null {
+  const k = groupKey(c);
+  const total = groupCountByKey.get(k) ?? 1;
+  if (total < 2) return null;
+  if (c.public_label) return c.public_label;
+  const idx = cohortGroupIndex.get(c.id) ?? 0;
+  return `Group ${String.fromCharCode(65 + idx)}`;  // A / B / C ...
+}
 ---
 
 <Layout locale={typedLocale} seo={t.seo}>
@@ -370,6 +398,7 @@ const isEmpty = cohorts.length === 0;
                 const timeOfDay = deriveTimeOfDay(c.slot.time_et);
                 const timeLabel = timeOfDay === "morning" ? t.filterTimeMorning : t.filterTimeEvening;
                 const weeks = cohortWeeks(c.programme_id);
+                const gLabel = groupLabel(c);
                 return (
                   <li>
                     <a class="apply-cohort-card" href={`/${typedLocale}/apply/contact?cohort=${c.id}`}>
@@ -380,6 +409,12 @@ const isEmpty = cohorts.length === 0;
                           {timeLabel.toLowerCase()}
                           {" · "}
                           <span class="apply-cohort-card__time-et">{c.slot.time_et} ET</span>
+                          {gLabel && (
+                            <>
+                              {" · "}
+                              <span class="apply-cohort-card__group">{gLabel}</span>
+                            </>
+                          )}
                         </p>
                         <p class="apply-cohort-card__dates">
                           {t.starts}: <strong>{formatDate(c.start_date, true)}</strong>
@@ -631,6 +666,14 @@ const isEmpty = cohorts.length === 0;
     color: var(--text-faint);
     font-family: var(--font-mono, ui-monospace, monospace);
     font-size: var(--type-body-sm);
+  }
+  /* Group A/B label — показывается только при 2+ cohorts в один час */
+  .apply-cohort-card__group {
+    color: var(--text-accent);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    font-weight: 500;
   }
   .apply-cohort-card__dates {
     margin: 0;

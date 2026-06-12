@@ -20,7 +20,8 @@ import type { CohortRow, CohortStatus, SlotRow } from "../../../db/types";
 
 const COHORT_COLUMNS = `
   id, programme_id, slot_id, start_date, end_date, status,
-  apply_count, paid_count, created_at, updated_at
+  apply_count, paid_count, public_priority, public_label,
+  created_at, updated_at
 `;
 
 const SLOT_COLUMNS = `
@@ -49,6 +50,8 @@ export interface CohortWithSlot extends CohortRow {
 }
 
 interface JoinedRow extends CohortRow {
+  public_priority: number | null;
+  public_label: string | null;
   s_id: string;
   s_programme_id: string;
   s_days_json: string;
@@ -84,6 +87,8 @@ function pickCohort(row: JoinedRow): CohortRow {
     status: row.status,
     apply_count: row.apply_count,
     paid_count: row.paid_count,
+    public_priority: row.public_priority,
+    public_label: row.public_label,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -114,6 +119,7 @@ export async function getCohortWithSlot(
   const row = await env.DB.prepare(
     `SELECT c.id, c.programme_id, c.slot_id, c.start_date, c.end_date,
             c.status, c.apply_count, c.paid_count,
+            c.public_priority, c.public_label,
             c.created_at, c.updated_at,
             s.id AS s_id, s.programme_id AS s_programme_id,
             s.days_json AS s_days_json, s.time_et AS s_time_et,
@@ -182,6 +188,7 @@ export async function listActiveCohorts(
   const result = await env.DB.prepare(
     `SELECT c.id, c.programme_id, c.slot_id, c.start_date, c.end_date,
             c.status, c.apply_count, c.paid_count,
+            c.public_priority, c.public_label,
             c.created_at, c.updated_at,
             s.id AS s_id, s.programme_id AS s_programme_id,
             s.days_json AS s_days_json, s.time_et AS s_time_et,
@@ -190,7 +197,8 @@ export async function listActiveCohorts(
             s.created_at AS s_created_at, s.updated_at AS s_updated_at
        FROM cohorts c JOIN slots s ON s.id = c.slot_id
        WHERE ${where}
-       ORDER BY c.programme_id ASC, c.start_date ASC`,
+       ORDER BY c.programme_id ASC, c.start_date ASC,
+                c.public_priority ASC NULLS LAST, c.paid_count ASC, c.id ASC`,
   )
     .bind(...binds)
     .all<JoinedRow>();
@@ -225,6 +233,7 @@ export async function listCohortsByInstructor(
   const result = await env.DB.prepare(
     `SELECT c.id, c.programme_id, c.slot_id, c.start_date, c.end_date,
             c.status, c.apply_count, c.paid_count,
+            c.public_priority, c.public_label,
             c.created_at, c.updated_at,
             s.id AS s_id, s.programme_id AS s_programme_id,
             s.days_json AS s_days_json, s.time_et AS s_time_et,

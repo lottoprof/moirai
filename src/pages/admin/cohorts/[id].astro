@@ -38,11 +38,14 @@ interface CohortRec {
   lead_name: string | null;
   lead_email: string | null;
   modules_snapshot_json: string;
+  public_priority: number | null;
+  public_label: string | null;
 }
 
 const cohort = await env.DB.prepare(
   `SELECT c.id, c.programme_id AS programme_slug, c.start_date, c.end_date, c.status,
           c.lead_instructor_id, c.modules_snapshot_json,
+          c.public_priority, c.public_label,
           u.name AS lead_name, u.email AS lead_email
      FROM cohorts c
      LEFT JOIN users u ON u.id = c.lead_instructor_id
@@ -116,6 +119,11 @@ const t = ru
       saved: "Сохранено",
       failed: "Ошибка",
       enrolled: (n: number) => `${n.toString()} студент${n === 1 ? "" : n < 5 ? "а" : "ов"}`,
+      publicDisplayTitle: "Публичный вид (apply UI)",
+      publicDisplayHint: "Когда 2+ когорт стартуют в одну дату/час — показываются как Group A/B. Lower priority = выше в списке. Пусто = в конце. Label опционально override 'Group A'.",
+      publicLabelLabel: "Label override",
+      publicPriorityLabel: "Priority (число)",
+      publicSave: "Сохранить",
       seo: { title: `${programmeTitle} — Admin`, description: "Cohort assignment" },
     }
   : {
@@ -133,6 +141,11 @@ const t = ru
       saved: "Saved",
       failed: "Failed",
       enrolled: (n: number) => `${n.toString()} student${n === 1 ? "" : "s"}`,
+      publicDisplayTitle: "Public display (apply UI)",
+      publicDisplayHint: "When 2+ cohorts start same date/hour — shown as Group A/B. Lower priority = top of list. Empty = bottom. Label optionally overrides 'Group A'.",
+      publicLabelLabel: "Label override",
+      publicPriorityLabel: "Priority (number)",
+      publicSave: "Save",
       seo: { title: `${programmeTitle} — Admin`, description: "Cohort assignment" },
     };
 ---
@@ -183,6 +196,28 @@ const t = ru
           <span class="assignment__status" data-assign-status hidden></span>
         </div>
       )}
+    </section>
+
+    <section class="public-display">
+      <h2 class="section__title">{t.publicDisplayTitle}</h2>
+      <p class="public-display__hint">{t.publicDisplayHint}</p>
+      <form class="public-display__form" data-public-form>
+        <label class="public-display__field">
+          <span class="public-display__label">{t.publicLabelLabel}</span>
+          <input type="text" name="public_label" value={cohort.public_label ?? ""}
+                 placeholder="Group A" maxlength="40"
+                 class="public-display__input" />
+        </label>
+        <label class="public-display__field">
+          <span class="public-display__label">{t.publicPriorityLabel}</span>
+          <input type="number" name="public_priority"
+                 value={cohort.public_priority?.toString() ?? ""}
+                 placeholder="0" step="1"
+                 class="public-display__input public-display__input--narrow" />
+        </label>
+        <button type="submit" class="assignment__btn" data-public-save>{t.publicSave}</button>
+        <span class="public-display__status" data-public-status hidden></span>
+      </form>
     </section>
 
     <section class="sessions">
@@ -304,6 +339,42 @@ const t = ru
         }
       });
     });
+
+    // === Public display form (Q8 — public_label + public_priority) ===
+    const publicForm = document.querySelector("[data-public-form]") as HTMLFormElement | null;
+    const publicSaveBtn = document.querySelector("[data-public-save]") as HTMLButtonElement | null;
+    const publicStatusEl = document.querySelector("[data-public-status]") as HTMLElement | null;
+    if (publicForm && publicSaveBtn && publicStatusEl) {
+      publicForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(publicForm);
+        const labelRaw = (fd.get("public_label") as string ?? "").trim();
+        const priorityRaw = (fd.get("public_priority") as string ?? "").trim();
+        const body = {
+          public_label: labelRaw.length > 0 ? labelRaw : null,
+          public_priority: priorityRaw.length > 0 ? Number.parseInt(priorityRaw, 10) : null,
+        };
+        publicSaveBtn.disabled = true;
+        publicStatusEl.hidden = false;
+        publicStatusEl.textContent = "...";
+        try {
+          const res = await fetch(`/api/admin/cohorts/${encodeURIComponent(cohortId)}/public-display`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) throw new Error("save_failed");
+          publicStatusEl.textContent = "OK";
+          setTimeout(() => { publicStatusEl.hidden = true; }, 2000);
+        } catch (err) {
+          console.error(err);
+          publicStatusEl.textContent = "Failed";
+        } finally {
+          publicSaveBtn.disabled = false;
+        }
+      });
+    }
   }
 </script>
 
@@ -343,6 +414,24 @@ const t = ru
     color: var(--text);
     margin: 0 0 var(--space-md);
   }
+
+  .public-display { margin-bottom: var(--space-xl); padding-bottom: var(--space-xl); border-bottom: 1px solid var(--border); }
+  .public-display__hint { color: var(--text-faint); margin: 0 0 var(--space-md); font-size: var(--type-micro-md); max-width: 60ch; }
+  .public-display__form { display: flex; align-items: flex-end; gap: var(--space-md); flex-wrap: wrap; }
+  .public-display__field { display: flex; flex-direction: column; gap: 4px; }
+  .public-display__label { font-size: var(--type-micro-sm); color: var(--text-faint); text-transform: uppercase; letter-spacing: var(--tracking-wider); }
+  .public-display__input {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 8px 10px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    border-radius: 2px;
+    width: 220px;
+  }
+  .public-display__input--narrow { width: 100px; }
+  .public-display__status { color: var(--text-accent); font-size: var(--type-micro-md); text-transform: uppercase; }
 
   .assignment { margin-bottom: var(--space-xl); padding-bottom: var(--space-xl); border-bottom: 1px solid var(--border); }
   .assignment__current { color: var(--text-muted); margin: 0 0 var(--space-md); }
