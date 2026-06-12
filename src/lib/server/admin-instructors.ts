@@ -2,8 +2,11 @@
  * admin-instructors.ts — server helpers для admin instructor management
  * (qualifications, cohort assignment, substitute, handover, delete guard).
  *
- * Spec: .agent/plans/active/admin-instructor-management.md
+ * Spec: .agent/plans/done/admin-instructor-management.md +
+ *       .agent/plans/active/cohort-conflict-implementation.md (S2/S3).
  */
+
+import { LK_CONFIG } from '../config/lk';
 
 export interface InstructorListRow {
   user_id: string;
@@ -108,13 +111,21 @@ export interface QualifiedInstructorCandidate {
  * `requireAllModules`:
  *   true (default) → qualified по ВСЕМ модулям (для lead_instructor cohort'ы)
  *   false → qualified хотя бы по одному (для substitute single session)
+ *
+ * `conflictWindow`:
+ *   sessionAtSec — unix time когда стартует target session
+ *   durationMin  — длительность session (default LK_CONFIG.default_session_duration_min)
+ *
+ *   Helper внутри padает window до [sessionAtSec - rest, sessionAtSec + dur + rest]
+ *   где rest = LK_CONFIG.min_instructor_rest_min (Q6 hard rule, decisions
+ *   archive 2026-06-11). Caller не должен знать про rest period.
  */
 export async function findQualifiedInstructors(
   env: Cloudflare.Env,
   moduleSlugs: string[],
   opts?: {
     requireAllModules?: boolean;
-    conflictWindow?: { fromSec: number; toSec: number };
+    conflictWindow?: { sessionAtSec: number; durationMin?: number };
     excludeUserId?: string;
   },
 ): Promise<QualifiedInstructorCandidate[]> {
@@ -154,7 +165,14 @@ export async function findQualifiedInstructors(
     return candidatesList.map((c) => ({ ...c, available: true }));
   }
 
-  // Conflict check: у кого есть scheduled live-session в window
+  // Compute window with rest period padding (Q6 hard rule, ≥30 min gap)
+  const restSec = LK_CONFIG.min_instructor_rest_min * 60;
+  const durSec = (opts.conflictWindow.durationMin
+    ?? LK_CONFIG.default_session_duration_min) * 60;
+  const fromSec = opts.conflictWindow.sessionAtSec - restSec;
+  const toSec = opts.conflictWindow.sessionAtSec + durSec + restSec;
+
+  // Conflict check: у кого есть scheduled live-session в padded window
   const userIds = candidatesList.map((c) => c.user_id);
   const userPlaceholders = userIds.map(() => '?').join(',');
   const conflicts = await env.DB.prepare(
@@ -175,8 +193,8 @@ export async function findQualifiedInstructors(
             AND s.scheduled_at BETWEEN ? AND ?
        ) AS instr`,
   ).bind(
-    ...userIds, opts.conflictWindow.fromSec, opts.conflictWindow.toSec,
-    ...userIds, opts.conflictWindow.fromSec, opts.conflictWindow.toSec,
+    ...userIds, fromSec, toSec,
+    ...userIds, fromSec, toSec,
   ).all<{ user_id: string }>();
 
   const busySet = new Set(conflicts.results.map((r) => r.user_id));

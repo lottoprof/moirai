@@ -1,11 +1,14 @@
 /*
- * GET /api/admin/qualified-instructors?module=<slug>
+ * GET /api/admin/qualified-instructors?module=<slug>[&session_id=<id>]
  * GET /api/admin/qualified-instructors?modules=<slug>,<slug>,...
  *
  * Возвращает qualified instructors для запрошенных module slugs.
  *
  * - module=X — qualified для X (substitute use case, requireAll=false)
  * - modules=X,Y,Z — qualified для всех (cohort assignment use case, requireAll=true)
+ * - session_id — optional, для check conflict window вокруг конкретной
+ *   session (Q2 + Q6 — substitute dropdown получает available=false для
+ *   занятых preподов). Без session_id — conflict check не делается.
  */
 
 import type { APIRoute } from 'astro';
@@ -27,6 +30,7 @@ export const GET: APIRoute = async (ctx) => {
 
   const single = ctx.url.searchParams.get('module');
   const multi = ctx.url.searchParams.get('modules');
+  const sessionId = ctx.url.searchParams.get('session_id');
 
   let slugs: string[];
   let requireAll: boolean;
@@ -41,7 +45,23 @@ export const GET: APIRoute = async (ctx) => {
   }
 
   const env = ctx.locals.runtime.env;
-  const candidates = await findQualifiedInstructors(env, slugs, { requireAllModules: requireAll });
+
+  // Optional conflict window — если передан session_id, фетчим
+  // scheduled_at и передаём в helper (рест-period padding внутри)
+  let conflictWindow: { sessionAtSec: number } | undefined;
+  if (sessionId) {
+    const row = await env.DB.prepare(
+      `SELECT scheduled_at FROM sessions WHERE id = ?`,
+    ).bind(sessionId).first<{ scheduled_at: number }>();
+    if (row) {
+      conflictWindow = { sessionAtSec: row.scheduled_at };
+    }
+  }
+
+  const candidates = await findQualifiedInstructors(env, slugs, {
+    requireAllModules: requireAll,
+    conflictWindow,
+  });
 
   return new Response(JSON.stringify({ candidates }), {
     status: 200,
