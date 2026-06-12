@@ -1,0 +1,285 @@
+---
+/*
+ * /admin/calendar — FullCalendar view учебной сетки.
+ *
+ * Q9 (decisions_archive 2026-06-11) = A.
+ *
+ * Loaded data:
+ *   - all sessions in next 90 days
+ *   - cohort meta (programme_id, lead instructor) для color + tooltip
+ *
+ * UX flows:
+ *   - View toggle: week / month
+ *   - Color per programme через --prog-* CSS vars (Q9 decision)
+ *   - Click event → /admin/cohorts/[cohort_id] (existing detail page)
+ *   - Drag event → reschedule API (S5 endpoint) с soft warn modal
+ */
+
+import Layout from "../../../layouts/admin/Layout.astro";
+import { requireRole } from "../../../lib/server/guards";
+
+export const prerender = false;
+
+const userOrRes = await requireRole(Astro, "admin");
+if (userOrRes instanceof Response) return userOrRes;
+const user = userOrRes;
+const env = Astro.locals.runtime.env;
+const locale = user.locale ?? "en";
+const ru = locale === "ru";
+
+interface SessionEvent {
+  id: string;
+  cohort_id: string;
+  programme_id: string;
+  module_slug: string;
+  scheduled_at: number;
+  status: string;
+  lead_user_id: string | null;
+  lead_name: string | null;
+  substitute_user_id: string | null;
+  substitute_name: string | null;
+}
+
+const now = Math.floor(Date.now() / 1000);
+const horizonEnd = now + 90 * 86400;
+
+const sessions = await env.DB.prepare(
+  `SELECT s.id, s.cohort_id, c.programme_id AS programme_id,
+          s.module_slug, s.scheduled_at, s.status,
+          c.lead_instructor_id AS lead_user_id,
+          ul.name AS lead_name,
+          s.substitute_instructor_id AS substitute_user_id,
+          us.name AS substitute_name
+     FROM sessions s
+     JOIN cohorts c ON c.id = s.cohort_id
+     LEFT JOIN users ul ON ul.id = c.lead_instructor_id
+     LEFT JOIN users us ON us.id = s.substitute_instructor_id
+    WHERE s.status IN ('scheduled','rescheduled')
+      AND s.scheduled_at BETWEEN ? AND ?
+    ORDER BY s.scheduled_at ASC
+    LIMIT 1000`,
+).bind(now, horizonEnd).all<SessionEvent>();
+
+const events = sessions.results.map((s) => {
+  const effectiveName = s.substitute_name ?? s.lead_name ?? "TBA";
+  const title = `${s.module_slug} · ${effectiveName}`;
+  const start = new Date(s.scheduled_at * 1000).toISOString();
+  // 60 min default — соответствует LK_CONFIG.default_session_duration_min
+  const end = new Date((s.scheduled_at + 3600) * 1000).toISOString();
+  return {
+    id: s.id,
+    title,
+    start,
+    end,
+    extendedProps: {
+      cohortId: s.cohort_id,
+      programme: s.programme_id,
+      moduleSlug: s.module_slug,
+      status: s.status,
+      effectiveName,
+    },
+  };
+});
+
+const t = ru
+  ? {
+      title: "Календарь",
+      subtitle: "Все live-сессии на 90 дней вперёд",
+      legend: "Программы",
+      seo: { title: "Календарь — Admin", description: "Учебная сетка" },
+    }
+  : {
+      title: "Calendar",
+      subtitle: "All live-sessions for next 90 days",
+      legend: "Programmes",
+      seo: { title: "Calendar — Admin", description: "Schedule grid" },
+    };
+---
+
+<Layout
+  locale={locale}
+  seo={t.seo}
+  currentNavKey="enrollments"
+  userRoles={user.roles}
+>
+  <div class="admin-page">
+    <header class="admin-page__head">
+      <h1 class="admin-page__title">{t.title}</h1>
+      <p class="admin-page__subtitle">{t.subtitle}</p>
+    </header>
+
+    <div class="cal-legend" aria-label={t.legend}>
+      <span class="cal-legend__item cal-legend__item--beginner">Beginner</span>
+      <span class="cal-legend__item cal-legend__item--intermediate">Intermediate</span>
+      <span class="cal-legend__item cal-legend__item--advanced">Advanced</span>
+    </div>
+
+    <div id="calendar" class="cal-root"></div>
+  </div>
+</Layout>
+
+<script define:vars={{ events, locale }}>
+  // FullCalendar v6 vanilla integration
+  import("@fullcalendar/core").then(async ({ Calendar }) => {
+    const [{ default: dayGridPlugin }, { default: timeGridPlugin }, { default: interactionPlugin }] = await Promise.all([
+      import("@fullcalendar/daygrid"),
+      import("@fullcalendar/timegrid"),
+      import("@fullcalendar/interaction"),
+    ]);
+    const el = document.getElementById("calendar");
+    if (!el) return;
+
+    const calendar = new Calendar(el, {
+      plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+      initialView: "timeGridWeek",
+      headerToolbar: {
+        left: "prev,next today",
+        center: "title",
+        right: "timeGridDay,timeGridWeek,dayGridMonth",
+      },
+      locale,
+      slotMinTime: "06:00:00",
+      slotMaxTime: "23:00:00",
+      timeZone: "America/New_York",
+      events,
+      eventClassNames: (info) => [
+        `cal-event--${info.event.extendedProps.programme}`,
+      ],
+      eventClick: (info) => {
+        const cohortId = info.event.extendedProps.cohortId;
+        window.location.href = `/admin/cohorts/${encodeURIComponent(cohortId)}`;
+      },
+      editable: true,
+      eventDrop: async (info) => {
+        const newAt = Math.floor(info.event.start.getTime() / 1000);
+        try {
+          const res = await fetch(`/api/admin/sessions/${encodeURIComponent(info.event.id)}/reschedule`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scheduled_at: newAt }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            info.revert();
+            alert("Reschedule failed: " + (data.error ?? "unknown"));
+            return;
+          }
+          if (data.needs_confirm) {
+            const msg = "Conflicts detected:\n" + data.conflicts.map((c) =>
+              `  ${c.kind}: ${c.user_name ?? c.user_id}`
+            ).join("\n") + "\n\nProceed anyway?";
+            if (!window.confirm(msg)) {
+              info.revert();
+              return;
+            }
+            const res2 = await fetch(`/api/admin/sessions/${encodeURIComponent(info.event.id)}/reschedule?confirm=1`, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ scheduled_at: newAt }),
+            });
+            if (!res2.ok) {
+              info.revert();
+              alert("Reschedule (confirmed) failed");
+            }
+          }
+        } catch (err) {
+          console.error(err);
+          info.revert();
+        }
+      },
+    });
+    calendar.render();
+  }).catch((err) => {
+    console.error("[admin/calendar] FullCalendar load failed", err);
+  });
+</script>
+
+<style is:global>
+  /* FullCalendar baseline reset to match admin design system */
+  .cal-root {
+    --fc-border-color: var(--border);
+    --fc-page-bg-color: var(--bg);
+    --fc-neutral-bg-color: var(--bg-elevated);
+    --fc-list-event-hover-bg-color: var(--bg-elevated);
+    --fc-event-text-color: var(--ink);
+    --fc-today-bg-color: var(--amber-faint);
+    color: var(--text-muted);
+  }
+  .cal-root .fc-toolbar { gap: var(--space-md); }
+  .cal-root .fc-toolbar-title {
+    font-family: var(--font-display);
+    font-weight: 400;
+    color: var(--text);
+  }
+  .cal-root .fc-button {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    padding: 6px 10px;
+    border-radius: 2px;
+  }
+  .cal-root .fc-button:hover { color: var(--text); border-color: var(--text); }
+  .cal-root .fc-button-active,
+  .cal-root .fc-button-primary:not(:disabled).fc-button-active {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: var(--ink);
+  }
+
+  /* Event colors per programme (Q9 → use existing --prog-* tokens) */
+  .cal-root .cal-event--beginner {
+    background: var(--prog-beginner);
+    border-color: var(--prog-beginner);
+  }
+  .cal-root .cal-event--intermediate {
+    background: var(--prog-intermediate);
+    border-color: var(--prog-intermediate);
+  }
+  .cal-root .cal-event--advanced {
+    background: var(--prog-advanced);
+    border-color: var(--prog-advanced);
+  }
+  .cal-root .fc-event { cursor: pointer; }
+</style>
+
+<style>
+  .admin-page {
+    padding: var(--space-xl) var(--container-pad) var(--space-3xl);
+    max-width: var(--container-max);
+    margin: 0 auto;
+  }
+  .admin-page__head { margin-bottom: var(--space-lg); }
+  .admin-page__title {
+    font-family: var(--font-display);
+    font-size: var(--type-display-md);
+    font-weight: 400;
+    color: var(--text);
+    margin: 0;
+  }
+  .admin-page__subtitle { color: var(--text-faint); margin: 4px 0 0; font-size: var(--type-body-sm); }
+
+  .cal-legend {
+    display: flex;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+    flex-wrap: wrap;
+  }
+  .cal-legend__item {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-size: var(--type-micro-sm);
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .cal-legend__item--beginner { background: var(--prog-beginner); }
+  .cal-legend__item--intermediate { background: var(--prog-intermediate); }
+  .cal-legend__item--advanced { background: var(--prog-advanced); }
+</style>
