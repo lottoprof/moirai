@@ -26,6 +26,7 @@ import {
 } from "../../lib/server/admin-overview";
 import { getUserWithRoles } from "../../lib/server/guards";
 import { verifyRefreshSession } from "../../lib/server/session";
+import { pluralRu } from "../../lib/i18n/plural-ru";
 
 export const prerender = false;
 
@@ -70,16 +71,17 @@ const t = ru
   ? {
       eyebrow: "Админ",
       title: "Обзор.",
-      subtitleFn: (n: number) => `${String(n)} студентов в обучении`,
+      subtitleFn: (n: number) =>
+        `${String(n)} ${pluralRu(n, ["студент", "студента", "студентов"])} в обучении`,
       attentionTitle: "Требует внимания",
       attentionUnassigned: (n: number) =>
-        `Когорты без преподавателя · ${String(n)}`,
-      attentionAllClear: "Всё спокойно — open items нет.",
+        `${pluralRu(n, ["Когорта", "Когорты", "Когорт"])} без преподавателя · ${String(n)}`,
+      attentionAllClear: "Всё спокойно — нет открытых задач.",
       metricStudents: "Студенты в обучении",
       metricStudentsSub: (n: number) => `+${String(n)} за неделю`,
       metricCohorts: "Группы идут сейчас",
       metricCohortsSub: (open: number) =>
-        `${String(open)} групп открыты для записи`,
+        `${String(open)} ${pluralRu(open, ["группа открыта", "группы открыты", "групп открыты"])} для записи`,
       metricInstructors: "Преподаватели",
       metricInstructorsSub: "активны",
       metricRevenue: "Выручка месяца",
