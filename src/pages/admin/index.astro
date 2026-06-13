@@ -77,9 +77,9 @@ const t = ru
       attentionAllClear: "Всё спокойно — open items нет.",
       metricStudents: "Студенты в обучении",
       metricStudentsSub: (n: number) => `+${String(n)} за неделю`,
-      metricCohorts: "Идут сейчас",
+      metricCohorts: "Группы идут сейчас",
       metricCohortsSub: (open: number) =>
-        `${String(open)} открыты для записи`,
+        `${String(open)} групп открыты для записи`,
       metricInstructors: "Преподаватели",
       metricInstructorsSub: "активны",
       metricRevenue: "Выручка месяца",
@@ -87,8 +87,9 @@ const t = ru
       workloadTitle: "Загрузка преподавателей",
       workloadEmpty: "Нет назначенных преподавателей.",
       colInstructor: "Преподаватель",
-      colRunning: "Идут",
-      colOpen: "Открыты",
+      colRunning: "Идут (групп)",
+      colOpen: "Откр. (групп)",
+      colStudents: "Студенты",
       colPending: "На проверке",
       colNextSession: "Ближайшая сессия",
       pipelineTitle: "Pipeline · последние 7 дней",
@@ -110,9 +111,9 @@ const t = ru
       attentionAllClear: "All clear — no open items.",
       metricStudents: "Currently learning",
       metricStudentsSub: (n: number) => `+${String(n)} this week`,
-      metricCohorts: "Currently teaching",
+      metricCohorts: "Groups teaching now",
       metricCohortsSub: (open: number) =>
-        `${String(open)} open for apply`,
+        `${String(open)} groups open for apply`,
       metricInstructors: "Instructors",
       metricInstructorsSub: "active",
       metricRevenue: "Revenue (month)",
@@ -120,8 +121,9 @@ const t = ru
       workloadTitle: "Instructor workload",
       workloadEmpty: "No instructors assigned.",
       colInstructor: "Instructor",
-      colRunning: "Running",
-      colOpen: "Open",
+      colRunning: "Running (groups)",
+      colOpen: "Open (groups)",
+      colStudents: "Students",
       colPending: "Pending",
       colNextSession: "Next session",
       pipelineTitle: "Pipeline · last 7 days",
@@ -204,6 +206,7 @@ const noAttention = unassignedCohorts === 0;
               <th>{t.colInstructor}</th>
               <th class="admin-table__num">{t.colRunning}</th>
               <th class="admin-table__num">{t.colOpen}</th>
+              <th class="admin-table__num">{t.colStudents}</th>
               <th class="admin-table__num">{t.colPending}</th>
               <th>{t.colNextSession}</th>
             </tr>
@@ -220,6 +223,7 @@ const noAttention = unassignedCohorts === 0;
                   <td>{display}</td>
                   <td class="admin-table__num">{w.running_cohorts}</td>
                   <td class="admin-table__num">{w.open_cohorts}</td>
+                  <td class="admin-table__num">{w.students}</td>
                   <td class="admin-table__num">{w.pending_homework}</td>
                   <td>{next}</td>
                 </tr>

@@ -122,6 +122,10 @@ export interface InstructorWorkloadRow {
   email: string;
   running_cohorts: number;
   open_cohorts: number;
+  /** Paid students across all instructor's cohorts (running + open).
+   *  Учитывает status IN ('paid','running') applications — те, кто
+   *  фактически платил, неважно стартовала уже cohort или нет. */
+  students: number;
   pending_homework: number;
   next_session_at: number | null;
 }
@@ -139,6 +143,11 @@ export async function listInstructorWorkload(
               WHERE c.lead_instructor_id = u.id
                 AND c.status = 'open') AS open_cohorts,
             (SELECT COUNT(*)
+               FROM applications a
+               JOIN cohorts c ON c.id = a.cohort_id
+              WHERE c.lead_instructor_id = u.id
+                AND a.status IN ('paid','running')) AS students,
+            (SELECT COUNT(*)
                FROM homework_submissions hs
                JOIN enrollments e ON e.id = hs.enrollment_id
               WHERE e.lead_instructor_id = u.id
@@ -155,7 +164,7 @@ export async function listInstructorWorkload(
        JOIN user_roles ur ON ur.user_id = u.id
       WHERE ur.role = 'instructor'
         AND u.deactivated_at IS NULL
-      ORDER BY running_cohorts DESC, pending_homework DESC, u.name`,
+      ORDER BY running_cohorts DESC, students DESC, u.name`,
   ).bind(now).all<InstructorWorkloadRow>();
 
   return rows.results;
