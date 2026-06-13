@@ -17,11 +17,12 @@
  * показываем только workbook на single page.
  */
 
+import { marked } from "marked";
 import DashboardLayout from "../../../../layouts/dashboard/Layout.astro";
-import MarkdownContent from "../../../../components/shared/MarkdownContent.astro";
 import SubmissionCard from "../../../../components/dashboard/SubmissionCard.astro";
 import SubmissionUploader from "../../../../components/dashboard/SubmissionUploader.astro";
 import ModulesDrawer from "../../../../components/dashboard/ModulesDrawer.astro";
+import { youtubeExtension } from "../../../../lib/markdown/extensions/youtube";
 import { requireRole } from "../../../../lib/server/guards";
 import {
   getModuleForStudent,
@@ -78,9 +79,25 @@ if (!module_.workbook_r2_key) {
   }
 }
 
-// Markdown render — через <MarkdownContent slug=...> в шаблоне.
-// Component обеспечивает image rewrite, YT auto-embed + modal lightbox
-// единообразно с admin/instructor view.
+// Render markdown inline (без MarkdownContent component — тот ломает
+// SSR на этой странице по непонятной причине, см. логи 2026-06-13).
+// YT extension + image rewrite — те же что в MarkdownContent.
+marked.setOptions({ gfm: true, breaks: false });
+marked.use(youtubeExtension);
+let bodyHtml = "";
+if (bodyMarkdown) {
+  let fmStripped = bodyMarkdown.replace(/^---\n[\s\S]*?\n---\n/, "");
+  // Image refs → /api/modules/{slug}/images/{file}
+  fmStripped = fmStripped.replace(
+    /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
+    (match, alt: string, src: string) => {
+      if (/^([a-z]+:|\/\/|\/)/i.test(src)) return match;
+      const clean = src.replace(/^\.\//, "");
+      return `![${alt}](/api/modules/${encodeURIComponent(slug)}/images/${encodeURIComponent(clean)})`;
+    },
+  );
+  bodyHtml = await marked.parse(fmStripped);
+}
 
 // Parse JSON arrays
 let objectives: string[] = [];
@@ -210,14 +227,23 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       </section>
     )}
 
-    <div class="module-page__body">
-      {bodyMarkdown ? (
-        <MarkdownContent md={bodyMarkdown} slug={slug} />
+    <div class="module-page__body prose">
+      {bodyHtml ? (
+        <div set:html={bodyHtml} />
       ) : bodyError === "missing" ? (
         <p class="module-page__placeholder">{t.bodyMissing}</p>
       ) : (
         <p class="module-page__placeholder">{t.bodyError}</p>
       )}
+    </div>
+
+    <!-- YT modal lightbox (singleton, для .yt-link клика). -->
+    <div class="yt-modal" data-yt-modal hidden role="dialog" aria-modal="true" aria-label="YouTube player">
+      <div class="yt-modal__backdrop" data-yt-modal-close></div>
+      <div class="yt-modal__inner">
+        <button type="button" class="yt-modal__close" data-yt-modal-close aria-label="Close player">×</button>
+        <div class="yt-modal__player"></div>
+      </div>
     </div>
 
     {Boolean(module_.has_homework) && (
@@ -469,4 +495,128 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
     font-style: italic;
     margin: 0;
   }
+
+  /* YT inline link → modal trigger */
+  .module-page__body :global(a.yt-link) {
+    color: var(--amber);
+    border-bottom: 1px dashed var(--amber);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .module-page__body :global(a.yt-link:hover) { border-bottom-style: solid; }
+
+  /* YT lite-load poster (for standalone URL paragraphs) */
+  .module-page__body :global(.yt-embed) {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    max-width: 100%;
+    background: var(--bg-elevated);
+    margin: var(--space-lg) 0;
+    cursor: pointer;
+    overflow: hidden;
+    border-radius: 2px;
+  }
+  .module-page__body :global(.yt-embed img) {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .module-page__body :global(.yt-embed__play) {
+    position: absolute; inset: 0; margin: auto;
+    width: 80px; height: 80px;
+    background: rgba(0, 0, 0, 0.65); color: white;
+    border: 2px solid white; border-radius: 50%;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .module-page__body :global(.yt-embed__play:hover) { background: rgba(212, 130, 10, 0.9); }
+  .module-page__body :global(.yt-embed iframe) { width: 100%; height: 100%; border: 0; }
+
+  /* Modal lightbox */
+  .yt-modal {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    padding: var(--space-lg);
+  }
+  .yt-modal[hidden] { display: none; }
+  .yt-modal__backdrop {
+    position: absolute; inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    cursor: pointer;
+  }
+  .yt-modal__inner {
+    position: relative; width: 100%; max-width: 1200px;
+    aspect-ratio: 16 / 9; background: black; border-radius: 4px; overflow: hidden;
+  }
+  .yt-modal__close {
+    position: absolute; top: 12px; right: 12px;
+    width: 40px; height: 40px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white; font-size: 22px; line-height: 1; cursor: pointer;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2;
+  }
+  .yt-modal__close:hover { background: var(--amber); color: var(--ink); }
+  .yt-modal__player { width: 100%; height: 100%; }
 </style>
+
+<script>
+  /* YT lite-load embed (для standalone URL parograph'a) — click swap'ит на iframe. */
+  document.querySelectorAll<HTMLElement>(".yt-embed").forEach((el) => {
+    el.addEventListener("click", () => {
+      const id = el.dataset.videoId;
+      if (!id) return;
+      const start = el.dataset.start;
+      const startParam = start ? `&start=${start}` : "";
+      const iframe = document.createElement("iframe");
+      iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1${startParam}`;
+      iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+      iframe.allowFullscreen = true;
+      iframe.title = "YouTube video";
+      el.innerHTML = "";
+      el.appendChild(iframe);
+    });
+  });
+
+  /* YT modal lightbox для .yt-link */
+  const modal = document.querySelector<HTMLElement>("[data-yt-modal]");
+  if (modal) {
+    const player = modal.querySelector<HTMLElement>(".yt-modal__player");
+    const openModal = (id: string, start: string | null): void => {
+      if (!player) return;
+      const startParam = start ? `&start=${start}` : "";
+      const iframe = document.createElement("iframe");
+      iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1${startParam}`;
+      iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+      iframe.allowFullscreen = true;
+      iframe.title = "YouTube video";
+      iframe.style.width = "100%";
+      iframe.style.height = "100%";
+      iframe.style.border = "0";
+      iframe.style.display = "block";
+      player.innerHTML = "";
+      player.appendChild(iframe);
+      modal.hidden = false;
+      document.body.style.overflow = "hidden";
+    };
+    const closeModal = (): void => {
+      if (!player) return;
+      player.innerHTML = "";
+      modal.hidden = true;
+      document.body.style.overflow = "";
+    };
+    document.querySelectorAll<HTMLAnchorElement>("a.yt-link").forEach((a) => {
+      a.addEventListener("click", (e) => {
+        const id = a.dataset.ytId;
+        if (!id) return;
+        e.preventDefault();
+        openModal(id, a.dataset.ytStart ?? null);
+      });
+    });
+    modal.querySelectorAll<HTMLElement>("[data-yt-modal-close]").forEach((el) => {
+      el.addEventListener("click", closeModal);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !modal.hidden) closeModal();
+    });
+  }
+</script>
