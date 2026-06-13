@@ -193,3 +193,11 @@
   /api/admin/sessions/[id]/reschedule с soft warn по Q5). Click →
   /admin/cohorts/[id] drawer. CF free tier check WebFetch перед
   installation.
+
+- **2026-06-13** — ANA Intermediate materials uploaded к 6 modules
+  (workbook + presentation × en + ru). Открытый вопрос: нумерация в
+  файлах ANA «Lesson 1..6» НЕ совпадает с нашими slug-номерами
+  (L1=int-05, L2=int-04, L3=int-13, L4=int-06, L5=int-07, L6=int-12).
+  Оставляем как есть до решения методиста — он скажет, как должна
+  идти линейная последовательность Intermediate-программы. Mapping
+  зафиксирован в commit message 5526374.
