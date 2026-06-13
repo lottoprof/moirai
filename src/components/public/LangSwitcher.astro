@@ -141,6 +141,27 @@ const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language"
   const switchers = document.querySelectorAll<HTMLDetailsElement>(".lang-switcher");
   switchers.forEach((switcher) => {
     const mode = switcher.dataset.mode ?? "public";
+
+    // Position dropdown menu в viewport-fixed координатах, чтобы
+    // overflow:auto ancestor (mobile-scroll list в protected nav) не
+    // клипал. Считаем top/right относительно summary при open.
+    const summary = switcher.querySelector<HTMLElement>(".lang-switcher__toggle");
+    const menu = switcher.querySelector<HTMLElement>(".lang-switcher__menu");
+    const positionMenu = (): void => {
+      if (!summary || !menu) return;
+      const rect = summary.getBoundingClientRect();
+      menu.style.position = "fixed";
+      menu.style.top = `${rect.bottom + 6}px`;
+      menu.style.right = `${window.innerWidth - rect.right}px`;
+      menu.style.left = "auto";
+    };
+    switcher.addEventListener("toggle", () => {
+      if (switcher.open) positionMenu();
+    });
+    window.addEventListener("resize", () => {
+      if (switcher.open) positionMenu();
+    });
+
     switcher.querySelectorAll<HTMLAnchorElement>(".lang-switcher__item").forEach((a) => {
       a.addEventListener("click", async (e) => {
         const locale = a.dataset.locale;
