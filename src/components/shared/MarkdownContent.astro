@@ -229,17 +229,27 @@ const html = await marked.parse(fmStripped);
   }
   .yt-modal__close {
     position: absolute;
-    top: -36px;
-    right: 0;
-    background: transparent;
-    border: none;
+    top: 12px;
+    right: 12px;
+    width: 40px;
+    height: 40px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
-    font-size: 28px;
+    font-size: 22px;
     line-height: 1;
     cursor: pointer;
-    padding: 4px 10px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    transition: background var(--duration-fast) var(--ease-out);
   }
-  .yt-modal__close:hover { color: var(--amber); }
+  .yt-modal__close:hover {
+    background: var(--amber);
+    color: var(--ink);
+  }
   .yt-modal__player {
     width: 100%;
     height: 100%;
