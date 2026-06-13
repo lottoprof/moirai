@@ -62,6 +62,7 @@ const t = locale === "ru"
         oauth_state_invalid: "Сессия входа истекла или повторно использована. Попробуйте ещё раз.",
         oauth_email_unverified: "Провайдер не подтвердил email. Войдите через другой метод или верифицируйте email у провайдера.",
         magic_link_invalid: "Ссылка для входа недействительна или истекла. Запросите новую.",
+        magic_link_email_required: "Введите email, чтобы получить ссылку.",
       } as Record<string, string>,
     }
   : {
@@ -99,6 +100,7 @@ const t = locale === "ru"
         oauth_state_invalid: "Sign-in session expired or replayed. Try again.",
         oauth_email_unverified: "Provider didn't verify email. Use another method or verify email with the provider.",
         magic_link_invalid: "Sign-in link is invalid or expired. Request a new one.",
+        magic_link_email_required: "Type your email to receive a link.",
       } as Record<string, string>,
     };
 
@@ -172,7 +174,14 @@ const magicSent = Astro.url.searchParams.get("sent") === "magic";
 
       <div class="form__divider">{t.or}</div>
 
-      <button type="button" id="magic-link-btn" class="form__alt-action">{t.magicLinkLabel}</button>
+      <button
+        type="button"
+        id="magic-link-btn"
+        class="form__alt-action"
+        data-err-empty-email={t.magicLinkEmailRequired}
+        data-err-no-turnstile={t.errors.turnstile_failed}
+        data-err-rate-limited={t.errors.rate_limited}
+      >{t.magicLinkLabel}</button>
       <p class="form__hint form__hint--small">{t.magicLinkHint}</p>
 
       <div class="form__divider">{t.or}</div>
@@ -244,19 +253,37 @@ const magicSent = Astro.url.searchParams.get("sent") === "magic";
   // Magic-link request handler (FLOW-19)
   const magicBtn = document.getElementById("magic-link-btn") as HTMLButtonElement | null;
   if (magicBtn && form) {
+    const errEmptyEmail = magicBtn.dataset.errEmptyEmail ?? "";
+    const errNoTurnstile = magicBtn.dataset.errNoTurnstile ?? "";
+
+    function showInlineError(message: string): void {
+      let errEl = form?.querySelector(".form__error");
+      if (!errEl) {
+        errEl = document.createElement("div");
+        errEl.className = "form__error";
+        errEl.setAttribute("role", "alert");
+        form?.insertBefore(errEl, form.firstChild);
+      }
+      errEl.textContent = message;
+      errEl.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+
     magicBtn.addEventListener("click", async () => {
       const fd = new FormData(form);
       const email = fd.get("email") as string | null;
       const turnstileToken = fd.get("cf-turnstile-response");
       const returnTo = fd.get("return_to") as string | null;
 
+      // Empty/short email — inline error + focus, no reload.
       if (!email || email.length < 3) {
-        window.location.search = "?error=magic_link_email_required";
-        // fallback if error key not in dict — keep generic; for now reuse turnstile_failed style
+        showInlineError(errEmptyEmail);
+        const emailInput = document.getElementById("login-email") as HTMLInputElement | null;
+        emailInput?.focus();
         return;
       }
+      // Turnstile не успел / не загружен — inline error, no reload.
       if (!turnstileToken) {
-        window.location.search = "?error=turnstile_failed";
+        showInlineError(errNoTurnstile);
         return;
       }
 
