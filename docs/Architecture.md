@@ -1,4 +1,4 @@
-# Moirai — Architecture v0.8.3
+# Moirai — Architecture v0.8.4
 
 > **Status:** working draft. Зафиксированы: технологический стек, локализация
 > через path-prefix, архитектура контента, модель программ и запусков
@@ -157,6 +157,13 @@ moirai.film/                             → редирект по Accept-Langua
   Nav-zone-switcher показывает links на другие доступные зоны.
 - **Deactivated user** (`users.deactivated_at IS NOT NULL`) попадает
   на `/[locale]/inactive` независимо от роли. `/account` доступен.
+- **Lang switcher в каждой зоне**: `<LangSwitcher mode="zone">` справа
+  от «Account» в shared `<ZoneNav>` (admin/instructor) и
+  `<DashboardNav>` (student). Public-mode переключает префикс URL
+  `/{en|ru}/`; zone-mode дополнительно POST'ит `/api/account/locale`,
+  чтобы `users.locale` в БД оставался в sync — нужно для `/admin/**`
+  страниц (там UI-locale читается из `user.locale`, не из URL) и
+  cross-zone email'ов (digest, password-reset).
 - См. §6 (детальные карты) и `decisions_archive.md` 2026-05-17.
 
 ### Translation pairs requirement
@@ -619,6 +626,24 @@ Layout: `src/layouts/admin/Layout.astro`. Nav: `AdminNav` (Overview / Users
 / Enrollments / Modules / Account →) + zone-switcher если user также
 instructor.
 
+**Admin overview (`/admin/`) content** (2026-06-13, real data из D1
+через `src/lib/server/admin-overview.ts`):
+
+- **Needs attention** — когорты с `paid_count > 0 AND
+  lead_instructor_id IS NULL`. CTA на `/admin/cohorts`.
+- **4 stat cards**: студенты в обучении (active enrollments в
+  running cohorts) + delta 7d; группы идут сейчас (running AND
+  lead_instructor); preподаватели active; revenue MTD из enrollments.
+- **Instructor workload table**: per-instructor running + open
+  cohorts, total students paid (paid+running applications), pending
+  HW, next session. Подсветка строки если `running > 2`
+  (`OVERLOAD_RUNNING_THRESHOLD`).
+- **Pipeline (7d)**: applications new / awaiting / paid / running.
+- **Today** — ссылка на `/admin/calendar`.
+
+RU pluralization через `pluralRu(n, [one, paucal, many])` из
+`src/lib/i18n/plural-ru.ts`.
+
 ### Cross-zone (auth required, любая роль)
 
 ```
@@ -975,7 +1000,27 @@ audit_log (
   metadata      TEXT,                             -- JSON: причина failure, провайдер, etc.
   created_at    INTEGER NOT NULL
 )
+```
 
+### Post-auth redirect
+
+После успешной auth (password login / OAuth callback / magic-link
+confirm / email-verify) единая функция `computeRedirectTarget(env,
+user, returnTo)` решает куда отправить:
+
+1. **Deactivated** → `/{locale}/inactive` (независимо от return_to).
+2. **Валидный `return_to`** (passes `sanitizeReturnTo` по ролям) →
+   return_to.
+3. **Новый студент** (primary='student' И 0 enrollments) →
+   `/{locale}/apply` — сразу к выбору когорты, минуя пустой
+   dashboard. Поведение через все 5 точек входа.
+4. Иначе — role-home: admin → `/admin/`, instructor →
+   `/{locale}/instructor/`, student → `/{locale}/dashboard/`.
+
+Async из-за case 3 (один D1 query `SELECT 1 FROM enrollments WHERE
+user_id=? LIMIT 1`). См. `src/lib/server/auth-redirect.ts`.
+
+```sql
 jwt_keys (
   kid               TEXT PRIMARY KEY,             -- "v1-YYYY-MM-DD-<uuid8>"
   secret_encrypted  TEXT NOT NULL,                -- AES-GCM blob (JSON: iv, ct, tag in base64), encrypted via env.MASTER_SECRET
@@ -1314,7 +1359,16 @@ base. Нужен слой experiment assignment (per-user / per-cookie) — от
   API через Worker binding, SQL-миграции через `wrangler d1 migrations`,
   TS-типы пишем вручную рядом со схемой. Zod остаётся — он про
   валидацию runtime API-входа, не про БД.
-- **v0.8.3 — текущая** — JWT keys rotation system: таблица `jwt_keys`
+- **v0.8.4 — текущая** — `computeRedirectTarget` async + новый-студент
+  routing: 0 enrollments → `/{locale}/apply` сразу после auth.
+  Discord OAuth login (полный endpoints set + lib). Magic-link confirm
+  тоже role-aware (раньше 404 для admin). `/api/account/locale`
+  endpoint + `<LangSwitcher mode="zone">` в admin/instructor/student
+  навигации (поддерживает `users.locale` в sync). Admin overview
+  rewrite на реальные данные: needs-attention + 4 metric cards +
+  instructor workload table + 7d pipeline funnel + ссылка на calendar.
+  `pluralRu` helper для RU-склонений.
+- v0.8.3 — JWT keys rotation system: таблица `jwt_keys`
   (active/deprecated/revoked) + `MASTER_SECRET` (env, AES-GCM
   encrypt/decrypt signing keys в БД) + `KV_CACHE` namespace. Порт из
   `~/git/301/`. D1: 19 → 20 таблиц.
