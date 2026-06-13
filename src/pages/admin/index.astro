@@ -2,38 +2,35 @@
 /*
  * /admin — overview-страница admin'ской панели.
  *
- * Без locale в URL. Locale UI берётся из user.locale.
- * Guard: requireRole(ctx, 'admin').
+ * Дизайн принят 2026-06-13:
+ *   1. Needs-attention — когорты без preподa с paid_count > 0.
+ *   2. Key metrics (4) — students, cohorts (running/open), instructors,
+ *      revenue month-to-date.
+ *   3. Instructor workload table — running, open, pending HW,
+ *      next session. Подсветка строки если running > OVERLOAD_THRESHOLD.
+ *   4. Pipeline (7d) — applications new/awaiting/paid/running counts.
+ *   5. Today's sessions — только ссылка на /admin/calendar.
  *
- * Содержимое (mockup parity):
- *   - 4 stat cards (active enrollments, pending homework, revenue, avg progress)
- *   - Students mini-table (recent активные)
- *   - Modules mini-list (последние published из D1)
- *
- * Реальные данные:
- *   - active enrollments count (COUNT из enrollments)
- *   - students table — JOIN enrollments + users
- *   - modules list — LIMIT из modules
- *
- * STUB:
- *   - pending homework count (homework table = Sprint 2)
- *   - revenue (payments table = Sprint 2)
- *   - avg progress (module_progress = Sprint 2)
+ * Все данные — real D1 queries (см. admin-overview.ts).
  */
 
 import Layout from "../../layouts/admin/Layout.astro";
 import InstructorHero from "../../components/instructor/InstructorHero.astro";
 import StatCard from "../../components/dashboard/StatCard.astro";
-import StudentRow from "../../components/instructor/StudentRow.astro";
+import {
+  countUnassignedCohorts,
+  fetchOverviewMetrics,
+  fetchPipelineFunnel,
+  listInstructorWorkload,
+  OVERLOAD_RUNNING_THRESHOLD,
+} from "../../lib/server/admin-overview";
 import { getUserWithRoles } from "../../lib/server/guards";
 import { verifyRefreshSession } from "../../lib/server/session";
 
 export const prerender = false;
 
-// Inline guard — без requireRole helper, потому что i18n + non-[locale]
-// route + return Response из вспомогательной функции даёт 404 со статусом
-// (вероятно Astro 5 adapter quirk). Astro.redirect() напрямую из
-// frontmatter работает корректно.
+// Inline guard (см. note в предыдущей версии — Astro adapter quirk
+// при возврате Response из helper'a из non-[locale] route).
 const env = Astro.locals.runtime.env;
 const session = await verifyRefreshSession(env, Astro.request);
 if (!session) {
@@ -45,103 +42,101 @@ if (user.deactivated_at !== null) return Astro.redirect(`/${user.locale}/inactiv
 if (!user.roles.has("admin")) return new Response(null, { status: 404 });
 
 const locale = user.locale;
+const ru = locale === "ru";
 
-// Реальные данные из D1
-interface Counts { active_enrollments: number; total_users: number; }
-const counts = await env.DB.prepare(
-  `SELECT
-     (SELECT COUNT(*) FROM enrollments WHERE status='active') AS active_enrollments,
-     (SELECT COUNT(*) FROM users WHERE deactivated_at IS NULL) AS total_users`,
-).first<Counts>();
+const [unassignedCohorts, metrics, pipeline, workload] = await Promise.all([
+  countUnassignedCohorts(env),
+  fetchOverviewMetrics(env),
+  fetchPipelineFunnel(env),
+  listInstructorWorkload(env),
+]);
 
-interface StudentRowData {
-  id: string;
-  name: string | null;
-  email: string;
-  programme_slug: string;
-}
-const studentsRaw = await env.DB.prepare(
-  `SELECT u.id, u.name, u.email, e.programme_slug
-   FROM users u
-   JOIN enrollments e ON e.user_id = u.id
-   WHERE e.status = 'active' AND u.deactivated_at IS NULL
-   ORDER BY e.enrolled_at DESC
-   LIMIT 5`,
-).all<StudentRowData>();
-
-interface ModuleRowMini { slug: string; title: string; track: string | null; }
-const modulesRaw = await env.DB.prepare(
-  `SELECT slug, title, track FROM modules
-   WHERE locale = ? AND status = 'published'
-   ORDER BY synced_at DESC
-   LIMIT 5`,
-).bind(locale).all<ModuleRowMini>();
-
-// STUB (Sprint 2)
-const stub = {
-  pendingHomework: 12,
-  revenue: locale === "ru" ? "$4 820" : "$4,820",
-  avgProgress: 38,
-};
-
-const students = studentsRaw.results.map((s, i) => {
-  const name = s.name?.trim() || s.email.split("@")[0];
-  const initials = name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-  return {
-    name,
-    initials,
-    currentModuleNum: String((i % 9) + 1).padStart(2, "0"),
-    progress: [0.25, 0.6, 0.08, 0.45, 0.9][i % 5],
-    href: `/admin/users`,
-  };
+const intlLocale = ru ? "ru-RU" : "en-US";
+const revenueFmt = new Intl.NumberFormat(intlLocale, {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 0,
+});
+const sessionTimeFmt = new Intl.DateTimeFormat(intlLocale, {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "America/New_York",
 });
 
-const modules = modulesRaw.results.length > 0
-  ? modulesRaw.results
-  : [
-      // STUB: модулей ещё нет в D1 (sync pipeline = Sprint 2)
-      { slug: "directors-eye",     title: locale === "ru" ? "Взгляд режиссёра" : "The Director's Eye", track: "DIRECTING" },
-      { slug: "story-structure",   title: locale === "ru" ? "Структура истории" : "Story Structure",   track: "SCRIPTWRITING" },
-      { slug: "the-cut",           title: locale === "ru" ? "Монтажный кадр"   : "The Cut",            track: "EDITING" },
-      { slug: "visual-language",   title: locale === "ru" ? "Визуальный язык"  : "Visual Language",    track: "DIRECTING" },
-      { slug: "pre-production",    title: locale === "ru" ? "Препродакшен"     : "Pre-Production",     track: "PRODUCING" },
-    ];
-
-const t = locale === "ru"
+const t = ru
   ? {
       eyebrow: "Админ",
       title: "Обзор.",
       subtitleFn: (n: number) => `${String(n)} активных студентов`,
-      statEnrollments: "Активные записи",
-      statEnrollmentsSub: "+3 за неделю",
-      statHomework: "Задания на проверке",
-      statHomeworkSub: "у 2 инструкторов",
-      statRevenue: "Выручка (мес.)",
-      statRevenueSub: "via Lemon Squeezy",
-      statProgress: "Средний прогресс",
-      statProgressSub: "beginner-когорта",
-      studentsLabel: "Студенты",
-      modulesLabel: "Контент",
+      attentionTitle: "Требует внимания",
+      attentionUnassigned: (n: number) =>
+        `Когорты без преподавателя · ${String(n)}`,
+      attentionAllClear: "Всё спокойно — open items нет.",
+      metricStudents: "Студенты в процессе",
+      metricStudentsSub: (n: number) => `+${String(n)} за неделю`,
+      metricCohorts: "Активные когорты",
+      metricCohortsSub: (running: number, open: number) =>
+        `${String(running)} идут · ${String(open)} открыты`,
+      metricInstructors: "Преподаватели",
+      metricInstructorsSub: "активны",
+      metricRevenue: "Выручка месяца",
+      metricRevenueSub: "оплачено",
+      workloadTitle: "Загрузка преподавателей",
+      workloadEmpty: "Нет назначенных преподавателей.",
+      colInstructor: "Преподаватель",
+      colRunning: "Идут",
+      colOpen: "Открыты",
+      colPending: "На проверке",
+      colNextSession: "Ближайшая сессия",
+      pipelineTitle: "Pipeline · последние 7 дней",
+      pipelineNewApps: "Новые заявки",
+      pipelineAwaiting: "Ждут оплаты",
+      pipelinePaid: "Оплачены",
+      pipelineRunning: "В когорте",
+      calendarTitle: "Сегодня",
+      calendarCta: "Открыть календарь",
       seo: { title: "Админ — Moirai", description: "Админ-обзор." },
     }
   : {
       eyebrow: "Admin",
       title: "Overview.",
       subtitleFn: (n: number) => `${String(n)} active students`,
-      statEnrollments: "Active enrollments",
-      statEnrollmentsSub: "+3 this week",
-      statHomework: "Pending homework",
-      statHomeworkSub: "across 2 instructors",
-      statRevenue: "Revenue (mo)",
-      statRevenueSub: "via Lemon Squeezy",
-      statProgress: "Avg progress",
-      statProgressSub: "beginner cohort",
-      studentsLabel: "Students",
-      modulesLabel: "Content",
+      attentionTitle: "Needs attention",
+      attentionUnassigned: (n: number) =>
+        `Cohorts without instructor · ${String(n)}`,
+      attentionAllClear: "All clear — no open items.",
+      metricStudents: "Students in progress",
+      metricStudentsSub: (n: number) => `+${String(n)} this week`,
+      metricCohorts: "Active cohorts",
+      metricCohortsSub: (running: number, open: number) =>
+        `${String(running)} running · ${String(open)} open`,
+      metricInstructors: "Instructors",
+      metricInstructorsSub: "active",
+      metricRevenue: "Revenue (month)",
+      metricRevenueSub: "settled",
+      workloadTitle: "Instructor workload",
+      workloadEmpty: "No instructors assigned.",
+      colInstructor: "Instructor",
+      colRunning: "Running",
+      colOpen: "Open",
+      colPending: "Pending",
+      colNextSession: "Next session",
+      pipelineTitle: "Pipeline · last 7 days",
+      pipelineNewApps: "New applications",
+      pipelineAwaiting: "Awaiting payment",
+      pipelinePaid: "Paid",
+      pipelineRunning: "In cohort",
+      calendarTitle: "Today",
+      calendarCta: "Open calendar",
       seo: { title: "Admin — Moirai", description: "Admin overview." },
     };
 
-const activeCount = counts?.active_enrollments ?? 0;
+const revenueDollars = metrics.revenue_month_cents / 100;
+const revenueLabel = revenueFmt.format(revenueDollars);
+const noAttention = unassignedCohorts === 0;
 ---
 
 <Layout
@@ -153,65 +148,114 @@ const activeCount = counts?.active_enrollments ?? 0;
   <InstructorHero
     eyebrow={t.eyebrow}
     title={t.title}
-    subtitle={t.subtitleFn(activeCount)}
+    subtitle={t.subtitleFn(metrics.active_students)}
   />
 
   <div class="admin-content">
+    <section class="admin-attention" aria-label={t.attentionTitle}>
+      <p class="admin-content__section-label">{t.attentionTitle}</p>
+      {noAttention ? (
+        <p class="admin-attention__clear">{t.attentionAllClear}</p>
+      ) : (
+        <ul class="admin-attention__list">
+          {unassignedCohorts > 0 && (
+            <li class="admin-attention__row">
+              <a class="admin-attention__link" href="/admin/cohorts">
+                {t.attentionUnassigned(unassignedCohorts)}
+              </a>
+            </li>
+          )}
+        </ul>
+      )}
+    </section>
+
     <section class="admin-content__stats" aria-label={t.eyebrow}>
       <StatCard
-        label={t.statEnrollments}
-        value={[activeCount, ""]}
-        sub={t.statEnrollmentsSub}
+        label={t.metricStudents}
+        value={[metrics.active_students, ""]}
+        sub={t.metricStudentsSub(metrics.new_students_7d)}
       />
       <StatCard
-        label={t.statHomework}
-        value={String(stub.pendingHomework)}
-        sub={t.statHomeworkSub}
+        label={t.metricCohorts}
+        value={[metrics.cohorts_running + metrics.cohorts_open, ""]}
+        sub={t.metricCohortsSub(metrics.cohorts_running, metrics.cohorts_open)}
       />
       <StatCard
-        label={t.statRevenue}
-        value={stub.revenue}
-        sub={t.statRevenueSub}
-        valueSmall
+        label={t.metricInstructors}
+        value={[metrics.active_instructors, ""]}
+        sub={t.metricInstructorsSub}
       />
       <StatCard
-        label={t.statProgress}
-        value={`${String(stub.avgProgress)}%`}
-        sub={t.statProgressSub}
+        label={t.metricRevenue}
+        value={revenueLabel}
+        sub={t.metricRevenueSub}
         valueSmall
       />
     </section>
 
+    <section class="admin-block" aria-label={t.workloadTitle}>
+      <p class="admin-content__section-label">{t.workloadTitle}</p>
+      {workload.length === 0 ? (
+        <p class="admin-block__empty">{t.workloadEmpty}</p>
+      ) : (
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>{t.colInstructor}</th>
+              <th class="admin-table__num">{t.colRunning}</th>
+              <th class="admin-table__num">{t.colOpen}</th>
+              <th class="admin-table__num">{t.colPending}</th>
+              <th>{t.colNextSession}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {workload.map((w) => {
+              const overloaded = w.running_cohorts > OVERLOAD_RUNNING_THRESHOLD;
+              const display = w.name?.trim() || w.email;
+              const next = w.next_session_at
+                ? sessionTimeFmt.format(new Date(w.next_session_at * 1000))
+                : "—";
+              return (
+                <tr class:list={[overloaded ? "admin-table__row--alert" : null]}>
+                  <td>{display}</td>
+                  <td class="admin-table__num">{w.running_cohorts}</td>
+                  <td class="admin-table__num">{w.open_cohorts}</td>
+                  <td class="admin-table__num">{w.pending_homework}</td>
+                  <td>{next}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </section>
+
     <section class="admin-content__two-col">
-      <div>
-        <p class="admin-content__section-label">{t.studentsLabel}</p>
-        <div class="admin-content__students">
-          {students.length === 0 && (
-            <p class="admin-content__empty">No students yet.</p>
-          )}
-          {students.map((s) => (
-            <StudentRow
-              name={s.name}
-              initials={s.initials}
-              currentModuleNum={s.currentModuleNum}
-              progress={s.progress}
-              href={s.href}
-            />
-          ))}
-        </div>
+      <div class="admin-block">
+        <p class="admin-content__section-label">{t.pipelineTitle}</p>
+        <dl class="admin-pipeline">
+          <div class="admin-pipeline__row">
+            <dt>{t.pipelineNewApps}</dt>
+            <dd>{pipeline.new_apps_7d}</dd>
+          </div>
+          <div class="admin-pipeline__row">
+            <dt>{t.pipelineAwaiting}</dt>
+            <dd>{pipeline.awaiting_payment}</dd>
+          </div>
+          <div class="admin-pipeline__row">
+            <dt>{t.pipelinePaid}</dt>
+            <dd>{pipeline.paid}</dd>
+          </div>
+          <div class="admin-pipeline__row">
+            <dt>{t.pipelineRunning}</dt>
+            <dd>{pipeline.running}</dd>
+          </div>
+        </dl>
       </div>
 
-      <div>
-        <p class="admin-content__section-label">{t.modulesLabel}</p>
-        <div class="admin-content__modules">
-          {modules.map((m, i) => (
-            <div class="module-row">
-              <span class="module-row__num">{String(i + 1).padStart(2, "0")}</span>
-              <span class="module-row__name">{m.title}</span>
-              <span class="module-row__track">{m.track ?? "—"}</span>
-            </div>
-          ))}
-        </div>
+      <div class="admin-block">
+        <p class="admin-content__section-label">{t.calendarTitle}</p>
+        <a class="admin-calendar-link" href="/admin/calendar">{t.calendarCta} →</a>
       </div>
     </section>
   </div>
@@ -227,12 +271,6 @@ const activeCount = counts?.active_enrollments ?? 0;
     margin: 0 auto;
   }
 
-  .admin-content__stats {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--space-sm);
-  }
-
   .admin-content__section-label {
     font-family: var(--font-body);
     font-size: var(--type-micro-sm);
@@ -243,45 +281,117 @@ const activeCount = counts?.active_enrollments ?? 0;
     margin-bottom: var(--space-md);
   }
 
+  .admin-attention__clear {
+    color: var(--text-faint);
+    font-size: var(--type-body-sm);
+    padding: var(--space-sm) 0;
+  }
+  .admin-attention__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  .admin-attention__row {
+    background: var(--amber-faint);
+    border-left: 3px solid var(--amber);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: 2px;
+  }
+  .admin-attention__link {
+    color: var(--text);
+    text-decoration: none;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    font-weight: 500;
+  }
+  .admin-attention__link:hover { color: var(--text-accent); }
+
+  .admin-content__stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-sm);
+  }
+
   .admin-content__two-col {
     display: grid;
-    grid-template-columns: 1.6fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: var(--space-lg);
   }
 
-  .admin-content__students,
-  .admin-content__modules {
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .admin-content__empty {
-    padding: var(--space-md);
-    font-family: var(--font-body);
+  .admin-block__empty {
     color: var(--text-faint);
-    font-size: var(--type-micro-md);
+    font-style: italic;
+    padding: var(--space-md);
+    border: 1px dashed var(--border);
+    border-radius: 2px;
     text-align: center;
+    font-size: var(--type-body-sm);
   }
 
-  .module-row {
-    display: grid;
-    grid-template-columns: 30px 1fr auto;
-    align-items: center;
-    gap: var(--space-sm);
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+  }
+  .admin-table th {
+    text-align: left;
+    padding: var(--space-sm) var(--space-md);
+    font-size: var(--type-micro-sm);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+  }
+  .admin-table td {
     padding: var(--space-sm) var(--space-md);
     border-bottom: 1px solid var(--border);
-    font-size: 12px;
+    color: var(--text-muted);
   }
-  .module-row:last-child { border-bottom: none; }
-  .module-row__num { color: var(--text-faint); font-family: var(--font-body); font-size: 10px; }
-  .module-row__name { color: var(--text); font-family: var(--font-body); }
-  .module-row__track {
-    color: color-mix(in srgb, var(--amber) 55%, transparent);
+  .admin-table th.admin-table__num,
+  .admin-table td.admin-table__num { text-align: right; }
+  .admin-table__row--alert { background: var(--amber-faint); }
+  .admin-table__row--alert td { color: var(--text); }
+
+  .admin-pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin: 0;
+  }
+  .admin-pipeline__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: var(--space-sm) 0;
+    border-bottom: 1px solid var(--border);
     font-family: var(--font-body);
-    font-size: 10px;
-    letter-spacing: 0.05em;
   }
+  .admin-pipeline__row:last-child { border-bottom: none; }
+  .admin-pipeline__row dt {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+  }
+  .admin-pipeline__row dd {
+    color: var(--text);
+    font-family: var(--font-display);
+    font-size: var(--type-body-lg);
+    margin: 0;
+  }
+
+  .admin-calendar-link {
+    color: var(--text-accent);
+    text-decoration: none;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+  .admin-calendar-link:hover { color: var(--text); }
 
   @media (max-width: 768px) {
     .admin-content__stats { grid-template-columns: repeat(2, 1fr); }
