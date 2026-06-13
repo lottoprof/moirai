@@ -91,6 +91,16 @@ const t = ru
       confirmRemoveOverrideBody: "Модуль вернётся к плановой логике разблокировки. Если плановая дата ещё не наступила — модуль станет недоступен.",
       confirmCancel: "Отмена",
       confirmConfirm: "Подтвердить",
+      meetingTitle: "Встреча группы",
+      meetingProviderLabel: "Платформа",
+      meetingProviderPlaceholder: "— не задано —",
+      meetingUrlLabel: "Ссылка для подключения (студентам)",
+      meetingHostUrlLabel: "Host-ссылка (только preподу)",
+      meetingHostUrlHint: "Опционально. Для Zoom split host/join.",
+      meetingSave: "Сохранить",
+      meetingSaving: "Сохранение...",
+      meetingSaved: "Сохранено",
+      meetingError: "Ошибка. Попробуйте ещё раз.",
       seo: { title: `${programmeTitle} — Moirai`, description: "Cohort detail" },
     }
   : {
@@ -119,6 +129,16 @@ const t = ru
       confirmRemoveOverrideBody: "The module will return to its scheduled unlock logic. If the scheduled date hasn't arrived yet, the module will become unavailable.",
       confirmCancel: "Cancel",
       confirmConfirm: "Confirm",
+      meetingTitle: "Meeting setup",
+      meetingProviderLabel: "Provider",
+      meetingProviderPlaceholder: "— not set —",
+      meetingUrlLabel: "Join link (for students)",
+      meetingHostUrlLabel: "Host link (instructor only)",
+      meetingHostUrlHint: "Optional. For Zoom split host/join.",
+      meetingSave: "Save",
+      meetingSaving: "Saving...",
+      meetingSaved: "Saved",
+      meetingError: "Failed. Try again.",
       seo: { title: `${programmeTitle} — Moirai`, description: "Cohort detail" },
     };
 
@@ -158,6 +178,37 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
         )}
       </div>
     </header>
+
+    <section class="meeting-setup" aria-labelledby="meeting-setup-title">
+      <h2 class="meeting-setup__title" id="meeting-setup-title">{t.meetingTitle}</h2>
+      <form data-meeting-form class="meeting-setup__form" data-cohort-id={matrix.cohort_id}>
+        <label class="meeting-setup__field">
+          <span class="meeting-setup__label">{t.meetingProviderLabel}</span>
+          <select name="meeting_provider">
+            <option value="">{t.meetingProviderPlaceholder}</option>
+            <option value="zoom"  selected={matrix.meeting_provider === "zoom"}>Zoom</option>
+            <option value="teams" selected={matrix.meeting_provider === "teams"}>Microsoft Teams</option>
+            <option value="gmeet" selected={matrix.meeting_provider === "gmeet"}>Google Meet</option>
+          </select>
+        </label>
+        <label class="meeting-setup__field">
+          <span class="meeting-setup__label">{t.meetingUrlLabel}</span>
+          <input type="url" name="meeting_url" value={matrix.meeting_url ?? ""} placeholder="https://..." />
+        </label>
+        <label class="meeting-setup__field">
+          <span class="meeting-setup__label">{t.meetingHostUrlLabel}</span>
+          <input type="url" name="meeting_host_url" value={matrix.meeting_host_url ?? ""} placeholder="https://..." />
+          <span class="meeting-setup__hint">{t.meetingHostUrlHint}</span>
+        </label>
+        <div class="meeting-setup__actions">
+          <button type="submit" class="meeting-setup__submit" data-meeting-save
+                  data-i18n-saving={t.meetingSaving}
+                  data-i18n-saved={t.meetingSaved}
+                  data-i18n-error={t.meetingError}>{t.meetingSave}</button>
+          <span class="meeting-setup__status" data-meeting-status hidden></span>
+        </div>
+      </form>
+    </section>
 
     {matrix.students.length === 0 ? (
       <p class="cohort-detail__empty">{t.empty}</p>
@@ -336,6 +387,72 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
     border-radius: 2px;
   }
   .cohort-detail__zoom-cta:hover { background: var(--amber-light); }
+
+  .meeting-setup {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: var(--space-lg);
+    margin-bottom: var(--space-xl);
+    background: var(--bg-elevated);
+  }
+  .meeting-setup__title {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: var(--type-body-lg);
+    color: var(--text);
+    margin: 0 0 var(--space-md);
+  }
+  .meeting-setup__form { display: grid; gap: var(--space-md); }
+  .meeting-setup__field { display: flex; flex-direction: column; gap: 4px; }
+  .meeting-setup__label {
+    font-size: var(--type-micro-sm);
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wider);
+    font-weight: 500;
+  }
+  .meeting-setup select,
+  .meeting-setup input[type="url"] {
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    padding: 8px 10px;
+    font-family: var(--font-body);
+    font-size: var(--type-body-sm);
+    border-radius: 2px;
+  }
+  .meeting-setup__hint {
+    color: var(--text-faint);
+    font-size: var(--type-micro-md);
+    font-style: italic;
+  }
+  .meeting-setup__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin-top: var(--space-xs);
+  }
+  .meeting-setup__submit {
+    background: var(--amber);
+    border: 1px solid var(--amber);
+    color: var(--ink);
+    padding: 10px 18px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .meeting-setup__submit:hover { background: var(--amber-light); }
+  .meeting-setup__submit:disabled { opacity: 0.5; cursor: wait; }
+  .meeting-setup__status {
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+  .meeting-setup__status[data-tone="ok"]  { color: var(--text-accent); }
+  .meeting-setup__status[data-tone="err"] { color: var(--amber); }
 
   .cohort-detail__empty {
     color: var(--text-faint);
@@ -803,4 +920,61 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       if (ok) await callOverride("DELETE");
     })();
   });
+</script>
+
+<script>
+  /*
+   * Meeting setup form handler — PATCH /api/instructor/cohorts/[id]/meeting.
+   * Локализованные строки status (saved / saving / error) пробрасываются
+   * через data-* атрибуты на кнопке (data-i18n-saved и т.п.), что заметно
+   * упрощает Astro bundling без define:vars (форсит is:inline).
+   */
+  const form = document.querySelector<HTMLFormElement>("[data-meeting-form]");
+  if (form) {
+    const cohortId = form.dataset.cohortId ?? "";
+    const submitBtn = form.querySelector<HTMLButtonElement>("[data-meeting-save]");
+    const statusEl = form.querySelector<HTMLElement>("[data-meeting-status]");
+    const labelSave = submitBtn?.textContent ?? "Save";
+    const i18nSaving = submitBtn?.dataset.i18nSaving ?? "Saving...";
+    const i18nSaved = submitBtn?.dataset.i18nSaved ?? "Saved";
+    const i18nError = submitBtn?.dataset.i18nError ?? "Error";
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!submitBtn || !statusEl) return;
+      const fd = new FormData(form);
+      const provider = fd.get("meeting_provider") as string;
+      const url = fd.get("meeting_url") as string;
+      const hostUrl = fd.get("meeting_host_url") as string;
+      const body = {
+        meeting_provider: provider || null,
+        meeting_url: url || null,
+        meeting_host_url: hostUrl || null,
+      };
+      submitBtn.disabled = true;
+      submitBtn.textContent = i18nSaving;
+      statusEl.hidden = true;
+      try {
+        const res = await fetch(`/api/instructor/cohorts/${encodeURIComponent(cohortId)}/meeting`, {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(`http ${res.status.toString()}`);
+        statusEl.textContent = i18nSaved;
+        statusEl.hidden = false;
+        statusEl.dataset.tone = "ok";
+        setTimeout(() => { statusEl.hidden = true; }, 2000);
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = i18nError;
+        statusEl.dataset.tone = "err";
+        statusEl.hidden = false;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = labelSave;
+      }
+    });
+  }
 </script>

@@ -387,7 +387,11 @@ export interface CohortMatrix {
   modules: { slug: string; title: string | null; order_idx: number }[];
   students: CohortMatrixStudent[];
   meeting_provider: string | null;
+  /** Computed: meeting_host_url ?? meeting_url. Для join CTA в hero. */
   meeting_join_url: string | null;
+  /** Raw — для form editing. */
+  meeting_url: string | null;
+  meeting_host_url: string | null;
   next_session_at: number | null;
 }
 
@@ -459,6 +463,8 @@ export async function getCohortMatrix(
       students: [],
       meeting_provider: cohort.meeting_provider,
       meeting_join_url: cohort.meeting_host_url ?? cohort.meeting_url,
+      meeting_url: cohort.meeting_url,
+      meeting_host_url: cohort.meeting_host_url,
       next_session_at: null,
     };
   }
@@ -576,6 +582,8 @@ export async function getCohortMatrix(
     students,
     meeting_provider: cohort.meeting_provider,
     meeting_join_url: cohort.meeting_host_url ?? cohort.meeting_url,
+    meeting_url: cohort.meeting_url,
+    meeting_host_url: cohort.meeting_host_url,
     next_session_at: nextSessionAt,
   };
 }
