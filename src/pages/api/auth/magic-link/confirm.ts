@@ -66,7 +66,7 @@ export const GET: APIRoute = async ({ request, locals, url }) => {
   // /{locale}/instructor/, student → /{locale}/dashboard/. Учитывает
   // sanitized return_to (silent fallback на role-home если return_to
   // не подходит роли).
-  const destination = computeRedirectTarget(user, returnToRaw);
+  const destination = await computeRedirectTarget(env, user, returnToRaw);
 
   return redirectTo(destination, cookieHeader);
 };

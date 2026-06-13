@@ -134,7 +134,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   // redirect_to из ответа. См. decisions 2026-05-17 §18.
   const userWithRoles = await getUserWithRoles(env, user.id);
   const redirectTo = userWithRoles
-    ? computeRedirectTarget(userWithRoles, returnTo ?? null)
+    ? await computeRedirectTarget(env, userWithRoles, returnTo ?? null)
     : `/${user.locale}/dashboard/`;
 
   return new Response(

@@ -200,7 +200,7 @@ export const GET: APIRoute = async ({ request, url, locals }) => {
   // Step 7: role-aware destination
   const userWithRoles = await getUserWithRoles(env, userId);
   const target = userWithRoles
-    ? computeRedirectTarget(userWithRoles, returnTo ?? null)
+    ? await computeRedirectTarget(env, userWithRoles, returnTo ?? null)
     : `/${locale}/dashboard/`;
   return redirect(target, cookieHeader);
 };

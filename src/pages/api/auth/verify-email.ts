@@ -78,7 +78,7 @@ export const GET: APIRoute = async ({ url, request, locals }) => {
   // См. decisions 2026-05-17 §18.
   const userWithRoles = await getUserWithRoles(env, user.id);
   const baseTarget = userWithRoles
-    ? computeRedirectTarget(userWithRoles, null)
+    ? await computeRedirectTarget(env, userWithRoles, null)
     : `/${user.locale}/dashboard/`;
   const sep = baseTarget.includes("?") ? "&" : "?";
   return redirect(`${baseTarget}${sep}verified=1`, cookieHeader);

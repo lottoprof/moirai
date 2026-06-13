@@ -203,7 +203,7 @@ export const GET: APIRoute = async ({ request, url, locals }) => {
   // См. decisions 2026-05-17 §18.
   const userWithRoles = await getUserWithRoles(env, userId);
   const target = userWithRoles
-    ? computeRedirectTarget(userWithRoles, returnTo ?? null)
+    ? await computeRedirectTarget(env, userWithRoles, returnTo ?? null)
     : `/${locale}/dashboard/`;
   return redirect(target, cookieHeader);
 };
