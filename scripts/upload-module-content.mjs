@@ -54,20 +54,37 @@ const slugDirs = readdirSync(contentRoot)
 
 console.log(`[upload-content] discovered ${slugDirs.length} slug(s)`);
 
-// File list with (slug, kind, locale, localPath, r2Key)
+// File list with (slug, kind, locale, localPath, r2Key, contentType)
 const files = [];
 for (const slug of slugDirs) {
   const dir = join(contentRoot, slug);
   for (const file of readdirSync(dir)) {
-    const m = /^(workbook|presentation)\.(en|ru)\.md$/.exec(file);
-    if (!m) continue;
-    const [, kind, locale] = m;
+    const localPath = join(dir, file);
+    if (statSync(localPath).isDirectory()) continue;
+    const md = /^(workbook|presentation)\.(en|ru)\.md$/.exec(file);
+    if (md) {
+      const [, kind, locale] = md;
+      files.push({
+        slug, kind, locale, localPath,
+        r2Key: `modules/${slug}/${kind}.${locale}.md`,
+        contentType: 'text/markdown; charset=utf-8',
+      });
+    }
+  }
+  // Images subfolder
+  const imgDir = join(dir, 'images');
+  let imgEntries = [];
+  try { imgEntries = readdirSync(imgDir); } catch { /* no images folder */ }
+  for (const file of imgEntries) {
+    const ext = file.toLowerCase().split('.').pop() ?? '';
+    const ctMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml' };
+    const contentType = ctMap[ext];
+    if (!contentType) continue;
     files.push({
-      slug,
-      kind,
-      locale,
-      localPath: join(dir, file),
-      r2Key: `modules/${slug}/${kind}.${locale}.md`,
+      slug, kind: 'image', locale: null,
+      localPath: join(imgDir, file),
+      r2Key: `modules/${slug}/images/${file}`,
+      contentType,
     });
   }
 }
@@ -83,7 +100,7 @@ for (const f of files) {
     `moirai-content/${f.r2Key}`,
     `--file=${f.localPath}`,
     isLocal ? '--local' : '--remote',
-    '--content-type', 'text/markdown; charset=utf-8',
+    '--content-type', f.contentType,
   ];
   if (isDryRun) {
     console.log(`  [dry] PUT ${f.r2Key}`);
@@ -101,9 +118,12 @@ for (const f of files) {
 // ============================================================
 // 3. D1 UPDATE workbook_r2_key + presentation_r2_key
 // ============================================================
-// Group by (slug, locale) — one UPDATE per row covering both keys
+// Group by (slug, locale) — one UPDATE per row covering both keys.
+// Картинки (kind='image', locale=null) в D1 НЕ пишем — они адресуются
+// через /api/modules/[slug]/images/[file] и rewrite в MarkdownContent.
 const rows = new Map(); // key: `${slug}.${locale}` → { workbook?: r2Key, presentation?: r2Key }
 for (const f of files) {
+  if (f.kind === 'image' || !f.locale) continue;
   const k = `${f.slug}.${f.locale}`;
   if (!rows.has(k)) rows.set(k, { slug: f.slug, locale: f.locale });
   rows.get(k)[f.kind] = f.r2Key;

@@ -82,7 +82,7 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
   {isMissing ? (
     <p class="present-placeholder">{placeholderText}</p>
   ) : (
-    <MarkdownContent md={markdown} />
+    <MarkdownContent md={markdown} slug={slug} />
   )}
 </PresentationLayout>
 

@@ -83,7 +83,16 @@ marked.setOptions({ gfm: true, breaks: false });
 let bodyHtml = "";
 if (bodyMarkdown) {
   // Strip frontmatter если есть (--- ... ---)
-  const fmStripped = bodyMarkdown.replace(/^---\n[\s\S]*?\n---\n/, "");
+  let fmStripped = bodyMarkdown.replace(/^---\n[\s\S]*?\n---\n/, "");
+  // Rewrite relative image refs к gated /api/modules/{slug}/images/{file}
+  fmStripped = fmStripped.replace(
+    /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
+    (match, alt: string, src: string) => {
+      if (/^([a-z]+:|\/\/|\/)/i.test(src)) return match;
+      const clean = src.replace(/^\.\//, "");
+      return `![${alt}](/api/modules/${encodeURIComponent(slug)}/images/${encodeURIComponent(clean)})`;
+    },
+  );
   bodyHtml = await marked.parse(fmStripped);
 }
 

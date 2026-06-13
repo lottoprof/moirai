@@ -20,9 +20,13 @@ import { youtubeExtension } from "../../lib/markdown/extensions/youtube";
 
 interface Props {
   md: string;
+  /** Module slug — если задан, относительные image refs `![alt](file.png)`
+   *  перезаписываются в `/api/modules/{slug}/images/{file}` (gated R2 fetch).
+   *  Абсолютные URL (http/https/protocol-relative `//`) остаются как есть. */
+  slug?: string;
 }
 
-const { md } = Astro.props;
+const { md, slug } = Astro.props;
 
 // Configure marked + register YT extension (idempotent — multiple
 // MarkdownContent на одной странице используют тот же global state).
@@ -30,7 +34,21 @@ marked.setOptions({ gfm: true, breaks: false });
 marked.use(youtubeExtension);
 
 // Strip frontmatter если есть (--- ... ---)
-const fmStripped = md.replace(/^---\n[\s\S]*?\n---\n/, "");
+let fmStripped = md.replace(/^---\n[\s\S]*?\n---\n/, "");
+
+// Rewrite relative image refs к gated /api/modules/{slug}/images/{file}
+if (slug) {
+  fmStripped = fmStripped.replace(
+    /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
+    (match, alt: string, src: string) => {
+      if (/^([a-z]+:|\/\/|\/)/i.test(src)) return match; // absolute — leave as is
+      // Strip leading ./
+      const clean = src.replace(/^\.\//, "");
+      return `![${alt}](/api/modules/${encodeURIComponent(slug)}/images/${encodeURIComponent(clean)})`;
+    },
+  );
+}
+
 const html = await marked.parse(fmStripped);
 ---
 

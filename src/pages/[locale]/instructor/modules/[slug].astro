@@ -86,12 +86,12 @@ const t = ru
 
     <section class="instr-mod__section">
       <h2 class="instr-mod__section-title">{t.workbookTitle}</h2>
-      {workbookMd ? <MarkdownContent md={workbookMd} /> : <p class="instr-mod__missing">{t.workbookMissing}</p>}
+      {workbookMd ? <MarkdownContent md={workbookMd} slug={slug} /> : <p class="instr-mod__missing">{t.workbookMissing}</p>}
     </section>
 
     <section class="instr-mod__section">
       <h2 class="instr-mod__section-title">{t.presentationTitle}</h2>
-      {presentationMd ? <MarkdownContent md={presentationMd} /> : <p class="instr-mod__missing">{t.presentationMissing}</p>}
+      {presentationMd ? <MarkdownContent md={presentationMd} slug={slug} /> : <p class="instr-mod__missing">{t.presentationMissing}</p>}
     </section>
   </div>
 </Layout>

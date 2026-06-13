@@ -177,12 +177,12 @@ const t = ru
 
     <section class="module-section">
       <h2 class="module-section__title">{t.workbookTitle} ({previewLocale.toUpperCase()})</h2>
-      {workbookMd ? <MarkdownContent md={workbookMd} /> : <p class="module-section__missing">{t.workbookMissing}</p>}
+      {workbookMd ? <MarkdownContent md={workbookMd} slug={slug} /> : <p class="module-section__missing">{t.workbookMissing}</p>}
     </section>
 
     <section class="module-section">
       <h2 class="module-section__title">{t.presentationTitle} ({previewLocale.toUpperCase()})</h2>
-      {presentationMd ? <MarkdownContent md={presentationMd} /> : <p class="module-section__missing">{t.presentationMissing}</p>}
+      {presentationMd ? <MarkdownContent md={presentationMd} slug={slug} /> : <p class="module-section__missing">{t.presentationMissing}</p>}
     </section>
 
     <section class="module-section">
