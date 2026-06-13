@@ -280,9 +280,16 @@ const html = await marked.parse(fmStripped);
       const startParam = start ? `&start=${start}` : "";
       const iframe = document.createElement("iframe");
       iframe.src = `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&playsinline=1${startParam}`;
-      iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+      iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
       iframe.allowFullscreen = true;
       iframe.title = "YouTube video";
+      // Inline-стили — обходим Astro CSS scoping (iframe вставлен
+      // динамически, без data-astro-cid attribute, scoped селекторы
+      // не сработают).
+      iframe.style.width = "100%";
+      iframe.style.height = "100%";
+      iframe.style.border = "0";
+      iframe.style.display = "block";
       player.innerHTML = "";
       player.appendChild(iframe);
       modal.hidden = false;
