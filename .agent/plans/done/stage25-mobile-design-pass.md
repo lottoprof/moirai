@@ -1,5 +1,14 @@
 # Stage 25 — Mobile design pass (deferred после Student ЛК)
 
+> **Закрыт 2026-06-13.** Аудит публичных страниц на 375px проведён
+> (см. m375-*.png + чат). Найденные пункты разобраны с lottoprof:
+> 1. Hero eyebrow marquee на /en/ — by design (intentional scroll).
+> 2. Apply filter row — marquee, by design.
+> 3. Instructor card watermark vs name — оставить как есть.
+> 4. Cookies page +7px horizontal overflow — отложили.
+> Bug-фиксов не потребовалось. Дальше — language switcher в admin/
+> instructor/student headers (отдельный commit).
+
 ## Контекст
 
 Stage 8 (PSI audit) подсветил техническую сторону — Performance / a11y /
