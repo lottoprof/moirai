@@ -35,7 +35,12 @@ export async function countUnassignedCohorts(
 export interface OverviewMetrics {
   active_students: number;
   new_students_7d: number;
+  /** running AND paid_count > 0 — реально идут с оплаченными студентами.
+   *  Чистого `status='running'` считать нельзя: seed/publish создаёт
+   *  open-cohorts на год вперёд, часть может быть помечена running
+   *  без студентов (артефакт публикации). См. feedback 2026-06-13. */
   cohorts_running: number;
+  /** status='open' — опубликованы для apply (могут быть пустыми). */
   cohorts_open: number;
   active_instructors: number;
   revenue_month_cents: number;
@@ -63,8 +68,8 @@ export async function fetchOverviewMetrics(
     ).bind(sevenDaysAgo),
     env.DB.prepare(
       `SELECT
-         SUM(CASE WHEN status='running' THEN 1 ELSE 0 END) AS running_n,
-         SUM(CASE WHEN status='open'    THEN 1 ELSE 0 END) AS open_n
+         SUM(CASE WHEN status='running' AND paid_count > 0 THEN 1 ELSE 0 END) AS running_n,
+         SUM(CASE WHEN status='open' THEN 1 ELSE 0 END) AS open_n
         FROM cohorts
        WHERE status IN ('running','open')`,
     ),

@@ -77,9 +77,9 @@ const t = ru
       attentionAllClear: "Всё спокойно — open items нет.",
       metricStudents: "Студенты в процессе",
       metricStudentsSub: (n: number) => `+${String(n)} за неделю`,
-      metricCohorts: "Активные когорты",
-      metricCohortsSub: (running: number, open: number) =>
-        `${String(running)} идут · ${String(open)} открыты`,
+      metricCohorts: "Идут сейчас",
+      metricCohortsSub: (open: number) =>
+        `${String(open)} открыты для записи`,
       metricInstructors: "Преподаватели",
       metricInstructorsSub: "активны",
       metricRevenue: "Выручка месяца",
@@ -110,9 +110,9 @@ const t = ru
       attentionAllClear: "All clear — no open items.",
       metricStudents: "Students in progress",
       metricStudentsSub: (n: number) => `+${String(n)} this week`,
-      metricCohorts: "Active cohorts",
-      metricCohortsSub: (running: number, open: number) =>
-        `${String(running)} running · ${String(open)} open`,
+      metricCohorts: "Currently teaching",
+      metricCohortsSub: (open: number) =>
+        `${String(open)} open for apply`,
       metricInstructors: "Instructors",
       metricInstructorsSub: "active",
       metricRevenue: "Revenue (month)",
@@ -177,8 +177,8 @@ const noAttention = unassignedCohorts === 0;
       />
       <StatCard
         label={t.metricCohorts}
-        value={[metrics.cohorts_running + metrics.cohorts_open, ""]}
-        sub={t.metricCohortsSub(metrics.cohorts_running, metrics.cohorts_open)}
+        value={[metrics.cohorts_running, ""]}
+        sub={t.metricCohortsSub(metrics.cohorts_open)}
       />
       <StatCard
         label={t.metricInstructors}
