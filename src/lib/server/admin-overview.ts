@@ -60,15 +60,25 @@ export async function fetchOverviewMetrics(
   const [students, cohorts, instructors, revenue] = await env.DB.batch([
     env.DB.prepare(
       `SELECT
-         (SELECT COUNT(*) FROM enrollments
-           WHERE status='active' AND archived_at IS NULL) AS active_count,
-         (SELECT COUNT(*) FROM enrollments
-           WHERE status='active' AND archived_at IS NULL
-             AND enrolled_at >= ?) AS new_7d`,
+         (SELECT COUNT(*) FROM enrollments e
+           WHERE e.status='active' AND e.archived_at IS NULL
+             AND EXISTS (
+               SELECT 1 FROM applications a
+               JOIN cohorts c ON c.id = a.cohort_id
+                WHERE a.enrollment_id = e.id AND c.status='running'
+             )) AS active_count,
+         (SELECT COUNT(*) FROM enrollments e
+           WHERE e.status='active' AND e.archived_at IS NULL
+             AND e.enrolled_at >= ?
+             AND EXISTS (
+               SELECT 1 FROM applications a
+               JOIN cohorts c ON c.id = a.cohort_id
+                WHERE a.enrollment_id = e.id AND c.status='running'
+             )) AS new_7d`,
     ).bind(sevenDaysAgo),
     env.DB.prepare(
       `SELECT
-         SUM(CASE WHEN status='running' AND paid_count > 0 THEN 1 ELSE 0 END) AS running_n,
+         SUM(CASE WHEN status='running' AND lead_instructor_id IS NOT NULL THEN 1 ELSE 0 END) AS running_n,
          SUM(CASE WHEN status='open' THEN 1 ELSE 0 END) AS open_n
         FROM cohorts
        WHERE status IN ('running','open')`,

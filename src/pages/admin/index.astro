@@ -70,12 +70,12 @@ const t = ru
   ? {
       eyebrow: "Админ",
       title: "Обзор.",
-      subtitleFn: (n: number) => `${String(n)} активных студентов`,
+      subtitleFn: (n: number) => `${String(n)} студентов в обучении`,
       attentionTitle: "Требует внимания",
       attentionUnassigned: (n: number) =>
         `Когорты без преподавателя · ${String(n)}`,
       attentionAllClear: "Всё спокойно — open items нет.",
-      metricStudents: "Студенты в процессе",
+      metricStudents: "Студенты в обучении",
       metricStudentsSub: (n: number) => `+${String(n)} за неделю`,
       metricCohorts: "Идут сейчас",
       metricCohortsSub: (open: number) =>
@@ -103,12 +103,12 @@ const t = ru
   : {
       eyebrow: "Admin",
       title: "Overview.",
-      subtitleFn: (n: number) => `${String(n)} active students`,
+      subtitleFn: (n: number) => `${String(n)} students currently learning`,
       attentionTitle: "Needs attention",
       attentionUnassigned: (n: number) =>
         `Cohorts without instructor · ${String(n)}`,
       attentionAllClear: "All clear — no open items.",
-      metricStudents: "Students in progress",
+      metricStudents: "Currently learning",
       metricStudentsSub: (n: number) => `+${String(n)} this week`,
       metricCohorts: "Currently teaching",
       metricCohortsSub: (open: number) =>
