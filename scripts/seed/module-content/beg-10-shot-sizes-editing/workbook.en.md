@@ -2,7 +2,7 @@
 
 ## The Six Shot Sizes (Kuleshov)
 
-![Six Frame Sizes](Six_Frame_Sizes.png)
+![Six Frame Sizes](six-frame-sizes.png)
 
 1. **Extreme Long Shot** — The human figure is extremely small, occupying no more than 1/7 of the frame. Emphasis is on the location; commonly used for establishing shots.
 2. **Long Shot** — The full human figure fits within the frame, with a small amount of space above the head and below the feet.
