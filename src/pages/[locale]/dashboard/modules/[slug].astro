@@ -17,8 +17,8 @@
  * показываем только workbook на single page.
  */
 
-import { marked } from "marked";
 import DashboardLayout from "../../../../layouts/dashboard/Layout.astro";
+import MarkdownContent from "../../../../components/shared/MarkdownContent.astro";
 import SubmissionCard from "../../../../components/dashboard/SubmissionCard.astro";
 import SubmissionUploader from "../../../../components/dashboard/SubmissionUploader.astro";
 import ModulesDrawer from "../../../../components/dashboard/ModulesDrawer.astro";
@@ -78,23 +78,9 @@ if (!module_.workbook_r2_key) {
   }
 }
 
-// Render markdown (body is methodist-controlled, no sanitization needed for MVP)
-marked.setOptions({ gfm: true, breaks: false });
-let bodyHtml = "";
-if (bodyMarkdown) {
-  // Strip frontmatter если есть (--- ... ---)
-  let fmStripped = bodyMarkdown.replace(/^---\n[\s\S]*?\n---\n/, "");
-  // Rewrite relative image refs к gated /api/modules/{slug}/images/{file}
-  fmStripped = fmStripped.replace(
-    /!\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g,
-    (match, alt: string, src: string) => {
-      if (/^([a-z]+:|\/\/|\/)/i.test(src)) return match;
-      const clean = src.replace(/^\.\//, "");
-      return `![${alt}](/api/modules/${encodeURIComponent(slug)}/images/${encodeURIComponent(clean)})`;
-    },
-  );
-  bodyHtml = await marked.parse(fmStripped);
-}
+// Markdown render — через <MarkdownContent slug=...> в шаблоне.
+// Component обеспечивает image rewrite, YT auto-embed + modal lightbox
+// единообразно с admin/instructor view.
 
 // Parse JSON arrays
 let objectives: string[] = [];
@@ -224,9 +210,9 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       </section>
     )}
 
-    <div class="module-page__body prose">
-      {bodyHtml ? (
-        <div set:html={bodyHtml} />
+    <div class="module-page__body">
+      {bodyMarkdown ? (
+        <MarkdownContent md={bodyMarkdown} slug={slug} />
       ) : bodyError === "missing" ? (
         <p class="module-page__placeholder">{t.bodyMissing}</p>
       ) : (

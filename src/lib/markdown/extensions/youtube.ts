@@ -42,14 +42,21 @@ function parseYouTubeUrl(text: string): { id: string; start: number | null } | n
 }
 
 /**
- * Marked extension для auto-detect YT в paragraph tokens.
+ * Marked extension для auto-detect YT в:
+ *   1. Standalone paragraph URL — конвертится в lite-load poster
+ *      (.yt-embed div, click swap на iframe in-place).
+ *   2. Markdown link `[text](yt-url)` — конвертится в .yt-link,
+ *      click открывает modal lightbox с iframe (preserves текст ссылки
+ *      и окружающее форматирование списка/параграфа).
  *
- * Применяется на rendering уровне — заменяет paragraph HTML output.
+ * Применяется на rendering уровне — заменяет HTML output обоих
+ * paragraph и link tokens.
  */
 export const youtubeExtension: MarkedExtension = {
   renderer: {
     paragraph(token: Tokens.Paragraph) {
-      // Если paragraph содержит только text token с URL — convert.
+      // Если paragraph содержит только text token с URL — convert
+      // в poster-embed (большой блок).
       const tokens = token.tokens;
       if (tokens.length === 1 && tokens[0].type === 'text') {
         const inner = tokens[0] as { text?: string };
@@ -67,8 +74,28 @@ export const youtubeExtension: MarkedExtension = {
 </div>\n`;
         }
       }
-      // Fallback — стандартный render через возврат false (marked spec).
       return false;
+    },
+    link(token: Tokens.Link) {
+      // `[text](yt-url)` → modal-trigger link (visual = обычная ссылка,
+      // click = открыть lightbox в текущей странице, не уходить с moirai).
+      const parsed = parseYouTubeUrl(token.href);
+      if (!parsed) return false;
+      const startAttr = parsed.start != null ? ` data-yt-start="${String(parsed.start)}"` : '';
+      // Render children (например inline strong / em внутри текста ссылки)
+      let inner = '';
+      for (const t of token.tokens) {
+        const tt = t as { type: string; text?: string; raw?: string };
+        inner += (tt.text ?? tt.raw ?? '');
+      }
+      if (!inner) inner = token.text || token.href;
+      // escape HTML в inner для безопасности
+      const esc = inner
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+      return `<a class="yt-link" data-yt-id="${parsed.id}"${startAttr} href="${token.href}" target="_blank" rel="noopener">${esc}</a>`;
     },
   },
 };
