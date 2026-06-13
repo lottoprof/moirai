@@ -17,6 +17,7 @@
 import type { Role } from "../../../db/types";
 import Logo from "../shared/Logo.astro";
 import List from "../icons/List.astro";
+import LangSwitcher from "../public/LangSwitcher.astro";
 
 interface Props {
   locale: "en" | "ru";
@@ -67,6 +68,8 @@ if (roles?.has("instructor")) {
 if (roles?.has("admin")) {
   otherZones.push({ href: `/admin/`, label: labels.switchAdmin });
 }
+
+const pathname = Astro.url.pathname;
 ---
 
 <nav class="dashboard-nav" aria-label={labels.aria}>
@@ -89,6 +92,9 @@ if (roles?.has("admin")) {
         >{item.label}</a>
       </li>
     ))}
+    <li class="dashboard-nav__item dashboard-nav__item--lang">
+      <LangSwitcher current={locale} pathname={pathname} mode="zone" />
+    </li>
     {otherZones.map((z) => (
       <li class="dashboard-nav__item">
         <a href={z.href} class="dashboard-nav__link dashboard-nav__link--switch">{z.label}</a>
@@ -167,6 +173,13 @@ if (roles?.has("admin")) {
 
   .dashboard-nav__item {
     flex-shrink: 0;
+  }
+
+  /* LangSwitcher в dashboard-nav — приглушённая палитра под muted-фон */
+  .dashboard-nav__item--lang {
+    --lang-switcher-color: var(--text-muted);
+    --lang-switcher-hover: var(--text-accent);
+    --lang-switcher-menu-color: var(--text-muted);
   }
 
   .dashboard-nav__link {

@@ -59,6 +59,8 @@ if (roles?.has("student")) {
 if (roles?.has("admin")) {
   otherZones.push({ href: `/admin/`, label: labels.switchAdmin });
 }
+
+const pathname = Astro.url.pathname;
 ---
 
 <ZoneNav
@@ -68,4 +70,5 @@ if (roles?.has("admin")) {
   items={items}
   currentKey={currentKey}
   otherZones={otherZones}
+  langSwitcher={{ locale, pathname }}
 />

@@ -1,34 +1,38 @@
 ---
 /*
- * <LangSwitcher /> — переключатель локалей в Nav.
+ * <LangSwitcher /> — переключатель локалей.
  *
- * UX-логика: locale auto-detect через middleware (Accept-Language → /{locale}/).
- * Пользователь чаще всего видит correct locale → показывать обе ("EN / RU")
- * = visual noise. Поэтому current locale показывается как summary, при клике
- * раскрывается dropdown с альтернативой(ами).
+ * Используется в публичном <Nav /> (mode='public') и в protected
+ * зонах admin/instructor/student через <ZoneNav /> / <DashboardNav />
+ * (mode='zone').
  *
- * Прогрессивное усиление через нативный `<details>` — работает без JS
- * (browser обрабатывает open/close на клик summary). JS добавляет:
- *   - click-outside / Escape для close
- *   - cookie save (locale_pref, 1 год) — middleware respects на следующем
- *     визите корня поверх Accept-Language
+ * Pathname rewrite:
+ *   - /{en|ru}/X → /{другая-локаль}/X (public + student/instructor/account)
+ *   - /admin/X — нет локали в URL, target остаётся = pathname,
+ *     JS форсит reload после смены user.locale.
  *
- * При 2-х локалях menu = 1 item. При расширении (3+ locales) auto-grows.
+ * Mode='public': только cookie `locale_pref` + браузерная навигация.
+ * Mode='zone':  cookie + POST /api/account/locale (DB user.locale) +
+ *               reload/navigate. См. /pages/api/account/locale.ts.
  *
- * См. план `.agent/plans/active/sprint0-stage11-language-switcher.md`.
+ * Цвета — CSS-vars с дефолтами под публичный hero. Зоны переопределяют
+ * --lang-switcher-color/-hover/-menu-color для muted-палитры.
  */
 
 interface Props {
   current: "en" | "ru";
   pathname: string;
+  mode?: "public" | "zone";
 }
 
-const { current, pathname } = Astro.props;
+const { current, pathname, mode = "public" } = Astro.props;
 
-// Strip leading /{locale}/ → построение href с любой другой локалью.
+const hasLocalePrefix = /^\/(en|ru)(\/|$)/.test(pathname);
 const stripped = pathname.replace(/^\/(en|ru)(\/|$)/, "/");
-const target = (locale: "en" | "ru"): string =>
-  stripped === "/" || stripped === "" ? `/${locale}/` : `/${locale}${stripped}`;
+const target = (locale: "en" | "ru"): string => {
+  if (!hasLocalePrefix) return pathname;
+  return stripped === "/" || stripped === "" ? `/${locale}/` : `/${locale}${stripped}`;
+};
 
 const items: { code: "en" | "ru"; label: string }[] = [
   { code: "en", label: "EN" },
@@ -41,7 +45,7 @@ const altItems = items.filter((i) => i.code !== current);
 const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language";
 ---
 
-<details class="lang-switcher">
+<details class="lang-switcher" data-mode={mode}>
   <summary class="lang-switcher__toggle" aria-label={ariaLabel}>
     <span>{currentItem.label}</span>
   </summary>
@@ -64,17 +68,13 @@ const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language"
 <style>
   .lang-switcher {
     position: relative;
-    /* details element не имеет дефолтного inline-block layout — выставим */
     display: inline-block;
   }
 
-  /* Toggle = summary. Скрываем нативный disclosure marker (треугольник)
-     через ::-webkit-details-marker (Webkit/Safari) и ::marker (Chromium/FF).
-     Воспринимается как обычный clickable text. */
   .lang-switcher__toggle {
     list-style: none;
     cursor: pointer;
-    color: var(--paper);
+    color: var(--lang-switcher-color, var(--paper));
     padding: 2px 4px;
     font-size: var(--type-micro-md);
     font-weight: 500;
@@ -87,19 +87,15 @@ const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language"
   .lang-switcher__toggle::marker { content: ""; }
 
   .lang-switcher__toggle:hover {
-    color: var(--amber);
+    color: var(--lang-switcher-hover, var(--amber));
   }
   .lang-switcher__toggle:active {
     opacity: 0.7;
   }
-  /* Open-state визуальный indicator — current text становится амбером */
   .lang-switcher[open] .lang-switcher__toggle {
-    color: var(--amber);
+    color: var(--lang-switcher-hover, var(--amber));
   }
 
-  /* Menu — абсолютно spawn'ится под toggle, прижата к правому краю
-     (чтобы не выходила за границу viewport на mobile в Nav).
-     z-index выше hero/content. */
   .lang-switcher__menu {
     position: absolute;
     top: calc(100% + var(--space-xs));
@@ -116,7 +112,7 @@ const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language"
   .lang-switcher__item {
     display: block;
     padding: var(--space-xs) var(--space-sm);
-    color: var(--text-muted);
+    color: var(--lang-switcher-menu-color, var(--text-muted));
     text-decoration: none;
     font-size: var(--type-micro-md);
     font-weight: 500;
@@ -126,7 +122,7 @@ const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language"
     transition: color var(--duration-fast) var(--ease-out);
   }
   .lang-switcher__item:hover {
-    color: var(--amber);
+    color: var(--lang-switcher-hover, var(--amber));
   }
   .lang-switcher__item:active {
     opacity: 0.7;
@@ -135,20 +131,41 @@ const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language"
 
 <script>
   /*
-   * JS усиление:
+   * JS поведение:
    *   - cookie save (locale_pref, 1 год) при клике на alt-locale.
-   *     Middleware на следующем визите корня респектит этот cookie
-   *     поверх Accept-Language.
-   *   - click-outside → close (нативный <details> сам не закрывается)
-   *   - Escape → close
+   *   - mode='zone': POST /api/account/locale (DB user.locale) + force
+   *     reload, если href === current URL (admin path). Иначе follow href.
+   *   - mode='public': дефолтный browser-navigate.
+   *   - click-outside / Escape → close.
    */
-  const switcher = document.querySelector<HTMLDetailsElement>(".lang-switcher");
-  if (switcher) {
+  const switchers = document.querySelectorAll<HTMLDetailsElement>(".lang-switcher");
+  switchers.forEach((switcher) => {
+    const mode = switcher.dataset.mode ?? "public";
     switcher.querySelectorAll<HTMLAnchorElement>(".lang-switcher__item").forEach((a) => {
-      a.addEventListener("click", () => {
+      a.addEventListener("click", async (e) => {
         const locale = a.dataset.locale;
-        if (locale === "en" || locale === "ru") {
-          document.cookie = `locale_pref=${locale}; path=/; max-age=31536000; samesite=lax; secure`;
+        if (locale !== "en" && locale !== "ru") return;
+
+        document.cookie = `locale_pref=${locale}; path=/; max-age=31536000; samesite=lax; secure`;
+
+        if (mode === "zone") {
+          e.preventDefault();
+          try {
+            await fetch("/api/account/locale", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ locale }),
+            });
+          } catch { /* network failure — fallback на reload, cookie всё равно стоит */ }
+
+          const href = a.getAttribute("href") ?? "";
+          const currentPath = window.location.pathname;
+          if (href === currentPath || href === currentPath + window.location.search) {
+            window.location.reload();
+          } else {
+            window.location.href = href;
+          }
         }
       });
     });
@@ -162,5 +179,5 @@ const ariaLabel = current === "ru" ? "Выбор языка" : "Switch language"
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") switcher.open = false;
     });
-  }
+  });
 </script>

@@ -11,6 +11,10 @@
  *   items                      — основной ряд nav-items (key/label/href).
  *   currentKey                 — active item.
  *   otherZones                 — zone-switcher'ы справа (multi-role).
+ *   langSwitcher               — { locale, pathname } для <LangSwitcher
+ *                                mode="zone" /> между items и otherZones
+ *                                (см. план stage25 mobile-design /
+ *                                feedback "справа от Account").
  *
  * Все цвета/шрифты — из tokens.css. Стили scoped и shared между
  * Admin/Instructor — единый источник истины.
@@ -19,6 +23,7 @@
  */
 
 import Logo from "./Logo.astro";
+import LangSwitcher from "../public/LangSwitcher.astro";
 
 interface NavItem {
   key: string;
@@ -38,6 +43,7 @@ interface Props {
   items: readonly NavItem[];
   currentKey: string;
   otherZones?: OtherZone[];
+  langSwitcher?: { locale: "en" | "ru"; pathname: string };
 }
 
 const {
@@ -47,6 +53,7 @@ const {
   items,
   currentKey,
   otherZones = [],
+  langSwitcher,
 } = Astro.props;
 ---
 
@@ -64,6 +71,11 @@ const {
         >{item.label}</a>
       </li>
     ))}
+    {langSwitcher && (
+      <li class="zone-nav__item zone-nav__item--lang">
+        <LangSwitcher current={langSwitcher.locale} pathname={langSwitcher.pathname} mode="zone" />
+      </li>
+    )}
     {otherZones.map((z) => (
       <li class="zone-nav__item">
         <a href={z.href} class="zone-nav__link zone-nav__link--switch">{z.label}</a>
@@ -125,6 +137,13 @@ const {
   .zone-nav__list::-webkit-scrollbar { display: none; }
 
   .zone-nav__item { flex-shrink: 0; }
+
+  /* LangSwitcher в zone-nav — приглушённая палитра под muted-фон */
+  .zone-nav__item--lang {
+    --lang-switcher-color: var(--text-muted);
+    --lang-switcher-hover: var(--text-accent);
+    --lang-switcher-menu-color: var(--text-muted);
+  }
 
   .zone-nav__link {
     font-family: var(--font-body);
