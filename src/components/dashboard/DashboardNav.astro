@@ -38,8 +38,8 @@ const labels = locale === "ru"
       modules: "Модули",
       homework: "Задания",
       account: "Аккаунт",
-      switchInstructor: "Преподавателю",
-      switchAdmin: "Админу",
+      switchInstructor: "Преподаватель",
+      switchAdmin: "Админ",
     }
   : {
       aria: "Dashboard navigation",
@@ -82,25 +82,27 @@ const pathname = Astro.url.pathname;
     )}
     <a href={`/${locale}/`} class="dashboard-nav__logo" aria-label="Moirai home"><Logo height={26} /></a>
   </div>
-  <ul class="dashboard-nav__list" role="list">
-    {items.map((item) => (
-      <li class="dashboard-nav__item">
-        <a
-          href={item.href}
-          class:list={["dashboard-nav__link", { "dashboard-nav__link--active": item.key === currentKey }]}
-          aria-current={item.key === currentKey ? "page" : undefined}
-        >{item.label}</a>
-      </li>
-    ))}
-    <li class="dashboard-nav__item dashboard-nav__item--lang">
+  <div class="dashboard-nav__right">
+    <ul class="dashboard-nav__list" role="list">
+      {items.map((item) => (
+        <li class="dashboard-nav__item">
+          <a
+            href={item.href}
+            class:list={["dashboard-nav__link", { "dashboard-nav__link--active": item.key === currentKey }]}
+            aria-current={item.key === currentKey ? "page" : undefined}
+          >{item.label}</a>
+        </li>
+      ))}
+      {otherZones.map((z) => (
+        <li class="dashboard-nav__item">
+          <a href={z.href} class="dashboard-nav__link dashboard-nav__link--switch">{z.label}</a>
+        </li>
+      ))}
+    </ul>
+    <div class="dashboard-nav__lang">
       <LangSwitcher current={locale} pathname={pathname} mode="zone" />
-    </li>
-    {otherZones.map((z) => (
-      <li class="dashboard-nav__item">
-        <a href={z.href} class="dashboard-nav__link dashboard-nav__link--switch">{z.label}</a>
-      </li>
-    ))}
-  </ul>
+    </div>
+  </div>
 </nav>
 
 <style>
@@ -175,8 +177,16 @@ const pathname = Astro.url.pathname;
     flex-shrink: 0;
   }
 
-  /* LangSwitcher в dashboard-nav — приглушённая палитра под muted-фон */
-  .dashboard-nav__item--lang {
+  /* LangSwitcher вне scrollable __list — иначе absolute-меню клипается
+     overflow-x:auto ancestor'ом. См. feedback 2026-06-13. */
+  .dashboard-nav__right {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-lg);
+    min-width: 0;
+  }
+  .dashboard-nav__lang {
+    flex-shrink: 0;
     --lang-switcher-color: var(--text-muted);
     --lang-switcher-hover: var(--text-accent);
     --lang-switcher-menu-color: var(--text-muted);

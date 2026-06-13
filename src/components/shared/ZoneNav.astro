@@ -61,27 +61,29 @@ const {
   <div class="zone-nav__brand">
     <a href={brandHref} class="zone-nav__logo" aria-label={brandAriaLabel}><Logo height={26} /></a>
   </div>
-  <ul class="zone-nav__list" role="list">
-    {items.map((item) => (
-      <li class="zone-nav__item">
-        <a
-          href={item.href}
-          class:list={["zone-nav__link", { "zone-nav__link--active": item.key === currentKey }]}
-          aria-current={item.key === currentKey ? "page" : undefined}
-        >{item.label}</a>
-      </li>
-    ))}
+  <div class="zone-nav__right">
+    <ul class="zone-nav__list" role="list">
+      {items.map((item) => (
+        <li class="zone-nav__item">
+          <a
+            href={item.href}
+            class:list={["zone-nav__link", { "zone-nav__link--active": item.key === currentKey }]}
+            aria-current={item.key === currentKey ? "page" : undefined}
+          >{item.label}</a>
+        </li>
+      ))}
+      {otherZones.map((z) => (
+        <li class="zone-nav__item">
+          <a href={z.href} class="zone-nav__link zone-nav__link--switch">{z.label}</a>
+        </li>
+      ))}
+    </ul>
     {langSwitcher && (
-      <li class="zone-nav__item zone-nav__item--lang">
+      <div class="zone-nav__lang">
         <LangSwitcher current={langSwitcher.locale} pathname={langSwitcher.pathname} mode="zone" />
-      </li>
+      </div>
     )}
-    {otherZones.map((z) => (
-      <li class="zone-nav__item">
-        <a href={z.href} class="zone-nav__link zone-nav__link--switch">{z.label}</a>
-      </li>
-    ))}
-  </ul>
+  </div>
 </nav>
 
 <style>
@@ -138,8 +140,17 @@ const {
 
   .zone-nav__item { flex-shrink: 0; }
 
-  /* LangSwitcher в zone-nav — приглушённая палитра под muted-фон */
-  .zone-nav__item--lang {
+  /* LangSwitcher живёт ВНЕ scrollable __list — иначе его absolute-меню
+     клипается ancestor'ом с overflow-x:auto (overflow-y становится auto
+     неявно). См. user feedback 2026-06-13 «переключатель не работает». */
+  .zone-nav__right {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-lg);
+    min-width: 0;
+  }
+  .zone-nav__lang {
+    flex-shrink: 0;
     --lang-switcher-color: var(--text-muted);
     --lang-switcher-hover: var(--text-accent);
     --lang-switcher-menu-color: var(--text-muted);
