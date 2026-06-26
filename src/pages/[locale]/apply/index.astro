@@ -267,15 +267,16 @@ function spotBadge(c: CohortWithSlot): { text: string; variant: "spots_left" } |
   return null;
 }
 
-/* Длительность когорты в неделях. Считается из programme metadata
-   (module_count_hint / 2 sessions per week) — это authoritative источник,
-   совпадает с тем, как cohort'ы генерируются в publish-cohorts.mjs. */
-function cohortWeeks(programmeId: string): number | null {
-  const meta = programmeMeta.get(programmeId);
-  if (!meta) return null;
-  const modules = meta.module_count_hint;
-  if (typeof modules !== "number" || modules <= 0) return null;
-  return Math.ceil(modules / 2);
+/* Длительность когорты в неделях. Authoritative источник — даты
+   когорты (end_date - start_date), а не programme metadata. Это
+   позволяет вручную сместить end_date в админке без рассинхрона
+   с лейблом, и автоматически реагирует на изменение количества
+   модулей при следующем publish-cohorts run. */
+const DAY_SEC = 24 * 3600;
+function cohortWeeks(c: { start_date: number; end_date: number }): number | null {
+  const spanDays = (c.end_date - c.start_date) / DAY_SEC;
+  if (spanDays <= 0) return null;
+  return Math.ceil(spanDays / 7);
 }
 
 const isEmpty = cohorts.length === 0;
@@ -397,7 +398,7 @@ function groupLabel(c: CohortWithSlot): string | null {
                 const daysLabel = cohortDaysLabel(c.slot.days_json);
                 const timeOfDay = deriveTimeOfDay(c.slot.time_et);
                 const timeLabel = timeOfDay === "morning" ? t.filterTimeMorning : t.filterTimeEvening;
-                const weeks = cohortWeeks(c.programme_id);
+                const weeks = cohortWeeks(c);
                 const gLabel = groupLabel(c);
                 return (
                   <li>

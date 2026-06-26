@@ -28,7 +28,6 @@ import {
   parseDaysJson,
   normalizeDayPair,
   deriveTimeOfDay,
-  computeDurationWeeks,
 } from "../../../lib/server/cohorts";
 import { findActiveApplicationByUserProgramme } from "../../../lib/server/applications";
 import { verifyRefreshSession } from "../../../lib/server/session";
@@ -94,8 +93,8 @@ function formatDate(unixSec: number): string {
 const days = normalizeDayPair(parseDaysJson(cohort.slot.days_json));
 const daysLabel = days.map(weekdayLabel).join(" + ");
 const timeOfDay = deriveTimeOfDay(cohort.slot.time_et);
-const modulesTotal = programme.data.module_count_hint;
-const durationWeeks = modulesTotal > 0 ? computeDurationWeeks(modulesTotal, 2) : 0;
+const spanDays = (cohort.end_date - cohort.start_date) / (24 * 3600);
+const durationWeeks = spanDays > 0 ? Math.ceil(spanDays / 7) : 0;
 
 const t = ru
   ? {

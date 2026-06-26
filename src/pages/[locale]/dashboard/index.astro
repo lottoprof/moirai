@@ -28,7 +28,7 @@ import ModulesDrawer from "../../../components/dashboard/ModulesDrawer.astro";
 import Lock from "../../../components/icons/Lock.astro";
 import { requireRole } from "../../../lib/server/guards";
 import { listApplicationsByUser } from "../../../lib/server/applications";
-import { getCohortWithSlot, parseDaysJson, normalizeDayPair, deriveTimeOfDay, computeDurationWeeks, type CohortWithSlot } from "../../../lib/server/cohorts";
+import { getCohortWithSlot, parseDaysJson, normalizeDayPair, deriveTimeOfDay, type CohortWithSlot } from "../../../lib/server/cohorts";
 import { listEnrollmentModules, getCurrentEnrollmentProgress, type StudentModuleEntry } from "../../../lib/server/student-modules";
 
 export const prerender = false;
@@ -250,9 +250,8 @@ const ppDays = cohort ? normalizeDayPair(parseDaysJson(cohort.slot.days_json)) :
 const ppDaysLabel = ppDays.map(weekdayLabel).join(" + ");
 const ppTimeOfDay = cohort ? deriveTimeOfDay(cohort.slot.time_et) : "morning";
 const ppTimeLabel = ppTimeOfDay === "morning" ? t.ppTimeMorning : t.ppTimeEvening;
-const ppDurationWeeks = programme && programme.data.module_count_hint > 0
-  ? computeDurationWeeks(programme.data.module_count_hint, 2)
-  : 0;
+const ppCohortSpanDays = cohort ? (cohort.end_date - cohort.start_date) / (24 * 3600) : 0;
+const ppDurationWeeks = ppCohortSpanDays > 0 ? Math.ceil(ppCohortSpanDays / 7) : 0;
 const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.data.price_currency) : "";
 ---
 

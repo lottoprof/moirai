@@ -5,9 +5,9 @@
  * Stage 14f — auto-publish cohorts на 12 месяцев вперёд из active slots.
  *
  * Алгоритм (для каждого active slot):
- *   1. Resolve programme.lessons_total_hint из Content Collection
+ *   1. Resolve programme.module_count_hint из Content Collection
  *      (src/content/programmes/<slug>.en.mdx frontmatter)
- *   2. durationWeeks = ceil(lessons / 2)  — FLOW-8
+ *   2. durationWeeks = ceil(modules / 2)  — FLOW-8
  *   3. earliestStart = max(now, latest_cohort.end_date)
  *   4. Pick first weekday из slot.days_json как cohort start day
  *   5. Generate consecutive start_dates до horizon (12 мес)
@@ -58,7 +58,7 @@ const SESSIONS_PER_WEEK = 2; // FLOW-4
 // Programme metadata reader (parse mdx frontmatter)
 // ============================================================
 
-function readProgrammeLessons() {
+function readProgrammeModules() {
   const dir = resolve(repoRoot, 'src/content/programmes');
   const files = readdirSync(dir).filter((f) => f.endsWith('.en.mdx'));
   const map = {};
@@ -68,29 +68,29 @@ function readProgrammeLessons() {
     const fmMatch = text.match(/^---\n([\s\S]*?)\n---/);
     if (!fmMatch) continue;
     const fm = fmMatch[1];
-    const lessonsMatch = fm.match(/^lessons_total_hint:\s*(\d+)/m);
+    const modulesMatch = fm.match(/^module_count_hint:\s*(\d+)/m);
     const publishedMatch = fm.match(/^published:\s*(true|false)/m);
-    if (!lessonsMatch) {
-      console.warn(`[publish] WARN ${slug}: no lessons_total_hint в frontmatter; skip`);
+    if (!modulesMatch) {
+      console.warn(`[publish] WARN ${slug}: no module_count_hint в frontmatter; skip`);
       continue;
     }
-    const lessons = parseInt(lessonsMatch[1], 10);
+    const modules = parseInt(modulesMatch[1], 10);
     const published = publishedMatch ? publishedMatch[1] === 'true' : true;
-    if (lessons <= 0) {
-      console.log(`[publish] ${slug}: lessons=0 — skip (likely individual)`);
+    if (modules <= 0) {
+      console.log(`[publish] ${slug}: modules=0 — skip (likely individual)`);
       continue;
     }
     if (!published) {
       console.log(`[publish] ${slug}: published=false — skip`);
       continue;
     }
-    map[slug] = lessons;
+    map[slug] = modules;
   }
   return map;
 }
 
-const programmeLessons = readProgrammeLessons();
-console.log('[publish] programme lessons:', programmeLessons);
+const programmeModules = readProgrammeModules();
+console.log('[publish] programme modules:', programmeModules);
 
 // ============================================================
 // Read active slots from D1
@@ -169,12 +169,12 @@ console.log(`[publish] existing cohorts in D1: ${existing.length}`);
 const newCohorts = [];
 
 for (const slot of activeSlots) {
-  const lessons = programmeLessons[slot.programme_id];
-  if (!lessons) {
+  const modules = programmeModules[slot.programme_id];
+  if (!modules) {
     console.log(`[publish] WARN slot ${slot.id} (${slot.programme_id}): no programme metadata; skip`);
     continue;
   }
-  const durationWeeks = Math.ceil(lessons / SESSIONS_PER_WEEK);
+  const durationWeeks = Math.ceil(modules / SESSIONS_PER_WEEK);
   const intervalSec = durationWeeks * 7 * DAY_SEC;
 
   // Latest cohort для этого slot'а

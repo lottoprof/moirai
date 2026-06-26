@@ -22,7 +22,7 @@ import Btn from "../../components/public/Btn.astro";
 import { verifyRefreshSession } from "../../lib/server/session";
 import { findUserById, findAuthMethod } from "../../lib/server/user-ops";
 import { findApplicationById } from "../../lib/server/applications";
-import { getCohortWithSlot, parseDaysJson, normalizeDayPair, deriveTimeOfDay, computeDurationWeeks } from "../../lib/server/cohorts";
+import { getCohortWithSlot, parseDaysJson, normalizeDayPair, deriveTimeOfDay } from "../../lib/server/cohorts";
 
 export const prerender = false;
 
@@ -103,14 +103,13 @@ function formatPrice(cents: number, currency: string): string {
 const days = normalizeDayPair(parseDaysJson(cohort.slot.days_json));
 const daysLabel = days.map(weekdayLabel).join(" + ");
 const timeOfDay = deriveTimeOfDay(cohort.slot.time_et);
-const durationWeeks = programme.data.module_count_hint > 0
-  ? computeDurationWeeks(programme.data.module_count_hint, 2)
-  : 0;
+const DAY_SEC = 24 * 3600;
+const cohortSpanDays = (cohort.end_date - cohort.start_date) / DAY_SEC;
+const durationWeeks = cohortSpanDays > 0 ? Math.ceil(cohortSpanDays / 7) : 0;
 const totalCents = programme.data.price_amount;
 const currency = programme.data.price_currency;
 
 // Refund summary (FLOW-9a tier preview)
-const DAY_SEC = 24 * 3600;
 const T = cohort.start_date;
 const T14 = T - 14 * DAY_SEC;
 const T7 = T - 7 * DAY_SEC;
