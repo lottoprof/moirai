@@ -604,22 +604,26 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       if (iframeEl) iframeEl.style.display = "none";
     }
 
-    // Auto-load preview URL on page mount. Делаем HEAD-проверку
-    // прежде чем привязать к iframe/img/video, чтобы не показывать
-    // R2 NoSuchKey XML напрямую в UI (тестовые / удалённые файлы).
+    // Auto-load preview URL on page mount. Server endpoint /file-url
+    // делает HEAD через HOMEWORK_BUCKET Worker binding перед signing —
+    // если файла нет, возвращает 404 → getFileUrl() == null → placeholder.
+    // Дополнительно вешаем error-listener на video/img — на случай
+    // network glitch / unexpected media error после успешного fetch URL.
     if (videoSrc || imgEl || iframeEl) {
-      getFileUrl().then(async (url) => {
+      getFileUrl().then((url) => {
         if (!url) { showMissing(); return; }
-        try {
-          const head = await fetch(url, { method: "HEAD" });
-          if (!head.ok) { showMissing(); return; }
-        } catch { showMissing(); return; }
         if (videoSrc) {
           videoSrc.src = url;
           const video = videoSrc.parentElement;
-          if (video instanceof HTMLVideoElement) video.load();
+          if (video instanceof HTMLVideoElement) {
+            video.addEventListener("error", showMissing, { once: true });
+            video.load();
+          }
         }
-        if (imgEl) imgEl.src = url;
+        if (imgEl) {
+          imgEl.addEventListener("error", showMissing, { once: true });
+          imgEl.src = url;
+        }
         if (iframeEl) iframeEl.src = url;
       }).catch(() => { showMissing(); });
     }

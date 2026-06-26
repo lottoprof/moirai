@@ -41,6 +41,17 @@ export const GET: APIRoute = async (ctx) => {
   const acl = await getSubmissionForAcl(env, submissionId, user.id, isAdmin);
   if (!acl) return jsonError('not_found', 404);
 
+  // Check actual R2 existence via Worker binding (HEAD на signed URL
+  // блокируется CORS, поэтому делаем здесь). Если объекта нет —
+  // 404, UI покажет placeholder без рендера broken player.
+  try {
+    const obj = await env.HOMEWORK_BUCKET.head(acl.file_r2_key);
+    if (!obj) return jsonError('file_not_found', 404);
+  } catch (err) {
+    console.error('[file-url] R2 head failed:', err);
+    return jsonError('file_check_failed', 500);
+  }
+
   let signed;
   try {
     signed = await generateGetUrl(
