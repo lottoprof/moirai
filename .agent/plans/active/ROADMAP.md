@@ -119,6 +119,11 @@ Discovery: `.agent/plans/active/student-lk-v2-discovery.md`
   предотвращает 404 на live-сайте
 - [ ] **Mobile design pass** (stage25) — после реального теста ЛК
 - [ ] Light theme infrastructure (stage10) — после длинного тела модуля
+- [ ] **ЛК performance audit** (`lk-performance-audit.md`) — замеры
+  TTFB/D1/bundle/hydration на 10 страницах + findings.md с
+  bottleneck-per-page. **Отложено**, тесты делаем позже когда
+  накопим реальный пользовательский трафик и появятся жалобы
+  на скорость. План готов — можно поднимать в любой момент.
 
 Sprint 2 (новые планы будут):
 - [ ] **Announcements: Content Collection → D1 + admin UI**. Сейчас
