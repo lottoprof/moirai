@@ -25,13 +25,16 @@ interface Props {
   submission: SubmissionDisplay;
   locale: "en" | "ru";
   /** Это самая свежая попытка для (enrollment, module)?
-   *  CTA "Submit new version" рендерится только на latest needs_revision,
-   *  чтобы старые исторические записи не путали студента. Default true
-   *  для backward-compat (одиночное использование). */
+   *  При false — opacity 0.65 + neutral border (исторический контекст,
+   *  не actionable). Default true для одиночного отображения. */
   isLatest?: boolean;
+  /** Рендерить ли "Submit new version →" CTA (для needs_revision attempts).
+   *  Только на homework listing — на module page форма Upload уже
+   *  рядом, CTA там избыточный. Default false. */
+  showResubmitCta?: boolean;
 }
 
-const { submission, locale, isLatest = true } = Astro.props;
+const { submission, locale, isLatest = true, showResubmitCta = false } = Astro.props;
 const ru = locale === "ru";
 
 // Filename = последний segment R2 path
@@ -81,7 +84,11 @@ const studentCommentHtml = submission.student_comment
   : null;
 ---
 
-<article class:list={["submission-card", `submission-card--${submission.status}`]}
+<article class:list={[
+           "submission-card",
+           `submission-card--${submission.status}`,
+           { "submission-card--superseded": !isLatest },
+         ]}
          data-submission-id={submission.id}>
   <header class="submission-card__head">
     <div class="submission-card__meta">
@@ -116,7 +123,7 @@ const studentCommentHtml = submission.student_comment
   )}
 
   <footer class="submission-card__actions">
-    {isLatest && submission.status === "needs_revision" && (
+    {showResubmitCta && submission.status === "needs_revision" && (
       <a class="submission-card__resubmit"
          href={`/${locale}/dashboard/modules/${submission.module_slug}#hw-label`}>
         {resubmitLabel}
@@ -146,6 +153,14 @@ const studentCommentHtml = submission.student_comment
   }
   .submission-card--needs_revision {
     border-color: color-mix(in srgb, var(--amber) 50%, transparent);
+  }
+  /* Superseded attempt — старая попытка для которой студент уже
+     загрузил новую. Приглушаем opacity и сбрасываем amber accent
+     (border возвращаем к нейтральному var(--border)), чтобы внимание
+     не уходило от latest активной карточки. */
+  .submission-card--superseded {
+    opacity: 0.65;
+    border-color: var(--border);
   }
 
   .submission-card__head {
