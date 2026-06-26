@@ -36,6 +36,11 @@ export interface SubmissionDisplay {
   instructor_comment: string | null;
   instructor_annotation_r2_key: string | null;
   instructor_annotation_uploaded_at: number | null;
+  /** True если для (enrollment, module) есть более свежая submission.
+   *  Используется на UI для опускания старых attempts (opacity + neutral
+   *  border) и скрытия CTA "Submit new version" — действие уже сделано
+   *  студентом, новая попытка ждёт ревью. */
+  is_superseded: boolean;
 }
 
 interface RawSubmissionRow {
@@ -57,6 +62,7 @@ interface RawSubmissionRow {
   instructor_comment: string | null;
   instructor_annotation_r2_key: string | null;
   instructor_annotation_uploaded_at: number | null;
+  is_superseded: number;
 }
 
 function normalizeRow(row: RawSubmissionRow, locale: 'en' | 'ru'): SubmissionDisplay {
@@ -80,8 +86,20 @@ function normalizeRow(row: RawSubmissionRow, locale: 'en' | 'ru'): SubmissionDis
     instructor_comment: row.instructor_comment,
     instructor_annotation_r2_key: row.instructor_annotation_r2_key,
     instructor_annotation_uploaded_at: row.instructor_annotation_uploaded_at,
+    is_superseded: row.is_superseded === 1,
   };
 }
+
+/* SQL подзапрос: есть ли в homework_submissions более свежая попытка
+   для той же (enrollment_id, module_slug) пары. Используем 1/0 чтобы
+   D1 не превращал boolean в строку. */
+const SUPERSEDED_SQL = `
+  EXISTS(
+    SELECT 1 FROM homework_submissions hs2
+     WHERE hs2.enrollment_id = hs.enrollment_id
+       AND hs2.module_slug = hs.module_slug
+       AND hs2.uploaded_at > hs.uploaded_at
+  ) AS is_superseded`;
 
 // ============================================================
 // List queries
@@ -132,7 +150,8 @@ export async function listSubmissionsForStudent(
            hs.reviewed_at, hs.reviewed_by,
            u.name AS reviewer_name,
            hs.instructor_comment,
-           hs.instructor_annotation_r2_key, hs.instructor_annotation_uploaded_at
+           hs.instructor_annotation_r2_key, hs.instructor_annotation_uploaded_at,
+           ${SUPERSEDED_SQL}
       FROM homework_submissions hs
       JOIN enrollments e ON e.id = hs.enrollment_id
       LEFT JOIN modules m ON m.slug = hs.module_slug AND m.locale = ?
@@ -168,7 +187,8 @@ export async function listSubmissionsForModule(
             hs.reviewed_at, hs.reviewed_by,
             u.name AS reviewer_name,
             hs.instructor_comment,
-            hs.instructor_annotation_r2_key, hs.instructor_annotation_uploaded_at
+            hs.instructor_annotation_r2_key, hs.instructor_annotation_uploaded_at,
+            ${SUPERSEDED_SQL}
        FROM homework_submissions hs
        LEFT JOIN modules m ON m.slug = hs.module_slug AND m.locale = ?
        LEFT JOIN users u ON u.id = hs.reviewed_by
@@ -201,7 +221,8 @@ export async function getSubmissionForStudent(
             hs.reviewed_at, hs.reviewed_by,
             u.name AS reviewer_name,
             hs.instructor_comment,
-            hs.instructor_annotation_r2_key, hs.instructor_annotation_uploaded_at
+            hs.instructor_annotation_r2_key, hs.instructor_annotation_uploaded_at,
+            ${SUPERSEDED_SQL}
        FROM homework_submissions hs
        JOIN enrollments e ON e.id = hs.enrollment_id
        LEFT JOIN modules m ON m.slug = hs.module_slug AND m.locale = ?

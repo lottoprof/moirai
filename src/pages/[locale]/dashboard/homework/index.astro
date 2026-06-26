@@ -57,18 +57,6 @@ if (lateParam === "1") {
 
 const submissions = await listSubmissionsForStudent(env, user.id, typedLocale, filters);
 
-// Detect "latest" per (enrollment, module) pair. submissions sorted by
-// uploaded_at DESC, поэтому первая встретившаяся пара = newest.
-// Latest needs_revision получает action CTA + полный визуальный акцент;
-// старые попытки приглушаем (opacity 0.65, нейтральный border).
-const seenPairs = new Set<string>();
-const submissionsWithLatest = submissions.map((s) => {
-  const key = `${s.enrollment_id}|${s.module_slug}`;
-  const isLatest = !seenPairs.has(key);
-  seenPairs.add(key);
-  return { submission: s, isLatest };
-});
-
 const t = ru
   ? {
       eyebrow: "Кабинет",
@@ -141,15 +129,14 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       </div>
     ) : (
       <div class="homework-page__list">
-        {submissionsWithLatest.map(({ submission: s, isLatest }) => (
+        {submissions.map((s) => (
           <div class="homework-page__item">
             {s.module_title && (
               <p class="homework-page__item-module">
                 <a href={`/${typedLocale}/dashboard/modules/${s.module_slug}`}>{s.module_title}</a>
               </p>
             )}
-            <SubmissionCard submission={s} locale={typedLocale}
-                            isLatest={isLatest} showResubmitCta={true} />
+            <SubmissionCard submission={s} locale={typedLocale} showResubmitCta={true} />
           </div>
         ))}
       </div>

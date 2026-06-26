@@ -24,18 +24,16 @@ import type { SubmissionDisplay } from "../../lib/server/homework";
 interface Props {
   submission: SubmissionDisplay;
   locale: "en" | "ru";
-  /** Это самая свежая попытка для (enrollment, module)?
-   *  При false — opacity 0.65 + neutral border (исторический контекст,
-   *  не actionable). Default true для одиночного отображения. */
-  isLatest?: boolean;
   /** Рендерить ли "Submit new version →" CTA (для needs_revision attempts).
    *  Только на homework listing — на module page форма Upload уже
-   *  рядом, CTA там избыточный. Default false. */
+   *  рядом, CTA там избыточный. CTA внутри ещё фильтруется по
+   *  status === 'needs_revision' && !is_superseded. Default false. */
   showResubmitCta?: boolean;
 }
 
-const { submission, locale, isLatest = true, showResubmitCta = false } = Astro.props;
+const { submission, locale, showResubmitCta = false } = Astro.props;
 const ru = locale === "ru";
+const isSuperseded = submission.is_superseded;
 
 // Filename = последний segment R2 path
 const filename = submission.file_r2_key.split("/").pop() ?? submission.file_r2_key;
@@ -87,7 +85,7 @@ const studentCommentHtml = submission.student_comment
 <article class:list={[
            "submission-card",
            `submission-card--${submission.status}`,
-           { "submission-card--superseded": !isLatest },
+           { "submission-card--superseded": isSuperseded },
          ]}
          data-submission-id={submission.id}>
   <header class="submission-card__head">
@@ -123,7 +121,7 @@ const studentCommentHtml = submission.student_comment
   )}
 
   <footer class="submission-card__actions">
-    {showResubmitCta && submission.status === "needs_revision" && (
+    {showResubmitCta && submission.status === "needs_revision" && !isSuperseded && (
       <a class="submission-card__resubmit"
          href={`/${locale}/dashboard/modules/${submission.module_slug}#hw-label`}>
         {resubmitLabel}
