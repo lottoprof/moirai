@@ -103,8 +103,8 @@ function formatPrice(cents: number, currency: string): string {
 const days = normalizeDayPair(parseDaysJson(cohort.slot.days_json));
 const daysLabel = days.map(weekdayLabel).join(" + ");
 const timeOfDay = deriveTimeOfDay(cohort.slot.time_et);
-const durationWeeks = programme.data.lessons_total_hint > 0
-  ? computeDurationWeeks(programme.data.lessons_total_hint, 2)
+const durationWeeks = programme.data.module_count_hint > 0
+  ? computeDurationWeeks(programme.data.module_count_hint, 2)
   : 0;
 const totalCents = programme.data.price_amount;
 const currency = programme.data.price_currency;

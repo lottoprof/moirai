@@ -268,14 +268,14 @@ function spotBadge(c: CohortWithSlot): { text: string; variant: "spots_left" } |
 }
 
 /* Длительность когорты в неделях. Считается из programme metadata
-   (lessons_total_hint / 2 sessions per week) — это authoritative источник,
+   (module_count_hint / 2 sessions per week) — это authoritative источник,
    совпадает с тем, как cohort'ы генерируются в publish-cohorts.mjs. */
 function cohortWeeks(programmeId: string): number | null {
   const meta = programmeMeta.get(programmeId);
   if (!meta) return null;
-  const lessons = meta.lessons_total_hint;
-  if (typeof lessons !== "number" || lessons <= 0) return null;
-  return Math.ceil(lessons / 2);
+  const modules = meta.module_count_hint;
+  if (typeof modules !== "number" || modules <= 0) return null;
+  return Math.ceil(modules / 2);
 }
 
 const isEmpty = cohorts.length === 0;

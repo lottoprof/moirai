@@ -250,8 +250,8 @@ const ppDays = cohort ? normalizeDayPair(parseDaysJson(cohort.slot.days_json)) :
 const ppDaysLabel = ppDays.map(weekdayLabel).join(" + ");
 const ppTimeOfDay = cohort ? deriveTimeOfDay(cohort.slot.time_et) : "morning";
 const ppTimeLabel = ppTimeOfDay === "morning" ? t.ppTimeMorning : t.ppTimeEvening;
-const ppDurationWeeks = programme && programme.data.lessons_total_hint > 0
-  ? computeDurationWeeks(programme.data.lessons_total_hint, 2)
+const ppDurationWeeks = programme && programme.data.module_count_hint > 0
+  ? computeDurationWeeks(programme.data.module_count_hint, 2)
   : 0;
 const ppPrice = programme ? formatPrice(programme.data.price_amount, programme.data.price_currency) : "";
 ---

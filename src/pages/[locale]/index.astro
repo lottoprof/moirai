@@ -261,8 +261,8 @@ function programmeFeaturesToList(
   if (typeof features.one_on_one_sessions === "number" && features.one_on_one_sessions > 0) {
     const n = features.one_on_one_sessions;
     out.push(ru
-      ? `${n.toString()} личных сессий с инструктором`
-      : `${n.toString()} × 1:1 sessions with instructor`);
+      ? `${n.toString()} сессий с инструктором`
+      : `${n.toString()} sessions with instructor`);
   }
 
   if (typeof features.consultations_count === "number" && features.consultations_count > 0) {
@@ -433,8 +433,8 @@ const ui = typedLocale === "ru"
         <h2 id="who-title" class="h2" set:html={sections.who.title}></h2>
       </header>
       <div class="editorial-layout__body who-grid">
-        {sections.who.audiences.map((a, i) => (
-          <WhoCard num={i + 1} title={a.title} body={a.body} />
+        {sections.who.audiences.map((a) => (
+          <WhoCard title={a.title} body={a.body} />
         ))}
       </div>
     </div>
@@ -481,8 +481,8 @@ const ui = typedLocale === "ru"
       <h2 id="included-title" class="h2">{sections.included.title}</h2>
     </header>
     <ul class="features-grid">
-      {sections.included.items.map((item, i) => (
-        <FeatureItem num={i + 1} title={item.title} body={item.body} />
+      {sections.included.items.map((item) => (
+        <FeatureItem title={item.title} body={item.body} />
       ))}
     </ul>
   </section>

@@ -7,43 +7,19 @@
  */
 
 interface Props {
-  /** 1-based индекс — рендерится как "01", "02", ... */
-  num: number;
   title: string;
   body: string;
 }
 
-const { num, title, body } = Astro.props;
-const numLabel = String(num).padStart(2, "0");
+const { title, body } = Astro.props;
 ---
 
 <article class="who-card">
-  <div class="who-card__num">{numLabel}</div>
-  <div>
-    <h3 class="who-card__title">{title}</h3>
-    <p class="who-card__body">{body}</p>
-  </div>
+  <h3 class="who-card__title">{title}</h3>
+  <p class="who-card__body">{body}</p>
 </article>
 
 <style>
-  .who-card {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--space-md);
-    align-items: start;
-  }
-
-  .who-card__num {
-    font-family: var(--font-display);
-    font-size: 22px;
-    font-weight: 300;
-    font-style: italic;
-    color: var(--amber);
-    line-height: 1;
-    padding-top: 4px;
-    min-width: 32px;
-  }
-
   .who-card__title {
     font-size: var(--type-body-md);
     font-weight: 500;

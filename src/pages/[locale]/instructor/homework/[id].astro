@@ -61,6 +61,12 @@ marked.setOptions({ gfm: true, breaks: false });
 const studentCommentHtml = submission.student_comment
   ? await marked.parse(submission.student_comment)
   : null;
+const instructorCommentHtml = submission.instructor_comment
+  ? await marked.parse(submission.instructor_comment)
+  : null;
+const reviewedAtStr = submission.reviewed_at
+  ? dateFmt.format(new Date(submission.reviewed_at * 1000))
+  : null;
 
 const t = ru
   ? {
@@ -86,6 +92,9 @@ const t = ru
       submitCta: "Отправить отзыв",
       submitting: "Отправляем...",
       alreadyReviewed: "Уже проверено",
+      yourReviewLabel: "Ваш отзыв",
+      reviewedAtLabel: "Проверено",
+      noCommentLabel: "Без комментария",
       seo: { title: `Review — ${filename}`, description: "Instructor review" },
     }
   : {
@@ -111,6 +120,9 @@ const t = ru
       submitCta: "Submit review",
       submitting: "Submitting...",
       alreadyReviewed: "Already reviewed",
+      yourReviewLabel: "Your review",
+      reviewedAtLabel: "Reviewed",
+      noCommentLabel: "No comment",
       seo: { title: `Review — ${filename}`, description: "Instructor review" },
     };
 
@@ -204,33 +216,54 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
       <p class="review-page__annotation-status" hidden data-annotation-status></p>
     </section>
 
-    <form class="review-page__form" data-review-form>
-      <fieldset class="review-page__fieldset">
-        <legend class="review-page__section-label">{t.verdictLabel}</legend>
-        <label class="review-page__radio">
-          <input type="radio" name="status" value="approved" required />
-          <span>{t.approvedLabel}</span>
+    {isReviewed ? (
+      <section class="review-page__saved">
+        <p class="review-page__section-label">{t.yourReviewLabel}</p>
+        <div class="review-page__saved-head">
+          <span class={`badge badge--verdict badge--${submission.status}`}>
+            {submission.status === "approved" ? t.approvedLabel : t.needsRevisionLabel}
+          </span>
+          {reviewedAtStr && (
+            <span class="review-page__reviewed-at">
+              {t.reviewedAtLabel}: {reviewedAtStr}
+            </span>
+          )}
+        </div>
+        {instructorCommentHtml ? (
+          <div class="review-page__prose" set:html={instructorCommentHtml} />
+        ) : (
+          <p class="review-page__no-comment">{t.noCommentLabel}</p>
+        )}
+      </section>
+    ) : (
+      <form class="review-page__form" data-review-form>
+        <fieldset class="review-page__fieldset">
+          <legend class="review-page__section-label">{t.verdictLabel}</legend>
+          <label class="review-page__radio">
+            <input type="radio" name="status" value="approved" required />
+            <span>{t.approvedLabel}</span>
+          </label>
+          <label class="review-page__radio">
+            <input type="radio" name="status" value="needs_revision" />
+            <span>{t.needsRevisionLabel}</span>
+          </label>
+        </fieldset>
+
+        <label class="review-page__field">
+          <span class="review-page__section-label">{t.commentLabel}</span>
+          <textarea name="comment" rows="8" maxlength={LK_CONFIG.instructor_comment_max_chars}
+                    placeholder={t.commentPlaceholder}
+                    class="review-page__textarea"></textarea>
+          <span class="review-page__hint">{t.commentRequiredHint}</span>
         </label>
-        <label class="review-page__radio">
-          <input type="radio" name="status" value="needs_revision" />
-          <span>{t.needsRevisionLabel}</span>
-        </label>
-      </fieldset>
 
-      <label class="review-page__field">
-        <span class="review-page__section-label">{t.commentLabel}</span>
-        <textarea name="comment" rows="8" maxlength={LK_CONFIG.instructor_comment_max_chars}
-                  placeholder={t.commentPlaceholder}
-                  class="review-page__textarea"></textarea>
-        <span class="review-page__hint">{t.commentRequiredHint}</span>
-      </label>
+        <p class="review-page__error" hidden data-review-error></p>
 
-      <p class="review-page__error" hidden data-review-error></p>
-
-      <button type="submit" class="review-page__submit" data-review-submit disabled={isReviewed}>
-        <span data-review-submit-label>{isReviewed ? t.alreadyReviewed : t.submitCta}</span>
-      </button>
-    </form>
+        <button type="submit" class="review-page__submit" data-review-submit>
+          <span data-review-submit-label>{t.submitCta}</span>
+        </button>
+      </form>
+    )}
   </div>
 </InstructorLayout>
 
@@ -295,7 +328,8 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
   .review-page__preview,
   .review-page__section,
   .review-page__annotated,
-  .review-page__form {
+  .review-page__form,
+  .review-page__saved {
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 4px;
@@ -303,6 +337,33 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+  }
+  .review-page__saved-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+  }
+  .review-page__reviewed-at {
+    color: var(--text-faint);
+    font-size: var(--type-body-sm);
+  }
+  .review-page__no-comment {
+    color: var(--text-faint);
+    font-style: italic;
+    margin: 0;
+  }
+  .badge--verdict {
+    border-style: solid;
+    font-weight: 500;
+  }
+  .badge--approved {
+    border-color: var(--success, #4a9d6d);
+    color: var(--success, #4a9d6d);
+  }
+  .badge--needs_revision {
+    border-color: var(--amber);
+    color: var(--amber);
   }
   .review-page__section-label {
     font-family: var(--font-body);
