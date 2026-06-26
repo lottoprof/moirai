@@ -187,9 +187,9 @@ const t = ru
     flex-wrap: wrap;
   }
   .uploader__file-btn {
-    background: var(--amber);
-    color: var(--ink);
-    border: 1px solid var(--amber);
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text);
     padding: 8px 16px;
     font-family: var(--font-body);
     font-size: var(--type-micro-md);
@@ -199,11 +199,13 @@ const t = ru
     cursor: pointer;
     border-radius: 2px;
     display: inline-block;
-    transition: background var(--duration-fast) var(--ease-out);
+    transition: border-color var(--duration-fast) var(--ease-out),
+                color var(--duration-fast) var(--ease-out);
     user-select: none;
   }
   .uploader__file-btn:hover {
-    background: var(--amber-light);
+    border-color: var(--amber);
+    color: var(--amber);
   }
   .uploader__filename {
     color: var(--text-muted);
