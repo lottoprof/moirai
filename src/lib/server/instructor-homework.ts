@@ -592,6 +592,14 @@ export async function getCohortMatrix(
 // Submission detail для review page
 // ============================================================
 
+export interface PriorAttempt {
+  id: string;
+  uploaded_at: number;
+  status: HomeworkStatus;
+  reviewed_at: number | null;
+  instructor_comment: string | null;
+}
+
 export interface SubmissionForReview {
   id: string;
   enrollment_id: string;
@@ -611,8 +619,8 @@ export interface SubmissionForReview {
   reviewed_at: number | null;
   instructor_comment: string | null;
   instructor_annotation_r2_key: string | null;
-  // Prior attempts для context (excluding this one)
-  prior_count: number;
+  // Prior attempts для context (excluding this one), oldest first
+  prior_attempts: PriorAttempt[];
 }
 
 interface RawSubmissionForReviewRow {
@@ -670,13 +678,30 @@ export async function getSubmissionForReview(
 
   if (!row) return null;
 
-  // Count prior attempts для same (enrollment, module), excluding this one
-  const prior = await env.DB.prepare(
-    `SELECT COUNT(*) AS n FROM homework_submissions
-      WHERE enrollment_id = ? AND module_slug = ? AND id != ?`,
+  // Prior attempts для same (enrollment, module), excluding this one.
+  // ORDER uploaded_at ASC — chronological context при ревью новой попытки.
+  const priorRows = await env.DB.prepare(
+    `SELECT id, uploaded_at, status, reviewed_at, instructor_comment
+       FROM homework_submissions
+      WHERE enrollment_id = ? AND module_slug = ? AND id != ?
+      ORDER BY uploaded_at ASC`,
   )
     .bind(row.enrollment_id, row.module_slug, row.id)
-    .first<{ n: number }>();
+    .all<{
+      id: string;
+      uploaded_at: number;
+      status: string;
+      reviewed_at: number | null;
+      instructor_comment: string | null;
+    }>();
+
+  const priorAttempts: PriorAttempt[] = priorRows.results.map((r) => ({
+    id: r.id,
+    uploaded_at: r.uploaded_at,
+    status: r.status as HomeworkStatus,
+    reviewed_at: r.reviewed_at,
+    instructor_comment: r.instructor_comment,
+  }));
 
   return {
     id: row.id,
@@ -697,7 +722,7 @@ export async function getSubmissionForReview(
     reviewed_at: row.reviewed_at,
     instructor_comment: row.instructor_comment,
     instructor_annotation_r2_key: row.instructor_annotation_r2_key,
-    prior_count: prior?.n ?? 0,
+    prior_attempts: priorAttempts,
   };
 }
 

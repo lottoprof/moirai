@@ -68,6 +68,18 @@ const reviewedAtStr = submission.reviewed_at
   ? dateFmt.format(new Date(submission.reviewed_at * 1000))
   : null;
 
+// Prior attempts — render comments markdown server-side для read-only display.
+const priorAttemptsRendered = await Promise.all(
+  submission.prior_attempts.map(async (a) => ({
+    id: a.id,
+    uploaded_at: a.uploaded_at,
+    uploaded_str: dateFmt.format(new Date(a.uploaded_at * 1000)),
+    status: a.status,
+    reviewed_str: a.reviewed_at ? dateFmt.format(new Date(a.reviewed_at * 1000)) : null,
+    comment_html: a.instructor_comment ? await marked.parse(a.instructor_comment) : null,
+  })),
+);
+
 const t = ru
   ? {
       eyebrow: "Проверка ДЗ",
@@ -95,6 +107,10 @@ const t = ru
       yourReviewLabel: "Ваш отзыв",
       reviewedAtLabel: "Проверено",
       noCommentLabel: "Без комментария",
+      historyLabel: "История попыток",
+      attemptLabel: (idx: number, total: number) => `Попытка ${idx.toString()} из ${total.toString()}`,
+      attemptUploadedLabel: "Загружено",
+      attemptPendingLabel: "Ещё не проверена",
       seo: { title: `Review — ${filename}`, description: "Instructor review" },
     }
   : {
@@ -123,6 +139,10 @@ const t = ru
       yourReviewLabel: "Your review",
       reviewedAtLabel: "Reviewed",
       noCommentLabel: "No comment",
+      historyLabel: "Prior attempts",
+      attemptLabel: (idx: number, total: number) => `Attempt ${idx.toString()} of ${total.toString()}`,
+      attemptUploadedLabel: "Uploaded",
+      attemptPendingLabel: "Not reviewed yet",
       seo: { title: `Review — ${filename}`, description: "Instructor review" },
     };
 
@@ -151,8 +171,8 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
         {" · "}
         {t.sizeLabel}: {sizeStr}
       </p>
-      {submission.prior_count > 0 && (
-        <p class="review-page__attempts">{t.attemptsLabel(submission.prior_count)}</p>
+      {submission.prior_attempts.length > 0 && (
+        <p class="review-page__attempts">{t.attemptsLabel(submission.prior_attempts.length)}</p>
       )}
       {Boolean(submission.is_late) && (
         <span class="badge badge--late">{t.lateLabel}</span>
@@ -215,6 +235,41 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
              accept={allowedMimes.join(",")} />
       <p class="review-page__annotation-status" hidden data-annotation-status></p>
     </section>
+
+    {priorAttemptsRendered.length > 0 && (
+      <section class="review-page__history">
+        <p class="review-page__section-label">{t.historyLabel}</p>
+        {priorAttemptsRendered.map((a, idx) => (
+          <article class="review-page__history-item">
+            <div class="review-page__history-head">
+              <span class="review-page__history-attempt">
+                {t.attemptLabel(idx + 1, priorAttemptsRendered.length + 1)}
+              </span>
+              <span class="review-page__history-uploaded">
+                {t.attemptUploadedLabel}: {a.uploaded_str}
+              </span>
+              {a.status === "pending" ? (
+                <span class="badge badge--late">{t.attemptPendingLabel}</span>
+              ) : (
+                <span class={`badge badge--verdict badge--${a.status}`}>
+                  {a.status === "approved" ? t.approvedLabel : t.needsRevisionLabel}
+                </span>
+              )}
+              {a.reviewed_str && (
+                <span class="review-page__reviewed-at">
+                  {t.reviewedAtLabel}: {a.reviewed_str}
+                </span>
+              )}
+            </div>
+            {a.comment_html ? (
+              <div class="review-page__prose" set:html={a.comment_html} />
+            ) : a.status !== "pending" && (
+              <p class="review-page__no-comment">{t.noCommentLabel}</p>
+            )}
+          </article>
+        ))}
+      </section>
+    )}
 
     {isReviewed ? (
       <section class="review-page__saved">
@@ -329,7 +384,8 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
   .review-page__section,
   .review-page__annotated,
   .review-page__form,
-  .review-page__saved {
+  .review-page__saved,
+  .review-page__history {
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 4px;
@@ -337,6 +393,34 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
+  }
+  .review-page__history-item {
+    border-top: 1px solid var(--border);
+    padding-top: var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  .review-page__history-item:first-of-type {
+    border-top: none;
+    padding-top: 0;
+  }
+  .review-page__history-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+    font-size: var(--type-body-sm);
+  }
+  .review-page__history-attempt {
+    color: var(--text-faint);
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+  }
+  .review-page__history-uploaded {
+    color: var(--text-muted);
   }
   .review-page__saved-head {
     display: flex;
