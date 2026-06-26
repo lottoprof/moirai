@@ -6,6 +6,11 @@
  * INSERT'ами, один wrangler d1 execute call (vs 856 individual calls).
  *
  * Idempotent через INSERT OR IGNORE + UNIQUE (cohort_id, module_slug).
+ * После INSERT sessions для каждой cohort'ы добавляется
+ * UPDATE cohorts SET end_date = lastSession + 86400 — синк с
+ * convention из admin API (src/pages/api/admin/cohorts/index.ts).
+ * publish-cohorts.mjs ставит rough estimate, backfill корректирует
+ * до реальной last_session + 1 day буфера.
  *
  * Usage:
  *   node scripts/backfill-sessions-batch.mjs --local | --remote [--dry-run]
@@ -115,6 +120,15 @@ for (const cohort of cohorts) {
     );
     totalSessions++;
   }
+
+  // Sync cohort.end_date = lastSession + 86400 (1 day buffer).
+  // Convention из admin API (src/pages/api/admin/cohorts/index.ts:99-100).
+  // Idempotent: WHERE end_date != target — no-op если уже синхронно.
+  const lastSession = sessionDates[sessionDates.length - 1];
+  const cohortEnd = lastSession + 86400;
+  sqlStatements.push(
+    `UPDATE cohorts SET end_date = ${cohortEnd}, updated_at = unixepoch() WHERE id = '${cohort_id}' AND end_date != ${cohortEnd};`
+  );
 }
 
 console.log(`[backfill-sessions-batch] ${totalSessions} INSERT statements ready (${skippedCohorts} cohorts skipped)`);
