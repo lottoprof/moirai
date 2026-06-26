@@ -64,6 +64,7 @@ const downloadLabel = ru ? "Скачать" : "Download";
 const annotatedLabel = ru ? "С пометками преподавателя" : "Annotated by instructor";
 const studentCommentLabel = ru ? "Ваш комментарий" : "Your comment";
 const reviewerLabel = ru ? "Проверил" : "Reviewed by";
+const resubmitLabel = ru ? "Загрузить новую версию →" : "Submit new version →";
 
 // Render instructor_comment как markdown (если есть)
 marked.setOptions({ gfm: true, breaks: false });
@@ -110,6 +111,12 @@ const studentCommentHtml = submission.student_comment
   )}
 
   <footer class="submission-card__actions">
+    {submission.status === "needs_revision" && (
+      <a class="submission-card__resubmit"
+         href={`/${locale}/dashboard/modules/${submission.module_slug}#hw-label`}>
+        {resubmitLabel}
+      </a>
+    )}
     <button type="button" class="submission-card__download" data-action="download-file">
       {downloadLabel}
     </button>
@@ -248,6 +255,24 @@ const studentCommentHtml = submission.student_comment
   .submission-card__download--annotated {
     color: var(--text-accent);
     border-color: color-mix(in srgb, var(--amber) 40%, transparent);
+  }
+  .submission-card__resubmit {
+    background: var(--amber);
+    color: var(--ink);
+    border: 1px solid var(--amber);
+    padding: 6px 14px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    text-decoration: none;
+    transition: background var(--duration-fast) var(--ease-out);
+  }
+  .submission-card__resubmit:hover {
+    background: var(--amber-light);
   }
 </style>
 
