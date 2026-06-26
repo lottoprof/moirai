@@ -24,9 +24,14 @@ import type { SubmissionDisplay } from "../../lib/server/homework";
 interface Props {
   submission: SubmissionDisplay;
   locale: "en" | "ru";
+  /** Это самая свежая попытка для (enrollment, module)?
+   *  CTA "Submit new version" рендерится только на latest needs_revision,
+   *  чтобы старые исторические записи не путали студента. Default true
+   *  для backward-compat (одиночное использование). */
+  isLatest?: boolean;
 }
 
-const { submission, locale } = Astro.props;
+const { submission, locale, isLatest = true } = Astro.props;
 const ru = locale === "ru";
 
 // Filename = последний segment R2 path
@@ -111,7 +116,7 @@ const studentCommentHtml = submission.student_comment
   )}
 
   <footer class="submission-card__actions">
-    {submission.status === "needs_revision" && (
+    {isLatest && submission.status === "needs_revision" && (
       <a class="submission-card__resubmit"
          href={`/${locale}/dashboard/modules/${submission.module_slug}#hw-label`}>
         {resubmitLabel}
