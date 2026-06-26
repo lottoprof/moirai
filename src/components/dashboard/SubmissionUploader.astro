@@ -35,9 +35,8 @@ const t = ru
       title: "Загрузить работу",
       hint: "До 100 МБ. Сжимайте видео перед отправкой.",
       fileLabel: "Файл",
-      filePlaceholder: "Файл не выбран",
-      filePickInitial: "Выбрать файл",
-      filePickChange: "Изменить файл",
+      filePlaceholder: "Не выбран",
+      filePick: "Выбрать файл",
       commentLabel: "Комментарий (необязательно)",
       commentPlaceholder: "Например: переделал по замечаниям, переснял сцену 3...",
       submit: "Отправить",
@@ -52,9 +51,8 @@ const t = ru
       title: "Upload submission",
       hint: "Up to 100 MB. Compress videos before uploading.",
       fileLabel: "File",
-      filePlaceholder: "No file selected",
-      filePickInitial: "Choose file",
-      filePickChange: "Change file",
+      filePlaceholder: "None selected",
+      filePick: "Choose file",
       commentLabel: "Comment (optional)",
       commentPlaceholder: "e.g.: reworked per notes, reshot scene 3...",
       submit: "Submit",
@@ -74,20 +72,11 @@ const t = ru
   <p class="uploader__hint">{t.hint}</p>
 
   <form class="uploader__form" data-uploader-form>
-    <div class="uploader__field">
+    <label class="uploader__field">
       <span class="uploader__label">{t.fileLabel}</span>
-      <div class="uploader__file-row">
-        <button type="button" class="uploader__file-btn" data-uploader-pick
-                data-label-initial={t.filePickInitial}
-                data-label-change={t.filePickChange}>
-          {t.filePickInitial}
-        </button>
-        <span class="uploader__filename" data-uploader-filename
-              data-placeholder={t.filePlaceholder}>{t.filePlaceholder}</span>
-      </div>
       <input type="file" name="file" required class="uploader__input"
-             accept={allowedMimes.join(",")} hidden />
-    </div>
+             accept={allowedMimes.join(",")} />
+    </label>
 
     <label class="uploader__field">
       <span class="uploader__label">{t.commentLabel}</span>
@@ -146,6 +135,7 @@ const t = ru
     text-transform: uppercase;
     color: var(--text-faint);
   }
+  .uploader__input,
   .uploader__textarea {
     background: var(--bg);
     border: 1px solid var(--border-strong);
@@ -154,42 +144,10 @@ const t = ru
     font-family: var(--font-body);
     font-size: var(--type-body-md);
     border-radius: 2px;
+  }
+  .uploader__textarea {
     resize: vertical;
     min-height: 60px;
-  }
-  .uploader__file-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-md);
-    flex-wrap: wrap;
-  }
-  .uploader__file-btn {
-    background: transparent;
-    border: 1px solid var(--border-strong);
-    color: var(--text);
-    padding: 8px 16px;
-    font-family: var(--font-body);
-    font-size: var(--type-micro-md);
-    font-weight: 500;
-    letter-spacing: var(--tracking-wide);
-    text-transform: uppercase;
-    cursor: pointer;
-    border-radius: 2px;
-    transition: border-color var(--duration-fast) var(--ease-out),
-                color var(--duration-fast) var(--ease-out);
-  }
-  .uploader__file-btn:hover {
-    border-color: var(--amber);
-    color: var(--amber);
-  }
-  .uploader__filename {
-    color: var(--text-muted);
-    font-size: var(--type-body-sm);
-    word-break: break-all;
-  }
-  .uploader__filename--empty {
-    color: var(--text-faint);
-    font-style: italic;
   }
   .uploader__progress {
     display: flex;
@@ -251,36 +209,8 @@ const t = ru
     const progressWrap = wrap.querySelector<HTMLElement>("[data-uploader-progress]");
     const progressFill = wrap.querySelector<HTMLElement>(".uploader__bar-fill");
     const progressText = wrap.querySelector<HTMLElement>(".uploader__progress-text");
-    const pickBtn = wrap.querySelector<HTMLButtonElement>("[data-uploader-pick]");
-    const fileNameEl = wrap.querySelector<HTMLElement>("[data-uploader-filename]");
-    const fileInputEl = wrap.querySelector<HTMLInputElement>("input[name=file]");
 
     if (!form || !submitBtn || !submitLabel || !errorEl || !progressWrap || !progressFill || !progressText) return;
-    if (!pickBtn || !fileNameEl || !fileInputEl) return;
-
-    // Custom file picker: clicking visible button triggers hidden input.
-    // Можно перевыбрать файл — каждый клик открывает picker заново.
-    pickBtn.addEventListener("click", () => fileInputEl.click());
-
-    const filenamePlaceholder = fileNameEl.dataset.placeholder ?? "";
-    const labelInitial = pickBtn.dataset.labelInitial ?? pickBtn.textContent ?? "";
-    const labelChange = pickBtn.dataset.labelChange ?? labelInitial;
-
-    fileInputEl.addEventListener("change", () => {
-      const file = fileInputEl.files?.[0];
-      if (file) {
-        fileNameEl.textContent = file.name;
-        fileNameEl.classList.remove("uploader__filename--empty");
-        pickBtn.textContent = labelChange;
-      } else {
-        fileNameEl.textContent = filenamePlaceholder;
-        fileNameEl.classList.add("uploader__filename--empty");
-        pickBtn.textContent = labelInitial;
-      }
-    });
-
-    // Initial state — нет файла
-    fileNameEl.classList.add("uploader__filename--empty");
 
     const moduleSlug = wrap.dataset.moduleSlug ?? "";
     const cap = Number.parseInt(wrap.dataset.cap ?? "0", 10);
