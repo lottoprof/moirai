@@ -30,13 +30,17 @@ interface Props {
 const { moduleSlug, locale, capBytes, allowedMimes } = Astro.props;
 const ru = locale === "ru";
 
+// Уникальный ID для label-for сопряжения с input (для одной страницы хватит).
+const inputId = `uploader-file-${moduleSlug}`;
+
 const t = ru
   ? {
       title: "Загрузить работу",
       hint: "До 100 МБ. Сжимайте видео перед отправкой.",
       fileLabel: "Файл",
-      filePlaceholder: "Не выбран",
-      filePick: "Выбрать файл",
+      filePlaceholder: "Файл не выбран",
+      filePickInitial: "Выбрать файл",
+      filePickChange: "Изменить файл",
       commentLabel: "Комментарий (необязательно)",
       commentPlaceholder: "Например: переделал по замечаниям, переснял сцену 3...",
       submit: "Отправить",
@@ -51,8 +55,9 @@ const t = ru
       title: "Upload submission",
       hint: "Up to 100 MB. Compress videos before uploading.",
       fileLabel: "File",
-      filePlaceholder: "None selected",
-      filePick: "Choose file",
+      filePlaceholder: "No file selected",
+      filePickInitial: "Choose file",
+      filePickChange: "Change file",
       commentLabel: "Comment (optional)",
       commentPlaceholder: "e.g.: reworked per notes, reshot scene 3...",
       submit: "Submit",
@@ -72,11 +77,26 @@ const t = ru
   <p class="uploader__hint">{t.hint}</p>
 
   <form class="uploader__form" data-uploader-form>
-    <label class="uploader__field">
+    <div class="uploader__field">
       <span class="uploader__label">{t.fileLabel}</span>
-      <input type="file" name="file" required class="uploader__input"
+      <div class="uploader__file-row">
+        {/* Native HTML5 label-for association — click на label автоматически
+           триггерит file picker на input. БЕЗ JS, works в любом браузере.
+           input скрыт через CSS (position:absolute + opacity:0 + width:1px) —
+           не через `hidden`, иначе label-click может не сработать. */}
+        <label for={inputId} class="uploader__file-btn"
+               data-uploader-pick
+               data-label-initial={t.filePickInitial}
+               data-label-change={t.filePickChange}>
+          {t.filePickInitial}
+        </label>
+        <span class="uploader__filename" data-uploader-filename
+              data-placeholder={t.filePlaceholder}>{t.filePlaceholder}</span>
+      </div>
+      <input id={inputId} type="file" name="file" required
+             class="uploader__input-hidden"
              accept={allowedMimes.join(",")} />
-    </label>
+    </div>
 
     <label class="uploader__field">
       <span class="uploader__label">{t.commentLabel}</span>
@@ -135,7 +155,6 @@ const t = ru
     text-transform: uppercase;
     color: var(--text-faint);
   }
-  .uploader__input,
   .uploader__textarea {
     background: var(--bg);
     border: 1px solid var(--border-strong);
@@ -144,10 +163,56 @@ const t = ru
     font-family: var(--font-body);
     font-size: var(--type-body-md);
     border-radius: 2px;
-  }
-  .uploader__textarea {
     resize: vertical;
     min-height: 60px;
+  }
+  /* Hidden file input — НЕ display:none / hidden attribute (иначе
+     label.click() в некоторых браузерах ломается). Используем
+     visually-hidden технику: position:absolute + clip + size 1px. */
+  .uploader__input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .uploader__file-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    flex-wrap: wrap;
+  }
+  .uploader__file-btn {
+    background: var(--amber);
+    color: var(--ink);
+    border: 1px solid var(--amber);
+    padding: 8px 16px;
+    font-family: var(--font-body);
+    font-size: var(--type-micro-md);
+    font-weight: 500;
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    display: inline-block;
+    transition: background var(--duration-fast) var(--ease-out);
+    user-select: none;
+  }
+  .uploader__file-btn:hover {
+    background: var(--amber-light);
+  }
+  .uploader__filename {
+    color: var(--text-muted);
+    font-size: var(--type-body-sm);
+    word-break: break-all;
+  }
+  .uploader__filename--empty {
+    color: var(--text-faint);
+    font-style: italic;
   }
   .uploader__progress {
     display: flex;
@@ -211,6 +276,31 @@ const t = ru
     const progressText = wrap.querySelector<HTMLElement>(".uploader__progress-text");
 
     if (!form || !submitBtn || !submitLabel || !errorEl || !progressWrap || !progressFill || !progressText) return;
+
+    // Filename display + label swap (Choose → Change) при выборе файла.
+    // Сам file picker открывается через native label[for=inputId] → input,
+    // без JS — поэтому работает даже если этот скрипт не загрузился.
+    const pickLabel = wrap.querySelector<HTMLElement>("[data-uploader-pick]");
+    const fileNameEl = wrap.querySelector<HTMLElement>("[data-uploader-filename]");
+    const fileInputEl = wrap.querySelector<HTMLInputElement>("input[name=file]");
+    if (fileInputEl && fileNameEl && pickLabel) {
+      const placeholder = fileNameEl.dataset.placeholder ?? "";
+      const labelInitial = pickLabel.dataset.labelInitial ?? pickLabel.textContent ?? "";
+      const labelChange = pickLabel.dataset.labelChange ?? labelInitial;
+      fileNameEl.classList.add("uploader__filename--empty");
+      fileInputEl.addEventListener("change", () => {
+        const file = fileInputEl.files?.[0];
+        if (file) {
+          fileNameEl.textContent = file.name;
+          fileNameEl.classList.remove("uploader__filename--empty");
+          pickLabel.textContent = labelChange;
+        } else {
+          fileNameEl.textContent = placeholder;
+          fileNameEl.classList.add("uploader__filename--empty");
+          pickLabel.textContent = labelInitial;
+        }
+      });
+    }
 
     const moduleSlug = wrap.dataset.moduleSlug ?? "";
     const cap = Number.parseInt(wrap.dataset.cap ?? "0", 10);
