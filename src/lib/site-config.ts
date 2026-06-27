@@ -25,6 +25,14 @@ export const SITE = {
    * scripts/generate-og-default.mjs, коммитится в public/.
    */
   ogDefault: "/og-default.png",
+  /**
+   * Зоны обслуживания для Schema.org Organization.areaServed. Online-
+   * курс физически расположен везде, но инструкторы — практикующие
+   * NYC-режиссёры, и основная целевая аудитория US/NY. Помогает Google
+   * связать сайт с гео-запросами "filmmaking New York" даже без
+   * физического адреса.
+   */
+  areaServed: ["New York", "United States"] as readonly string[],
 } as const;
 
 /** Per-locale описание организации — короткое, для Organization.description. */

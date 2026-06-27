@@ -31,6 +31,10 @@ const data = {
   logo: SITE.logo,
   description: SITE_DESCRIPTION[locale],
   inLanguage: locale,
+  areaServed: SITE.areaServed.map((name) => ({
+    "@type": "AdministrativeArea",
+    name,
+  })),
   ...(SITE.social.length > 0 ? { sameAs: SITE.social } : {}),
   ...(SITE.email ? { email: SITE.email } : {}),
 };
