@@ -1,232 +1,228 @@
-# Split: code deploys vs content deploys
+# Split: code deploys vs content deploys via GH Actions
 
 > Created 2026-07-03. Цель: разделить два потока изменений и их
-> deploy-циклы. Сейчас всё живёт в одном репо → любая правка
-> контента триггерит full Worker rebuild + deploy.
+> deploy-циклы. Один репо, GH Actions с path-based фильтрами.
+>
+> Работаем на уровне папок. Сначала — инвентаризация и группировка.
+> Дальше — дизайн workflow.
 
-## Мотивация
+## Инвентаризация + группы (зафиксировано 2026-07-03)
 
-Свежий пример (rebrand `Moirai → MoiraiOnline`):
-- Один семантический сдвиг → 25 файлов в диффе
-- Из них 17 файлов — контент (`src/content/works/`, `programmes/`,
-  `pages/home.{en,ru}.mdx`)
-- 8 файлов — код (Layout, Nav, Footer, site-config, SeoHead,
-  Schema, Logo)
-- `pnpm release` пересобирает всё атомарно, деплой ~1 минута
-  Worker bundle 2.7 MB
+### Группа A — Astro Content Collections (сборка в Worker bundle → Astro rebuild + Pages deploy)
 
-Пейн-поинты:
-1. **Правка опечатки в journal-посте** = full code rebuild.
-2. **Методист не может править content** без code-toolchain (Node
-   22, pnpm, wrangler login).
-3. **Race conditions**: если разработчик правит код и методист
-   параллельно правит контент → merge conflicts + один
-   релиз-цикл на двоих.
-4. **Blast radius**: content typo может уронить build (broken
-   frontmatter) → блокирует code deploy тоже.
-5. **Cache invalidation**: любой deploy инвалидирует ВЕСЬ
-   edge cache CF Pages, даже если менялся только 1 текст.
+- `src/content/announcements/`
+- `src/content/bundles/`
+- `src/content/instructors/`
+- `src/content/journal/`
+- `src/content/legal/`
+- `src/content/pages/`
+- `src/content/programmes/`
+- `src/content/segments/`
+- `src/content/works/`
 
-## Инвентаризация: что такое «content»
+### Группа B — R2 storage (upload через отдельный скрипт → без Astro build)
 
-### A. Content collections (Astro MDX) — сейчас в `src/content/`
+- `scripts/seed/module-content/` — staging для R2 `moirai-content` +
+  D1 metadata. Uploader: `scripts/upload-module-content.mjs`.
+  Владелец: методисты (Vladimir, Anastasia).
 
-| Coll | Files | Кто редактирует | Частота |
-|---|---|---|---|
-| `programmes/` (beginner/intermediate/individual/bundle × en+ru) | 8 | Основатель + методист | Средне (2-4 раза/мес при иценах, кранч перед запусками) |
-| `works/` (portfolio student films) | 12 (6 × 2 locales) | Методист / автор контента | Часто (новые работы студентов каждую когорту) |
-| `journal/` (blog posts) | 2+ | Author / editor | Часто (еженедельно при активном ведении) |
-| `pages/home.{en,ru}.mdx` | 2 | Основатель | Редко (SEO refine) |
-| `legal/{privacy,terms,refund,cookies}.{en,ru}.mdx` | 8 | Legal / основатель | Очень редко (при изменении tos) |
-| `instructors/{vladimir,anastasia}.{en,ru}.mdx` | 4 | Основатель / instructors | Редко |
-| `announcements/*.mdx` | dynamic | Основатель / marketing | Средне (промо-акции) |
-| `voice-guide.md` | 1 | Основатель | Очень редко |
+### Группа C — Статические ассеты (в Worker bundle → Astro rebuild)
 
-### B. Content уже вне репо
+- `public/images/`
+- `public/fonts/`
+- `src/assets/home/`
 
-- **Modules** — workbook.md / presentation.md **в R2** (`moirai-content`
-  bucket), key `modules/<slug>/<file>.<locale>.md`. Grabbed by Worker
-  binding at runtime. Уже отдельный поток (methodist uploads через
-  `scripts/upload-module-content.mjs`).
-- **Homework submissions** — R2 `moirai-homework`, D1 metadata.
-- **User profiles** — D1.
-- **Cohorts / sessions** — D1, admin CRUD UI.
+### Группа D — Не для prod (не деплоятся вообще)
 
-### C. Что точно должно остаться в code-repo
+- `docs/` — 20 файлов (спецификации, гайды, мокапы, runbooks)
+- `.agent/` — meta для AI (`agents/`, `plans/`, `rules/`, `skills/`)
+- `backups/` — SQL дампы
 
-- Astro components (`.astro`)
-- TypeScript logic (`.ts`)
-- Middleware, API endpoints
-- D1 schema/migrations
-- Wrangler config
-- Style tokens (`.css`)
-- Package deps
+### Группа E — УДАЛЕНО 2026-07-03 (commit 4c65b0c)
 
-## Опции
+- ~~`scripts/seed/student-book-drafts/`~~ — 48 legacy файлов
+- ~~`scripts/upload-student-books.mjs`~~
+- ~~`scripts/generate-student-book-drafts.mjs`~~
+- ~~`drafts/`~~ — пустая папка, только .gitkeep
+- ~~npm-scripts `drafts:gen`, `drafts:gen:force`, `drafts:upload`~~
+- Legacy Stage 22 секция в `docs/methodist-modules-guide.md`
 
-### Option 1 — External `moirai-content` repo + GH Actions
+## Роли редакторов (временно для обсуждения, 2026-07-03)
 
-**Structure:**
-```
-github.com/{org}/moirai-content/
-  ├── programmes/*.mdx
-  ├── works/*.mdx
-  ├── journal/*.mdx
-  ├── announcements/*.mdx
-  └── pages/*.mdx
-```
+Классификация по факту git log + предположениям о будущей команде.
+Не окончательная — используется как рабочая гипотеза для дизайна
+workflow.
 
-**Flow:**
-- Content editor pushes к `moirai-content` (можно через GH web UI —
-  не нужен local toolchain)
-- GH Actions webhook в code-repo → `git submodule update` OR sync
-  скрипт → CF Pages rebuild+deploy
+### Роль 1 — Methodists (Vladimir, Anastasia)
 
-**Pros:**
-- Clear ownership boundary (content team vs code team)
-- Content editor не нужен Node/pnpm — правит через GH.com UI
-- Можно применить branch protection / review отдельно на content
+**Зона:** `scripts/seed/module-content/` (Group B)
 
-**Cons:**
-- Пока всё равно full Astro rebuild (не incremental)
-- Deploy time не меняется (~1 min)
-- Требуется настройка sync (submodule, git subtree, или CI-скрипт)
-- Единый релиз-цикл сохраняется (просто триггер снаружи)
+**Cadence:** активно при подготовке новых модулей + правки существующих
 
-**Effort:** ~2 дня.
+**Инструмент:** локальный редактор + `git push` + `pnpm exec node
+scripts/upload-module-content.mjs` (или через GH Actions, TBD)
 
-### Option 2 — D1-backed content + admin CRUD
+### Роль 2 — SMM / Editorial
 
-**Structure:**
-- Новые D1 таблицы: `content_works`, `content_journal`,
-  `content_pages`, `content_announcements`
-- Астро pages fetch'ат D1 в SSR (уже делаем для cohorts/apply)
-- Admin UI в `/admin/content/*` — rich text editor или markdown editor
+**Зона (после уточнения 2026-07-03):**
 
-**Flow:**
-- Author пишет в admin UI → D1 UPDATE
-- SSR отдаёт свежий контент на следующем запросе
-- **НЕТ deploy'а вовсе** для контента
+- `src/content/journal/` — блог-посты (остаётся в MDX,
+  длинные тексты, PR-review имеет смысл)
 
-**Pros:**
-- Zero-deploy content update — методист меняет тексты live
-- Rollback через D1 audit_logs (у нас уже есть pattern)
-- Preview через draft/published flag
-- Можно дать доступ методисту без git-навыков
+**Cadence:** weekly (планируется)
 
-**Cons:**
-- Большой рефакторинг: content collection API → D1 queries
-- Теряем type-safe frontmatter из zod-схем (нужно валидировать D1 rows)
-- Rich content (markdown с YT-embed, images) требует storage +
-  serving логики
-- Admin UI: rich editor не тривиально (markdown IDE vs WYSIWYG)
-- Search/indexing: Astro's static content collections отпадут
+**Инструмент:** GH.com web-UI edit + PR + merge → auto-deploy
+(без local Node/pnpm)
 
-**Effort:** 3-5 недель на полную миграцию всех коллекций.
+### Роль 4 — Admin / Content ops (через Admin CRUD UI)
 
-### Option 3 — Hybrid (рекомендую)
+**Зона (мигрируется в D1 + admin UI, отдельные планы):**
 
-**Категория по частоте изменений:**
+- **works** — YT-плеер + короткая подпись (title/director/year/YT-id).
+  Мигрируется в D1 table `works` + admin CRUD `/admin/works`.
+- **announcements** — промо-плашки (kind/text/cta/starts_at/ends_at/
+  priority/dismissible). Мигрируется в D1 table `announcements` +
+  admin CRUD `/admin/announcements` (уже в Sprint 2 ROADMAP).
 
-| Коллекция | Куда | Причина |
+**Cadence:** works — per-cohort (~6-9 недель); announcements —
+per-campaign (несколько раз/мес)
+
+**Инструмент:** admin UI (edit-in-place + soft on/off через
+`published` flag + TTL через даты). Без git, без deploy.
+
+**Обоснование:**
+- Оба типа — структурированные данные, не prose. Формат ≈ форма
+  из полей.
+- Требуют активного управления (kill-switch, edit-in-place, reorder
+  priorities), которое TTL один не решает.
+- SMM-специалисту admin UI дружелюбнее, чем GH.com edit MDX.
+
+### Роль 3 — Developer / Owner
+
+**Зона:** всё остальное
+
+- `src/**` (кроме `src/content/journal`)
+- `src/content/programmes/`, `pages/`, `legal/`, `instructors/`,
+  `bundles/`, `segments/`
+- `public/`, `migrations/`, `db/`, `scripts/**` (кроме
+  `seed/module-content/`)
+- Root config: `astro.config.mjs`, `wrangler.toml`,
+  `package.json`, `tsconfig.json`
+- `docs/`, `.agent/`, `backups/` — не деплоится
+
+**Cadence:** нерегулярный (фичи, багфиксы, стратегические правки)
+
+**Инструмент:** local dev + PR + merge → auto-deploy
+
+## Финальная архитектура (утверждено 2026-07-03)
+
+### Репозитории
+
+| Репо | Кто пушит | Что содержит |
 |---|---|---|
-| `programmes/` | **code-repo** (остаётся) | Semver-controlled: цена, содержание — реально код |
-| `legal/` | **code-repo** (остаётся) | Legal review обязателен через PR |
-| `voice-guide.md` | **code-repo** | Референс для команды |
-| `instructors/` | **code-repo** | Меняется 1-2 раза в год |
-| `pages/home.mdx` | **code-repo** (пока) | SEO-critical, редко |
-| `works/` | **D1 + admin CRUD** | Новые каждую когорту, методист правит |
-| `journal/` | **D1 + admin CRUD** | Weekly posting, author правит live |
-| `announcements/` | **D1 + admin CRUD** (уже в roadmap) | Промо меняется часто |
-| Modules (workbook/present) | **R2** (уже) | Готово |
+| **`moirai`** (main, текущий) | Dev / Owner / SMM | Код + `src/content/*` (кроме module-content) + config + migrations |
+| **`moirai-content`** (новый) | Methodists (Vladimir, Anastasia) | Учебные материалы: `modules/{slug}/(workbook\|presentation).{en,ru}.md`, `images/`, `metadata.yaml`, `docs/` (копия гайда) |
 
-**Гибрид:**
-- Code+static content → code-repo → `pnpm release`
-- Editorial content (works, journal, announcements) → D1 → zero-deploy
-- Modules → R2 (существующий поток)
+### D1 базы (раздельные)
 
-**Effort:** 2 недели на works+journal+announcements миграцию в D1.
+| DB | Владелец | Содержит |
+|---|---|---|
+| **`moirai-prod`** | Main Worker | users, cohorts, sessions, applications, homework_submissions, enrollments, **modules (replica, sync target)** |
+| **`moirai-content`** (новая) | Methodist Actions | **modules (source of truth)** — единственная таблица |
 
-### Option 4 — Content на CMS (Sanity, Contentful, Strapi)
+### Main Worker bindings (`wrangler.toml`)
 
-**Structure:**
-- Content живёт в external CMS
-- Астро fetch'ит на build time OR runtime
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "moirai-prod"
 
-**Pros:**
-- Готовый WYSIWYG editor
-- Team collaboration
-- Draft/publish/schedule out of the box
+[[d1_databases]]
+binding = "MODULES_DB"
+database_name = "moirai-content"
 
-**Cons:**
-- $$$ (Sanity Free tier ok, но limits)
-- Vendor lock-in
-- External API dependency (single point of failure)
-- Нарушает CF Free Tier принцип «self-hosted всё что можно»
+[[r2_buckets]]
+binding = "MODULE_CONTENT"
+bucket_name = "moirai-content"  # без изменений — уже есть
+```
 
-**Effort:** 1-2 недели интеграция + $XX/мес.
+### Sync mechanism: E2 (webhook) + E1 (cron fallback)
 
-## Рекомендация: Option 3 (Hybrid) + Option 1 фаллбэк
+**Primary — E2 webhook:**
+1. Content-репо GH Actions после d1 execute + r2 put → POST `/api/internal/sync-modules`
+2. Auth: bearer `INTERNAL_SYNC_TOKEN` (в env main Worker + content-repo GH secrets)
+3. Main Worker endpoint:
+   - Читает `env.MODULES_DB.prepare('SELECT * FROM modules WHERE updated_at > ?')` (last_sync метка в KV_CACHE)
+   - `UPSERT INTO env.DB.modules` (whitelist полей: title, lessons, has_homework, has_video, workbook_r2_key, presentation_r2_key, updated_at)
+   - Обновляет `last_sync` в KV
+4. Delay: мгновенно (несколько секунд)
 
-**Rationale:**
-- Editorial (works, journal, announcements) выигрывает больше всего
-  от zero-deploy — там кранч и разные редакторы
-- Legal, programmes, pages — «code by nature», выиграшей мало
-- Modules R2 уже работает, паттерн проверен
+**Fallback — E1 cron:**
+- CF Cron trigger в main Worker: каждые 15 мин (либо 5 мин)
+- Тот же pull-sync код, что и в E2 endpoint
+- Догоняет если webhook fail'нул
 
-**Bonus:** `announcements` в D1 уже был в Sprint 2 ROADMAP —
-логично объединить с works/journal в одном migration-cycle.
+**Rationale:** Content-репо compromise → в худшем случае искажение бодиков в R2 + записи в `moirai-content` D1. `moirai-prod` в целости — sync запись только внутри main Worker.
 
-## Sequencing (если ok Option 3)
+### Content-репо GH Actions token scope
 
-**Stage 1 — announcements → D1** (уже в roadmap, минимальный риск)
-- Migration 002X: table `announcements` (kind, text, cta_*, dates, priority, dismissible, locale)
-- Admin CRUD `/admin/announcements`
-- PromoStrip + AnnouncementBar read from D1
-- Delete `src/content/announcements/`
+`CF_API_TOKEN` в content-репо GH secrets:
+- **R2 write only** к bucket `moirai-content`
+- **D1 write only** к database `moirai-content` (whitelist SQL операций через простой скрипт)
+- **НЕТ доступа** к `moirai-prod` (ни R2 других bucket'ов, ни D1)
 
-**Stage 2 — works → D1** (medium risk)
-- Migration: table `works` (slug, title, synopsis, hero_image, director, cohort, year, video_url, awards[])
-- Admin CRUD `/admin/works`
-- `/[locale]/works` list + `/[locale]/works/[slug]` detail read from D1
-- Preserve current URLs
+Compromise-сценарий: методистский репо утёк →
+- Могут испортить `moirai-content` D1 metadata → sync подхватит и main отобразит битую → быстрый revert в git + пересинк
+- Могут перезаписать R2 объекты в `moirai-content` bucket → тоже revert из git
+- **НЕ могут** трогать users, cohorts, applications, secrets, prod code
 
-**Stage 3 — journal → D1** (medium risk)
-- Migration: table `journal` (slug, title, body_md, author, published_at, tags[])
-- Admin CRUD `/admin/journal`
-- Rich-content markdown с YT-embed support (переиспользовать
-  MarkdownContent.astro)
-- Author-facing editor: monaco / codemirror с markdown highlighting
+### GH Actions workflows
 
-**Stage 4 — evaluate** what остальное stоит мигрировать
-(вероятно pages/home для быстрых SEO exp'ов)
+**В main-репо `moirai`:**
+- `.github/workflows/pages-deploy.yml` — Astro build + CF Pages deploy на push в relevant paths (src, public, config)
 
-**Не трогаем:** programmes, legal, instructors, voice-guide.
+**В content-репо `moirai-content`:**
+- `.github/workflows/upload-modules.yml` — на push в `modules/**`:
+  1. Detect changed files (diff HEAD~1..HEAD)
+  2. R2 upload bodies + images
+  3. D1 UPSERT metadata в `moirai-content` DB
+  4. POST webhook `/api/internal/sync-modules` в main app (E2 primary)
 
-## Открытые вопросы
+### Migration steps
 
-1. **Rich editor UX** для journal — WYSIWYG (typa Notion) или
-   markdown IDE? WYSIWYG сложнее сделать, markdown IDE легче но
-   учить методиста.
-2. **Draft/published workflow** — нужна ли preview на другом URL
-   для black-box проверки перед публикацией?
-3. **Migration data** — как перевезти существующие 12 works +
-   journal posts из MDX в D1? Одноразовый скрипт.
-4. **Images / media** — куда грузить фото для works/journal?
-   Собственный R2 `moirai-media` bucket + admin uploader?
-5. **Search** — если journal растёт, нужен full-text search
-   (D1 FTS5)?
-6. **Rollback** — как откатить кривой контент? Audit logs +
-   revert button?
+1. **Создать репо `lottoprof/moirai-content`** — public либо private (уточнить)
+2. **Копировать без git-истории** `scripts/seed/module-content/` → `moirai-content/modules/` (18 модулей)
+3. **Копировать `docs/methodist-modules-guide.md`** → `moirai-content/docs/methodist-guide.md`, обновить под новый flow
+4. **Создать `metadata.yaml`** per module (миграция из `scripts/seed/modules-2026-05-19.json`)
+5. **Создать D1 `moirai-content`** через `wrangler d1 create moirai-content`
+6. **Migration 002X в main-репо:** ничего — таблица `modules` уже есть, просто станет sync target
+7. **Migration в новой DB `moirai-content`:** копия schema `modules` из main → seed из yaml метаданных
+8. **Настроить binding `MODULES_DB`** в main `wrangler.toml`
+9. **Endpoint `/api/internal/sync-modules`** — реализация в main Worker
+10. **CF Cron trigger** для fallback sync
+11. **Setup GH secrets** в content-репо: `CF_API_TOKEN` (scoped), `CF_ACCOUNT_ID`, `INTERNAL_SYNC_TOKEN`, `SYNC_WEBHOOK_URL`
+12. **Setup GH secrets** в main-репо: `CF_API_TOKEN` (Pages deploy scope), `CF_ACCOUNT_ID`
+13. **Setup env `INTERNAL_SYNC_TOKEN`** в main Worker (wrangler pages secret put)
+14. **Удалить из main-репо:**
+    - `scripts/seed/module-content/` (все 18 модулей)
+    - `scripts/upload-module-content.mjs`
+15. **Первый deploy + test:**
+    - Methodist делает test-push в content-репо (typo fix)
+    - Убеждаемся: R2 uploaded, MODULES_DB updated, webhook triggered, main DB replica updated, страница модуля показывает новый текст
 
-## Что дальше
+### Что дальше
 
-Утверждение направления (Option 3 Hybrid?) → детальный plan на
-Stage 1 (announcements). Каждый stage — свой plan-документ +
-migration + deploy.
+Пункт по пункту реализовывать migration steps (1-15). Начнём с 1-3 (создание content-репо + миграция файлов).
+
+TODO:
+- Разобрать деплой-триггеры по группам (что запускает Pages
+  rebuild, что нет)
+- Дизайн workflow-файлов `.github/workflows/*.yml`
+- Секреты (CF_API_TOKEN, CF_ACCOUNT_ID) в GH repo secrets
+- Rollback стратегия
 
 ## НЕ забыть
 
-- Незакоммиченный текущий rebrand deploy (`12c5bee`) — либо
-  задеплоить как есть после re-login, либо продолжить в этом же
-  плане (тогда логотип SVG redesign — Phase 2)
+Незакоммиченный до этого rebrand `Moirai → MoiraiOnline`
+(commit 12c5bee) вошёл в push от 4c65b0c. **Не задеплоен** — ждёт
+следующей правки перед деплоем (по указанию пользователя).

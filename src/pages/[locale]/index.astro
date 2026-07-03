@@ -25,6 +25,7 @@ import Hero from "../../components/public/Hero.astro";
 import PromoStrip, { type PromoPlate } from "../../components/public/PromoStrip.astro";
 import PhotoStrip, { type PhotoItem } from "../../components/public/PhotoStrip.astro";
 import type { ImageMetadata } from "astro";
+import heroCohort from "../../generated/hero-cohort.json";
 import InstructorCard from "../../components/public/InstructorCard.astro";
 import StatsBanner from "../../components/public/StatsBanner.astro";
 import WhoCard from "../../components/public/WhoCard.astro";
@@ -417,7 +418,7 @@ const ui = typedLocale === "ru"
     lede={sections.hero.lede}
     ctaText={sections.hero.cta_text}
     ctaHref={sections.hero.cta_href}
-    cohortUrgency={sections.hero.cohort_urgency}
+    cohortUrgency={heroCohort.upcoming ? heroCohort.upcoming[typedLocale] : undefined}
     locale={typedLocale}
     bgImage={heroBgImage}
   />

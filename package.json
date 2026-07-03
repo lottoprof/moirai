@@ -25,6 +25,8 @@
     "publish:cohorts:dry": "node scripts/publish-cohorts.mjs --dry-run",
     "check:r2-d1": "node scripts/check-r2-d1-mapping.mjs",
     "check:r2-d1:fast": "node scripts/check-r2-d1-mapping.mjs --skip-r2",
+    "sync:hero-cohort": "node scripts/sync-hero-cohort.mjs",
+    "prerelease": "node scripts/sync-hero-cohort.mjs",
     "release": "pnpm build && wrangler pages deploy ./dist --project-name moirai --branch main --commit-message \"$(git log -1 --pretty=%s)\"",
     "release:preview": "pnpm build && wrangler pages deploy ./dist --project-name moirai --commit-message \"$(git log -1 --pretty=%s)\""
   },
