@@ -578,16 +578,15 @@ const ui = typedLocale === "ru"
     </section>
   )}
 
-  {/* urgency единый source с Hero: cohort_urgency автоматически
-      отражается и тут (single source of truth). При смене даты правится
-      только sections.hero.cohort_urgency. Sprint 2 SSG-sync из D1
-      заменит manual edit. */}
+  {/* urgency единый source с Hero: генерируется через
+      scripts/sync-hero-cohort.mjs → src/generated/hero-cohort.json.
+      Fallback: если нет upcoming cohorts (null) — не рендерим строку. */}
   <FinalCta
     eyebrow={sections.final_cta.eyebrow}
     title={sections.final_cta.title}
     body={sections.final_cta.body}
     ctaText={sections.final_cta.cta_text}
     ctaHref={sections.final_cta.cta_href}
-    urgency={sections.hero.cohort_urgency ?? sections.final_cta.urgency}
+    urgency={heroCohort.upcoming ? heroCohort.upcoming[typedLocale] : undefined}
   />
 </Layout>
