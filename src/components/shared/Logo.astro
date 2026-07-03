@@ -18,13 +18,15 @@
 interface Props {
   /** Высота SVG в пикселях. Width вычисляется по aspect (340:90 ≈ 3.78). */
   height?: number;
-  /** ARIA-label для screen reader. По умолчанию "Moirai". */
+  /** ARIA-label для screen reader. По умолчанию "MoiraiOnline".
+   *  Note: визуальный SVG wordmark пока читается как "Moirai." — редизайн
+   *  wordmark для полного соответствия — Phase 2. */
   label?: string;
   /** Дополнительный class на root <svg>. */
   class?: string;
 }
 
-const { height = 24, label = "Moirai", class: className = "" } = Astro.props;
+const { height = 24, label = "MoiraiOnline", class: className = "" } = Astro.props;
 const width = Math.round((height * 340) / 90);
 ---
 

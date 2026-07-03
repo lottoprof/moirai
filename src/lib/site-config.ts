@@ -14,8 +14,11 @@
 
 export const SITE = {
   url: "https://moiraionline.pro",
-  name: "Moirai",
-  legalName: "Moirai Online Filmmaking Program",
+  name: "MoiraiOnline",
+  /** Prior brand name — Schema.org `alternateName` для search-fallback,
+   *  чтобы Google находил нас по прежним запросам «Moirai filmmaking». */
+  alternateName: "Moirai",
+  legalName: "MoiraiOnline Filmmaking Program",
   logo: "https://moiraionline.pro/favicon.svg",
   email: "hello@moiraionline.pro",
   social: [] as string[],
@@ -37,6 +40,6 @@ export const SITE = {
 
 /** Per-locale описание организации — короткое, для Organization.description. */
 export const SITE_DESCRIPTION = {
-  en: "Hands-on online filmmaking course taught by working New York directors. Two levels — Beginner and Intermediate — with cohorts of up to 10 students, personal feedback on every assignment, and a finished short film at the end of each level.",
-  ru: "Онлайн-курс кино с практикующими нью-йоркскими режиссёрами. Два уровня — Beginner и Intermediate — группы до 10 человек, личный разбор каждой работы, готовый короткометражный фильм по итогам каждого уровня.",
+  en: "MoiraiOnline is a hands-on online filmmaking course taught by working New York directors. Two levels — Beginner and Intermediate — with cohorts of up to 10 students, personal feedback on every assignment, and a finished short film at the end of each level.",
+  ru: "MoiraiOnline — онлайн-курс кино с практикующими нью-йоркскими режиссёрами. Два уровня — Beginner и Intermediate — группы до 10 человек, личный разбор каждой работы, готовый короткометражный фильм по итогам каждого уровня.",
 } as const;
