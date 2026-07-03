@@ -124,6 +124,17 @@ Discovery: `.agent/plans/active/student-lk-v2-discovery.md`
   bottleneck-per-page. **Отложено**, тесты делаем позже когда
   накопим реальный пользовательский трафик и появятся жалобы
   на скорость. План готов — можно поднимать в любой момент.
+- [ ] **SVG logo redesign — `Moirai.` → `MoiraiOnline`** (Phase 2
+  rebrand). Сейчас: `src/components/shared/Logo.astro` рендерит
+  стилизованный wordmark `M + reel-monogram + irai + amber "."` —
+  визуально читается как `Moirai.`. После rebrand SITE.name/title/
+  Schema.org/footer-copy = `MoiraiOnline`, но логотип в шапке/футере
+  остался старый — есть brand inconsistency. Владелец делает сам
+  (design work — расширить viewBox 340→~480, добавить second text
+  run `Online` тонким weight; либо двухстрочный layout;
+  либо horizontal `[M-reel-irai.] Online`). Тем временем логотип =
+  artistic mark, brand name в тексте = `MoiraiOnline` — стандартная
+  практика (Coca-Cola case).
 
 Sprint 2 (новые планы будут):
 - [ ] **Announcements: Content Collection → D1 + admin UI**. Сейчас
