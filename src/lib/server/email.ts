@@ -9,7 +9,7 @@
  * Templates — отдельно в `email-templates.ts` (HTML + text per locale).
  * Этот модуль только sender + от какого from отправляет.
  *
- * From: `Moirai <noreply@moiraionline.pro>` — единый для transactional.
+ * From: `MoiraiOnline <noreply@moiraionline.pro>` — единый для transactional.
  * Mailbox не читается; в шаблоне просим не отвечать.
  *
  * Errors не блокируют caller (register/reset flow). Логируем в
@@ -31,7 +31,7 @@ export interface SendEmailParams {
   recipientName?: string | null;
 }
 
-const FROM = "Moirai <noreply@moiraionline.pro>";
+const FROM = "MoiraiOnline <noreply@moiraionline.pro>";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 interface ResendResponse {

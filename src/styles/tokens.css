@@ -1,5 +1,5 @@
 /*
- * Moirai — Design System v0.1 design tokens.
+ * MoiraiOnline — Design System v0.1 design tokens.
  * Source of truth: docs/Design_system.md §3–7 + §11.
  * Используется глобально через импорт в Layout. Никаких хардкодов
  * цветов/spacing/типографики в компонентах — только эти переменные.

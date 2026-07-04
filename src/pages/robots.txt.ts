@@ -16,7 +16,7 @@ import type { APIRoute } from "astro";
 
 export const prerender = false;
 
-const BODY = `# Moirai — robots.txt
+const BODY = `# MoiraiOnline — robots.txt
 # Stage 8: разрешаем индексацию публичного сайта; protected zones
 # (admin / dashboard / instructor / checkout / apply) исключены —
 # их страницы возвращают noindex meta + 404/redirect для unauthenticated,
@@ -51,7 +51,7 @@ Disallow: /ru/verify-email-pending
 Disallow: /en/inactive
 Disallow: /ru/inactive
 
-# AI scrapers — контент Moirai open для индексации (продаём курс,
+# AI scrapers — контент MoiraiOnline open для индексации (продаём курс,
 # не текст). Если когда-то понадобится opt-out — добавим конкретных
 # user-agent'ов (GPTBot, ClaudeBot, Google-Extended) с Disallow: /.
 

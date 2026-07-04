@@ -29,7 +29,7 @@ export interface PreArchiveResult {
 }
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
-const FROM = 'Moirai <noreply@moiraionline.pro>';
+const FROM = 'MoiraiOnline <noreply@moiraionline.pro>';
 const BASE_URL = 'https://moiraionline.pro';
 
 function getTemplate(
@@ -46,7 +46,7 @@ function getTemplate(
 <p>Через <strong>${daysLeft.toString()} дней</strong> мы удалим ваши домашние работы из системы (политика хранения данных).</p>
 <p>Если хотите сохранить файлы — скачайте их сейчас:</p>
 <p><a href="${BASE_URL}/ru/dashboard/homework" style="display: inline-block; padding: 12px 24px; background: #d4820a; color: #0d0b09; text-decoration: none; border-radius: 2px; font-weight: 500;">Открыть кабинет</a></p>
-<p style="color: #999; font-size: 12px; margin-top: 32px;">Moirai · moiraionline.pro</p>
+<p style="color: #999; font-size: 12px; margin-top: 32px;">MoiraiOnline · moiraionline.pro</p>
 </body></html>`,
     };
   }
@@ -59,7 +59,7 @@ function getTemplate(
 <p>In <strong>${daysLeft.toString()} days</strong> we'll remove your homework submissions per our retention policy.</p>
 <p>To save your files, download them now:</p>
 <p><a href="${BASE_URL}/en/dashboard/homework" style="display: inline-block; padding: 12px 24px; background: #d4820a; color: #0d0b09; text-decoration: none; border-radius: 2px; font-weight: 500;">Open dashboard</a></p>
-<p style="color: #999; font-size: 12px; margin-top: 32px;">Moirai · moiraionline.pro</p>
+<p style="color: #999; font-size: 12px; margin-top: 32px;">MoiraiOnline · moiraionline.pro</p>
 </body></html>`,
   };
 }

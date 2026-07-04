@@ -51,7 +51,7 @@ export interface InstructorDigestResult {
   duration_ms: number;
 }
 
-const FROM = "Moirai <noreply@moiraionline.pro>";
+const FROM = "MoiraiOnline <noreply@moiraionline.pro>";
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
 function escapeHtml(s: string): string {
@@ -166,7 +166,7 @@ export async function runInstructorDigest(env: Cloudflare.Env): Promise<Instruct
       const subjectParts: string[] = [];
       if (pendingTotal > 0) subjectParts.push(tCopy.subjectPending(pendingTotal));
       if (sessions.results.length > 0) subjectParts.push(tCopy.subjectSessions(sessions.results.length));
-      const subject = `Moirai · ${subjectParts.join(" · ")}`;
+      const subject = `MoiraiOnline · ${subjectParts.join(" · ")}`;
 
       const baseUrl = "https://moiraionline.pro";
       const queueUrl = `${baseUrl}/${ins.locale}/instructor/homework`;

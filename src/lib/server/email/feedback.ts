@@ -14,7 +14,7 @@
 
 import type { SubmissionForReview } from '../instructor-homework';
 
-const FROM = 'Moirai <feedback@moiraionline.pro>';
+const FROM = 'MoiraiOnline <feedback@moiraionline.pro>';
 const REPLY_TO = 'feedback@moiraionline.pro';
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const BASE_URL = 'https://moiraionline.pro';
@@ -98,7 +98,7 @@ function getTemplate(
 <p>${intro}</p>
 ${commentSnippet ? `<blockquote style="border-left: 3px solid #d4820a; padding: 8px 16px; color: #555; margin: 16px 0;"><strong>Комментарий преподавателя:</strong><br>${escapeHtml(commentSnippet)}</blockquote>` : ''}
 <p><a href="${dashboardUrl}" style="display: inline-block; padding: 12px 24px; background: #d4820a; color: #0d0b09; text-decoration: none; border-radius: 2px; font-weight: 500;">Открыть в кабинете</a></p>
-<p style="color: #999; font-size: 12px; margin-top: 32px;">Moirai · <a href="${BASE_URL}" style="color: #999;">moiraionline.pro</a></p>
+<p style="color: #999; font-size: 12px; margin-top: 32px;">MoiraiOnline · <a href="${BASE_URL}" style="color: #999;">moiraionline.pro</a></p>
 </body></html>`;
     return { subject: `${subjectStatus}: ${moduleTitle}`, text, html };
   }
@@ -120,7 +120,7 @@ ${commentSnippet ? `<blockquote style="border-left: 3px solid #d4820a; padding: 
 <p>${intro}</p>
 ${commentSnippet ? `<blockquote style="border-left: 3px solid #d4820a; padding: 8px 16px; color: #555; margin: 16px 0;"><strong>Instructor comment:</strong><br>${escapeHtml(commentSnippet)}</blockquote>` : ''}
 <p><a href="${dashboardUrl}" style="display: inline-block; padding: 12px 24px; background: #d4820a; color: #0d0b09; text-decoration: none; border-radius: 2px; font-weight: 500;">Open in dashboard</a></p>
-<p style="color: #999; font-size: 12px; margin-top: 32px;">Moirai · <a href="${BASE_URL}" style="color: #999;">moiraionline.pro</a></p>
+<p style="color: #999; font-size: 12px; margin-top: 32px;">MoiraiOnline · <a href="${BASE_URL}" style="color: #999;">moiraionline.pro</a></p>
 </body></html>`;
   return { subject: `${subjectStatus}: ${moduleTitle}`, text, html };
 }

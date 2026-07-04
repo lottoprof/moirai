@@ -12,7 +12,7 @@
  *   - heading в "display"-стиле (system serif fallback — без webfonts)
  *   - amber accent (#D4820A) для кнопки и links
  *   - ink (#0D0B09) текст на paper (#F7F3EC) фоне
- *   - logo: текст "Moirai." крупно (SVG-лого пока нет — добавим
+ *   - logo: текст "MoiraiOnline." крупно (SVG-лого пока нет — добавим
  *     отдельно когда дизайн утвердят)
  */
 
@@ -29,45 +29,45 @@ export type EmailKind =
 
 const messages: Record<string, string | undefined> = {
   // === VERIFY (новая регистрация) ===
-  "en:verify:subject":   "Confirm your email — Moirai",
+  "en:verify:subject":   "Confirm your email — MoiraiOnline",
   "en:verify:heading":   "Confirm your email.",
-  "en:verify:welcome":   "Welcome to Moirai.",
+  "en:verify:welcome":   "Welcome to MoiraiOnline.",
   "en:verify:body":      "Tap the button below to confirm your email and activate your account.",
   "en:verify:button":    "Confirm email",
   "en:verify:link_hint": "Or copy this link to your browser:",
   "en:verify:expires":   "This link is valid for 30 minutes.",
-  "en:verify:ignore":    "If you didn't sign up for Moirai — ignore this email.",
+  "en:verify:ignore":    "If you didn't sign up for MoiraiOnline — ignore this email.",
 
-  "ru:verify:subject":   "Подтвердите ваш email — Moirai",
+  "ru:verify:subject":   "Подтвердите ваш email — MoiraiOnline",
   "ru:verify:heading":   "Подтвердите ваш email.",
-  "ru:verify:welcome":   "Добро пожаловать в Moirai.",
+  "ru:verify:welcome":   "Добро пожаловать в MoiraiOnline.",
   "ru:verify:body":      "Нажмите кнопку ниже, чтобы подтвердить email и активировать аккаунт.",
   "ru:verify:button":    "Подтвердить email",
   "ru:verify:link_hint": "Или скопируйте эту ссылку в браузер:",
   "ru:verify:expires":   "Ссылка действительна 30 минут.",
-  "ru:verify:ignore":    "Если вы не регистрировались в Moirai — проигнорируйте это письмо.",
+  "ru:verify:ignore":    "Если вы не регистрировались в MoiraiOnline — проигнорируйте это письмо.",
 
   // === PASSWORD RESET ===
-  "en:password_reset:subject":   "Reset your password — Moirai",
+  "en:password_reset:subject":   "Reset your password — MoiraiOnline",
   "en:password_reset:heading":   "Reset your password.",
   "en:password_reset:welcome":   "",
-  "en:password_reset:body":      "A password reset was requested for your Moirai account. Tap the button below to set a new password.",
+  "en:password_reset:body":      "A password reset was requested for your MoiraiOnline account. Tap the button below to set a new password.",
   "en:password_reset:button":    "Reset password",
   "en:password_reset:link_hint": "Or copy this link to your browser:",
   "en:password_reset:expires":   "This link is valid for 15 minutes.",
   "en:password_reset:ignore":    "After password change, all active sessions are revoked — you'll need to sign in again on all devices. If you didn't request this — ignore this email.",
 
-  "ru:password_reset:subject":   "Сброс пароля — Moirai",
+  "ru:password_reset:subject":   "Сброс пароля — MoiraiOnline",
   "ru:password_reset:heading":   "Сбросьте пароль.",
   "ru:password_reset:welcome":   "",
-  "ru:password_reset:body":      "Поступил запрос на сброс пароля для вашего аккаунта Moirai. Нажмите кнопку ниже, чтобы задать новый пароль.",
+  "ru:password_reset:body":      "Поступил запрос на сброс пароля для вашего аккаунта MoiraiOnline. Нажмите кнопку ниже, чтобы задать новый пароль.",
   "ru:password_reset:button":    "Сбросить пароль",
   "ru:password_reset:link_hint": "Или скопируйте эту ссылку в браузер:",
   "ru:password_reset:expires":   "Ссылка действительна 15 минут.",
   "ru:password_reset:ignore":    "После смены пароля все активные сессии будут закрыты — потребуется заново войти на всех устройствах. Если вы не запрашивали сброс — проигнорируйте это письмо.",
 
   // === APPLY WELCOME (после Apply submit, Stage 14) ===
-  "en:apply_welcome:subject":   "Welcome to Moirai — your cohort is reserved",
+  "en:apply_welcome:subject":   "Welcome to MoiraiOnline — your cohort is reserved",
   "en:apply_welcome:heading":   "Your cohort is reserved.",
   "en:apply_welcome:welcome":   "Thanks for applying.",
   "en:apply_welcome:body":      "Your spot is reserved. Open your dashboard to see programme details, schedule, and the next step — payment is a separate action you can take when you're ready.",
@@ -76,7 +76,7 @@ const messages: Record<string, string | undefined> = {
   "en:apply_welcome:expires":   "If you sign out and forget your password, visit moiraionline.pro/login, type your email and request a sign-in link — we'll email a fresh one each time.",
   "en:apply_welcome:ignore":    "If you didn't apply for a cohort — let us know at hello@moiraionline.pro.",
 
-  "ru:apply_welcome:subject":   "Добро пожаловать в Moirai — место в когорте забронировано",
+  "ru:apply_welcome:subject":   "Добро пожаловать в MoiraiOnline — место в когорте забронировано",
   "ru:apply_welcome:heading":   "Место в когорте забронировано.",
   "ru:apply_welcome:welcome":   "Спасибо за заявку.",
   "ru:apply_welcome:body":      "Ваше место зарезервировано. Откройте кабинет, чтобы посмотреть детали программы, расписание и следующий шаг — оплата отдельным действием, когда будете готовы.",
@@ -105,8 +105,8 @@ const messages: Record<string, string | undefined> = {
   "ru:payment_confirmation:ignore":    "Вопросы по расписанию или материалам? Ответьте на это письмо или напишите на hello@moiraionline.pro.",
 
   // === MAGIC LINK (sign-in без пароля, FLOW-19 / Stage 14o) ===
-  "en:magic_link:subject":   "Your sign-in link — Moirai",
-  "en:magic_link:heading":   "Sign in to Moirai.",
+  "en:magic_link:subject":   "Your sign-in link — MoiraiOnline",
+  "en:magic_link:heading":   "Sign in to MoiraiOnline.",
   "en:magic_link:welcome":   "",
   "en:magic_link:body":      "Tap the button below to sign in. You don't need a password.",
   "en:magic_link:button":    "Sign in",
@@ -114,8 +114,8 @@ const messages: Record<string, string | undefined> = {
   "en:magic_link:expires":   "This link is valid for 30 minutes and works once.",
   "en:magic_link:ignore":    "If you didn't ask for a sign-in link, ignore this email. No action is needed — the link can't sign you out of an active session.",
 
-  "ru:magic_link:subject":   "Ссылка для входа — Moirai",
-  "ru:magic_link:heading":   "Войти в Moirai.",
+  "ru:magic_link:subject":   "Ссылка для входа — MoiraiOnline",
+  "ru:magic_link:heading":   "Войти в MoiraiOnline.",
   "ru:magic_link:welcome":   "",
   "ru:magic_link:body":      "Нажмите кнопку ниже, чтобы войти. Пароль не нужен.",
   "ru:magic_link:button":    "Войти",
@@ -162,9 +162,9 @@ const messages: Record<string, string | undefined> = {
   "ru:refund_processed:ignore":    "Вопросы по возврату? Ответьте на это письмо или напишите на hello@moiraionline.pro.",
 
   // === COMMON ===
-  "en:common:footer":  "Moirai — Online Filmmaking Program",
+  "en:common:footer":  "MoiraiOnline — Online Filmmaking Program",
   "en:common:website": "moiraionline.pro",
-  "ru:common:footer":  "Moirai — Онлайн-программа кинорежиссуры",
+  "ru:common:footer":  "MoiraiOnline — Онлайн-программа кинорежиссуры",
   "ru:common:website": "moiraionline.pro",
 };
 
@@ -275,7 +275,7 @@ function buildHTML(p: HTMLParams): string {
           <!-- logo -->
           <tr>
             <td align="center" style="padding:40px 40px 24px;">
-              <a href="https://${escapeHtml(p.website)}" style="font-family:Georgia,'Times New Roman',serif;font-size:32px;font-weight:300;color:#0D0B09;text-decoration:none;letter-spacing:0.02em;">Moirai.</a>
+              <a href="https://${escapeHtml(p.website)}" style="font-family:Georgia,'Times New Roman',serif;font-size:32px;font-weight:300;color:#0D0B09;text-decoration:none;letter-spacing:0.02em;">MoiraiOnline.</a>
             </td>
           </tr>
 
