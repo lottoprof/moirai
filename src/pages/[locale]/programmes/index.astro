@@ -1,0 +1,18 @@
+---
+/*
+ * /{locale}/programmes → 301 redirect to home #curriculum.
+ *
+ * Programmes detail pages живут по /{locale}/programmes/{id} (beginner /
+ * intermediate / bundle / individual) — 4 SSR-страницы через [id].astro.
+ * Bare /{locale}/programmes без ID раньше возвращал 404 (Astro dynamic
+ * route не матчится без параметра). Теперь 301 → home с якорем на секцию
+ * curriculum, где описаны оба уровня.
+ */
+
+export const prerender = false;
+
+const { locale } = Astro.params;
+const typedLocale = locale === "ru" ? "ru" : "en";
+
+return Astro.redirect(`/${typedLocale}/#curriculum`, 301);
+---
